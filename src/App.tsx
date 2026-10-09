@@ -1,197 +1,191 @@
-import { useEffect, useMemo, useState } from "react";
-import { activities, areaLessons, initialChildren, initialObservations, initialRecords, type Activity, type Area, type Child, type LessonRecord, type Observation, type Plan, type Stage } from "./data";
+import { useEffect, useState } from "react";
+import { Shell, PageHeader } from "./components/ui";
+import { ModalOverlay } from "./components/ModalOverlay";
+import { Icon } from "./components/Icon";
+import { ChildrenPage } from "./pages/ChildrenPage";
+import { DiscoverPage } from "./pages/DiscoverPage";
+import { ActivityDetailPage } from "./pages/ActivityDetailPage";
+import { ObservationsPage } from "./pages/ObservationsPage";
+import { ChildProfilePage } from "./pages/ChildProfilePage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { MyWeekPage, ActivityRow } from "./pages/MyWeekPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
+import { RecordFormPage } from "./pages/RecordFormPage";
+import { useStored } from "./lib/storage";
+import { copy } from "./lib/i18n";
+import { initialChildren } from "./data/children";
+import { initialRecords, initialObservations } from "./data/progress";
+import { activities } from "./data/activities";
+import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, Screen } from "./types";
 
-type Screen = "children" | "child" | "record" | "discover" | "activity" | "observations" | "profile" | "week" | "saved" | "notes" | "language" | "appearance" | "notifications" | "notificationPrefs" | "personal" | "privacy" | "help";
-type Modal = "quick" | "filters" | "addChild" | "plan" | "observation" | "weekAdd" | null;
-type Lang = "en" | "zh";
-
-const copy = {
-  en: {
-    myChildren: "My Children", discover: "Discover", observations: "Observations", profile: "Profile", myWeek: "My Week", saved: "Saved", weeklyPlan: "Weekly Plan", completed: "Completed", language: "Language", appearance: "Appearance", settings: "Settings", light: "Light", dark: "Dark", system: "System Default", practical: "Practical Life", sensorial: "Sensorial", mathematics: "Mathematics", addWeek: "Add to My Week", recordLesson: "Record Lesson", addObservation: "Add Observation", save: "Save", cancel: "Cancel", back: "Back", search: "Search", reset: "Reset", all: "All", profileSubtitle: "Your personal workspace", weekSubtitle: "Plan, save, and bring ideas to life.", discoverSubtitle: "Meaningful activities for curious minds", observationSubtitle: "Document and revisit children’s learning.", childSubtitle: "Follow each child’s unique learning journey.", popular: "Popular This Week", materials: "Materials", how: "How to Present", age: "Age", topic: "Topic", area: "Area", noResults: "No results found.", preferences: "Preferences", account: "Account", myActivities: "My Activities", savedActivities: "Saved Activities", myNotes: "My Notes", notifications: "Notification Preferences", personal: "Personal Information", privacy: "Privacy & Data", help: "Help & Support", addChild: "Add Child", showResults: "Show Results", filterChildren: "Filter Children", markAll: "Mark all as read", add: "Add", share: "Share", details: "View Activity", remove: "Remove", markComplete: "Mark completed", selectChildren: "Choose children", planningNote: "Planning note (optional)", date: "Date",
-  },
-  zh: {
-    myChildren: "我的孩子们", discover: "探索活动", observations: "观察记录", profile: "个人中心", myWeek: "我的计划", saved: "已收藏", weeklyPlan: "每周计划", completed: "已完成", language: "语言", appearance: "外观", settings: "设置", light: "浅色模式", dark: "深色模式", system: "跟随系统", practical: "日常生活", sensorial: "感官教育", mathematics: "数学", addWeek: "添加到计划", recordLesson: "记录课程", addObservation: "添加观察", save: "保存", cancel: "取消", back: "返回", search: "搜索", reset: "重置", all: "全部", profileSubtitle: "您的个人工作空间", weekSubtitle: "规划、收藏并实现灵感。", discoverSubtitle: "为好奇心准备的有意义活动", observationSubtitle: "记录并回顾孩子的学习。", childSubtitle: "关注每个孩子独特的学习旅程。", popular: "本周热门", materials: "材料", how: "如何展示", age: "年龄", topic: "主题", area: "领域", noResults: "未找到结果。", preferences: "偏好设置", account: "账户", myActivities: "我的活动", savedActivities: "已收藏活动", myNotes: "我的笔记", notifications: "通知偏好", personal: "个人信息", privacy: "隐私与数据", help: "帮助与支持", addChild: "添加孩子", showResults: "显示结果", filterChildren: "筛选孩子", markAll: "全部标为已读", add: "添加", share: "分享", details: "查看活动", remove: "移除", markComplete: "标记完成", selectChildren: "选择孩子", planningNote: "计划备注（可选）", date: "日期",
-  },
-};
-
-function useStored<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(() => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : initial; } catch { return initial; } });
-  useEffect(() => { localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
-  return [value, setValue] as const;
-}
-
-function Icon({ name, size = 20, filled = false }: { name: string; size?: number; filled?: boolean }) {
-  const p: Record<string, React.ReactNode> = {
-    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>, search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>, filter: <><path d="M4 6h16M7 12h10M10 18h4"/></>, grid: <><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></>, list: <><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="5" cy="6" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="18" r="1"/></>, chevron: <path d="m9 18 6-6-6-6"/>, down: <path d="m6 9 6 6 6-6"/>, back: <><path d="m15 18-6-6 6-6"/><path d="M9 12h11"/></>, home: <><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10M9 20v-6h6v6"/></>, compass: <><circle cx="12" cy="12" r="9"/><path d="m15 9-2 4-4 2 2-4z"/></>, note: <><path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h3"/></>, user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>, plus: <><path d="M12 5v14M5 12h14"/></>, heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5a5.5 5.5 0 0 0 1-8.9z"/>, share: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></>, clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>, layers: <><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></>, check: <path d="m5 12 4 4L19 6"/>, calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>, globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></>, moon: <path d="M20 15A8 8 0 0 1 9 4a8 8 0 1 0 11 11z"/>, shield: <><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></>, help: <><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.8 2c-1 .7-1.6 1.2-1.6 2.5M12 17h.01"/></>, book: <><path d="M4 4h6a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4z"/><path d="M20 4h-6a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h6z"/></>,
-  };
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{p[name]}</svg>;
-}
-
-function TreeLogo() {
-  return <div className="brand"><svg viewBox="0 0 46 46"><path d="M23 39V19M23 26l-8-7M23 23l8-9M23 30l11-7M17 39h12" stroke="#503475" strokeWidth="2.6" strokeLinecap="round"/><circle cx="13" cy="16" r="6" fill="#503475"/><circle cx="23" cy="11" r="7" fill="#503475"/><circle cx="33" cy="12" r="6" fill="#E8AD80"/><circle cx="36" cy="23" r="5.5" fill="#503475"/><circle cx="15" cy="25" r="5" fill="#E8AD80"/></svg><span>RootMap</span></div>;
-}
-
-const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-const isoToday = () => new Date().toISOString().slice(0, 10);
-
-function PageHeader({ title, subtitle, back, action }: { title: string; subtitle?: string; back?: () => void; action?: React.ReactNode }) {
-  return <header className={`page-header ${back ? "with-back" : ""}`}>{back && <button className="icon-button" onClick={back}><Icon name="back"/></button>}<div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>{action && <div className="header-action">{action}</div>}</header>;
-}
-
-function BottomNav({ active, go, openQuick, t }: { active: Screen; go: (s: Screen) => void; openQuick: () => void; t: typeof copy.en }) {
-  const items: [Screen, string, string][] = [["children", "home", t.myChildren], ["discover", "compass", t.discover], ["observations", "note", t.observations], ["profile", "user", t.profile]];
-  return <nav className="bottom-nav">{items.slice(0, 2).map(([s, i, l]) => <button className={active === s ? "active" : ""} onClick={() => go(s)} key={s}><Icon name={i}/><span>{l}</span></button>)}<button className="nav-add" onClick={openQuick}><i><Icon name="plus" size={25}/></i></button>{items.slice(2).map(([s, i, l]) => <button className={active === s ? "active" : ""} onClick={() => go(s)} key={s}><Icon name={i}/><span>{l}</span></button>)}</nav>;
-}
-
-function Shell({ children: content, active, go, openQuick, t, nav = true }: { children: React.ReactNode; active: Screen; go: (s: Screen) => void; openQuick: () => void; t: typeof copy.en; nav?: boolean }) {
-  return <div className={`screen ${nav ? "has-nav" : ""}`}>{content}{nav && <BottomNav active={active} go={go} openQuick={openQuick} t={t}/>}</div>;
-}
-
-function ChildrenPage({ childrenData, records, observations, goChild, openFilters, openNotifications, view, setView, filters, t }: { childrenData: Child[]; records: LessonRecord[]; observations: Observation[]; goChild: (id: string) => void; openFilters: () => void; openNotifications: () => void; view: string; setView: (v: string) => void; filters: any; t: typeof copy.en }) {
-  const [query, setQuery] = useState("");
-  const result = useMemo(() => {
-    let list = childrenData.filter(c => `${c.first} ${c.last}`.toLowerCase().includes(query.toLowerCase()));
-    if (filters.age === "0–3 Years") list = list.filter(c => c.ageYears < 3);
-    if (filters.age === "3–6 Years") list = list.filter(c => c.ageYears >= 3 && c.ageYears < 6);
-    if (filters.age === "6+ Years") list = list.filter(c => c.ageYears >= 6);
-    if (filters.group !== "All Groups") list = list.filter(c => c.group === filters.group);
-    if (filters.recent !== "Any Time") {
-      const latestDate = observations.reduce((max, o) => o.date > max ? o.date : max, "");
-      const days = filters.recent === "Today" ? 0 : filters.recent === "This Week" ? 7 : 31;
-      const cutoff = new Date(`${latestDate}T12:00:00`);
-      cutoff.setDate(cutoff.getDate() - days);
-      list = list.filter(c => {
-        const recent = observations.filter(o => o.childId === c.id).sort((a,b) => b.date.localeCompare(a.date))[0];
-        return recent && new Date(`${recent.date}T12:00:00`) >= cutoff;
-      });
-    }
-    return [...list].sort((a, b) => filters.sort === "Name Z–A" ? b.first.localeCompare(a.first) : filters.sort === "Age" ? a.ageYears - b.ageYears : filters.sort === "Most Recently Observed" ? (observations.find(o => o.childId === b.id)?.date || "").localeCompare(observations.find(o => o.childId === a.id)?.date || "") : a.first.localeCompare(b.first));
-  }, [childrenData, observations, query, filters]);
-  const latest = (id: string) => observations.filter(o => o.childId === id).sort((a,b) => b.date.localeCompare(a.date))[0];
-  return <><header className="brand-header"><TreeLogo/><button className="bell-button" onClick={openNotifications}><Icon name="bell"/><i/></button></header><main className="page-content children-page">
-    <div className="hero-title"><h1>{t.myChildren}</h1><p>{t.childSubtitle}</p></div>
-    <div className="search-row"><label className="search"><Icon name="search" size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={`${t.search}…`}/></label><button className="square-primary" onClick={openFilters}><Icon name="filter"/></button></div>
-    <div className="section-line"><span>{result.length} children</span><div className="view-toggle"><button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")}><Icon name="grid" size={16}/></button><button className={view === "list" ? "active" : ""} onClick={() => setView("list")}><Icon name="list" size={17}/></button></div></div>
-    {view === "grid" ? <div className="children-grid">{result.map(c => <button className="child-card" onClick={() => goChild(c.id)} key={c.id}><img src={c.photo} alt=""/><i/><strong>{c.first}</strong><span>{c.shortAge}</span><small>{c.lessons + records.filter(r => r.childId === c.id && !initialRecords.some(x => x.id === r.id)).length} lessons</small></button>)}</div> :
-    <div className="children-list">{result.map(c => <button className="child-list-card" onClick={() => goChild(c.id)} key={c.id}><img src={c.photo} alt=""/><div><strong>{c.first} {c.last}</strong><span>{c.age} · {c.lessons} lessons</span><small>{latest(c.id)?.notes || "No recent observation"}</small></div><Icon name="chevron"/></button>)}</div>}
-    {!result.length && <Empty text={t.noResults}/>}
-    {!!result.length && <><div className="section-title recent-title"><h2>Recent Activity</h2></div><div className="recent-activity">{observations.slice().sort((a,b) => b.date.localeCompare(a.date)).slice(0,3).map(o => { const c=childrenData.find(x=>x.id===o.childId); if(!c)return null; return <button onClick={()=>goChild(c.id)} key={o.id}><img src={c.photo} alt=""/><span><strong>{c.first} {c.last}</strong><small>{o.lesson || "Independent observation"} · {fmt(o.date)}</small><p>{o.notes}</p></span><Icon name="chevron" size={16}/></button>})}</div></>}
-  </main></>;
-}
-
-const categories = [["Practical Life","book"],["Art","heart"],["Science","compass"],["Math","layers"],["Language","book"],["Music","bell"],["Movement","user"],["Culture","globe"]];
-
-function Discover({ saved, toggleSaved, open, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; t: typeof copy.en }) {
-  const [q, setQ] = useState(""); const [age, setAge] = useState("All Ages"); const [topic, setTopic] = useState("All"); const [area, setArea] = useState("All");
-  const result = activities.filter(a => (!q || `${a.title} ${a.topic} ${a.area} ${a.materials.join(" ")} ${a.keywords}`.toLowerCase().includes(q.toLowerCase())) && (age === "All Ages" || a.ageKey === age) && (topic === "All" || a.topic === topic) && (area === "All" || a.area === area));
-  return <main className="page-content discover-page"><PageHeader title={t.discover} subtitle={t.discoverSubtitle}/><label className="search discover-search"><Icon name="search" size={18}/><input value={q} onChange={e => setQ(e.target.value)} placeholder={`${t.search} activities…`}/></label>
-    <div className="filter-row"><FilterSelect label={t.age} value={age} onChange={setAge} options={["All Ages","0–2","2–3","3–4","4–6","6+"]}/><FilterSelect label={t.topic} value={topic} onChange={setTopic} options={["All","Nature","Seasons","Everyday Life","Creativity","Sensory Exploration","Independence","Language Development"]}/><FilterSelect label={t.area} value={area} onChange={setArea} options={["All",...categories.map(c => c[0])]}/></div>
-    {(age !== "All Ages" || topic !== "All" || area !== "All") && <button className="reset-link" onClick={() => {setAge("All Ages");setTopic("All");setArea("All");}}>{t.reset}</button>}
-    <div className="category-grid">{categories.map(([name, icon], i) => <button className={area === name ? "selected" : ""} onClick={() => setArea(area === name ? "All" : name)} key={name}><i className={`cat-${i}`}><Icon name={icon}/></i><span>{name === "Practical Life" ? t.practical : name}</span></button>)}</div>
-    <div className="section-title"><h2>{t.popular}</h2><span>{result.length} activities</span></div>
-    <div className="activity-grid">{result.map(a => <ActivityCard activity={a} saved={saved.includes(a.id)} toggleSaved={toggleSaved} open={open} key={a.id}/>)}</div>{!result.length && <Empty text={t.noResults}/>}
-  </main>;
-}
-
-function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) { return <label className="mini-select"><span>{label}</span><select value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o}>{o}</option>)}</select></label>; }
-function ActivityCard({ activity: a, saved, toggleSaved, open }: { activity: Activity; saved: boolean; toggleSaved: (id: string) => void; open: (id: string) => void }) { return <article className="activity-card"><button className="activity-image" onClick={() => open(a.id)}><img src={a.image} alt=""/><span>{a.area}</span></button><div><button className="activity-name" onClick={() => open(a.id)}>{a.title}</button><button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(a.id)}><Icon name="heart" size={18} filled={saved}/></button><p>{a.age} · {a.area}</p><small><Icon name="clock" size={13}/>{a.minutes} min <Icon name="layers" size={13}/>{a.materialsLabel}</small></div></article>; }
-
-function ActivityDetail({ activity: a, saved, toggleSaved, back, openPlan, t }: { activity: Activity; saved: boolean; toggleSaved: () => void; back: () => void; openPlan: () => void; t: typeof copy.en }) {
-  const [checked, setChecked] = useState<number[]>([]);
-  const share = async () => { const data = { title: a.title, text: `${a.title} — ${a.description}` }; if (navigator.share) await navigator.share(data); else { await navigator.clipboard?.writeText(`${data.title}\n${data.text}`); window.alert("Activity details copied to clipboard."); } };
-  return <main className="detail-page"><div className="detail-actions"><button onClick={back}><Icon name="back"/></button><div><button className={saved ? "saved" : ""} onClick={toggleSaved}><Icon name="heart" filled={saved}/></button><button onClick={share}><Icon name="share"/></button></div></div><img className="detail-hero" src={a.image} alt=""/><div className="detail-content"><h1>{a.title}</h1><p className="meta">{a.age}<b>·</b>{a.area}<b>·</b>{a.minutes} minutes</p><p className="description">{a.description}</p><div className="domain-row">{a.domains.map((d,i) => <span key={d}><i><Icon name={i === 0 ? "user" : i === 1 ? "compass" : i === 2 ? "heart" : "globe"} size={18}/></i>{d}</span>)}</div><h2>{t.materials}</h2><div className="material-list">{a.materials.map((m,i) => <button className={checked.includes(i) ? "checked" : ""} onClick={() => setChecked(checked.includes(i) ? checked.filter(x => x !== i) : [...checked,i])} key={m}><i>{checked.includes(i) && <Icon name="check" size={13}/>}</i>{m}</button>)}</div><h2>{t.how}</h2><ol>{a.steps.map(s => <li key={s}>{s}</li>)}</ol></div><div className="sticky-action"><button onClick={openPlan}><Icon name="calendar" size={19}/>{t.addWeek}</button></div></main>;
-}
-
-function ObservationsPage({ observations, childrenData, openForm, goChild, t }: { observations: Observation[]; childrenData: Child[]; openForm: () => void; goChild: (id: string) => void; t: typeof copy.en }) {
-  const [child, setChild] = useState("All"); const [area, setArea] = useState("All");
-  const list = observations.filter(o => (child === "All" || o.childId === child) && (area === "All" || o.area === area)).sort((a,b) => b.date.localeCompare(a.date));
-  return <main className="page-content observations-page"><PageHeader title={t.observations} subtitle={t.observationSubtitle} action={<button className="small-primary" onClick={openForm}><Icon name="plus" size={16}/>{t.addObservation}</button>}/><div className="observation-filters"><FilterSelect label="" value={child} onChange={setChild} options={["All",...childrenData.map(c => c.id)]}/><FilterSelect label="" value={area} onChange={setArea} options={["All","Practical Life","Sensorial","Language","Mathematics","Independent"]}/></div><div className="observation-feed">{list.map(o => { const c = childrenData.find(x => x.id === o.childId)!; return <article className="observation-card" key={o.id}><button className="observation-person" onClick={() => goChild(c.id)}><img src={c.photo} alt=""/><span><strong>{c.first} {c.last}</strong><small>{fmt(o.date)}</small></span><Icon name="chevron" size={16}/></button><p>{o.notes}</p>{o.lesson && <span className="lesson-tag">{o.area} · {o.lesson}</span>}<div className="skill-tags">{o.skills.map(s => <span key={s}>{s}</span>)}</div>{o.nextSteps && <footer><strong>Follow-up</strong>{o.nextSteps}</footer>}</article>})}</div>{!list.length && <Empty text={t.noResults}/>}</main>;
-}
-
-const baseStats: Record<string, [number,number,number,number]> = {"Practical Life":[12,5,5,2],Sensorial:[8,3,4,1],Language:[6,4,2,0],Mathematics:[4,2,2,0]};
-function ChildProfile({ child, records, observations, edit, back, record, t }: { child: Child; records: LessonRecord[]; observations: Observation[]; edit: () => void; back: () => void; record: () => void; t: typeof copy.en }) {
-  const [tab,setTab] = useState("Overview"); const lessons = records.filter(r => r.childId === child.id).sort((a,b) => b.date.localeCompare(a.date)); const obs = observations.filter(o => o.childId === child.id);
-  return <main className="child-profile"><header className="child-header"><button onClick={back}><Icon name="back" size={18}/> Classroom</button><TreeLogo/><button onClick={edit}>Edit</button></header><section className="profile-hero"><img src={child.photo} alt=""/><h1>{child.first} {child.last}</h1><p>{child.age}</p><small>Enrolled since {child.enrolled} · {child.group}</small></section><div className="tabs">{["Overview","Lessons","Observations","Notes"].map(x => <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{x}</button>)}</div><div className="child-body">
-    {tab === "Overview" && <><div className="section-title"><h2>Learning Areas</h2></div><div className="learning-grid">{Object.entries(baseStats).map(([area,s],i) => { const added = lessons.filter(r => r.area === area && !initialRecords.find(x => x.id === r.id)); return <article className={`learning-card tone-${i}`} key={area}><i><Icon name={i === 0 ? "heart" : i === 1 ? "compass" : i === 2 ? "book" : "layers"}/></i><strong>{area}</strong><small>{s[0]+added.length} lessons</small><div><span><b>{s[1]+added.filter(x=>x.stage==="Introduced").length}</b>Introduced</span><span><b>{s[2]+added.filter(x=>x.stage==="Practicing").length}</b>Practicing</span><span><b>{s[3]+added.filter(x=>x.stage==="Independent").length}</b>Independent</span></div></article>})}</div><div className="section-title"><h2>Recent Lessons</h2></div><LessonList records={lessons.slice(0,3)}/></>}
-    {tab === "Lessons" && <><div className="section-title"><h2>Lesson History</h2></div><LessonList records={lessons}/></>}
-    {tab === "Observations" && <div className="observation-feed">{obs.map(o => <article className="observation-card" key={o.id}><small>{fmt(o.date)}</small><p>{o.notes}</p><div className="skill-tags">{o.skills.map(s => <span key={s}>{s}</span>)}</div></article>)}</div>}
-    {tab === "Notes" && <div className="personal-note">{child.notes || "No general notes have been added."}</div>}
-    <button className="wide-primary" onClick={record}><Icon name="plus" size={18}/>{t.recordLesson} / {t.addObservation}</button>
-  </div></main>;
-}
-function LessonList({ records }: { records: LessonRecord[] }) { return <div className="lesson-list">{records.map(r => <button key={r.id} onClick={() => window.alert(`${r.lesson}\n${r.area} · ${r.stage}\n${fmt(r.date)}${r.notes ? `\n\n${r.notes}` : ""}`)}><i><Icon name="book" size={18}/></i><span><strong>{r.lesson}</strong><small>{r.area} · {fmt(r.date)}</small></span><b className={`status ${r.stage.toLowerCase()}`}>{r.stage}</b><Icon name="chevron" size={15}/></button>)}</div>; }
-
-function ProfilePage({ go, lang, appearance, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; t: typeof copy.en }) {
-  const groups = [[t.myActivities,[["week","calendar",t.myWeek],["saved","heart",t.savedActivities],["notes","note",t.myNotes]]],[t.preferences,[["language","globe",t.language,lang === "en" ? "English" : "简体中文"],["appearance","moon",t.appearance,appearance],["notificationPrefs","bell",t.notifications]]],[t.account,[["personal","user",t.personal],["privacy","shield",t.privacy],["help","help",t.help]]]] as any[];
-  return <main className="page-content profile-page"><PageHeader title={t.profile} subtitle={t.profileSubtitle}/><section className="user-summary"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80" alt=""/><div><h2>Olivia Bennett</h2><p>Teacher · Primary Classroom</p></div></section>{groups.map(([title,items]) => <section className="menu-section" key={title}><h3>{title}</h3><div>{items.map(([screen,icon,label,value]: string[]) => <button onClick={() => go(screen as Screen)} key={`${title}-${label}`}><i><Icon name={icon} size={18}/></i><span>{label}</span>{value && <small>{value}</small>}<Icon name="chevron" size={16}/></button>)}</div></section>)}</main>;
-}
-
-function MyWeek({ saved, plans, setPlans, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: { saved: string[]; plans: Plan[]; setPlans: React.Dispatch<React.SetStateAction<Plan[]>>; childFilter: string; setChildFilter: (s: string) => void; childrenData: Child[]; openActivity: (id:string)=>void; openAdd:()=>void; back:()=>void; t: typeof copy.en }) {
-  const [tab,setTab] = useState<"saved"|"plan"|"completed">("plan"); const shownPlans = plans.filter(p => childFilter === "all" || p.childIds.includes(childFilter)); const planned = shownPlans.filter(p=>!p.completed).sort((a,b)=>a.date.localeCompare(b.date)); const complete = shownPlans.filter(p=>p.completed);
-  const mark = (id:string) => setPlans(current => current.map(p => p.id === id ? {...p,completed:true,completedDate:isoToday()} : p));
-  return <main className="week-page"><PageHeader title={t.myWeek} subtitle={t.weekSubtitle} back={back} action={<button className="round-add" onClick={openAdd}><Icon name="plus"/></button>}/><div className="week-controls"><label><span>{t.selectChildren}</span><select value={childFilter} onChange={e=>setChildFilter(e.target.value)}><option value="all">All Children</option>{childrenData.map(c=><option value={c.id} key={c.id}>{c.first}</option>)}</select></label><div className="segmented">{([["saved",t.saved],["plan",t.weeklyPlan],["completed",t.completed]] as const).map(([x,l])=><button className={tab===x?"active":""} onClick={()=>setTab(x)} key={x}>{l}</button>)}</div></div><div className="week-list">
-    {tab === "saved" && saved.map(id => {const a=activities.find(x=>x.id===id)!;return <ActivityRow a={a} action={<button onClick={()=>openActivity(a.id)}><Icon name="chevron"/></button>} key={id}/>})}
-    {tab === "plan" && <>{planned.map(p => {const a=activities.find(x=>x.id===p.activityId);if(!a)return null;return <article className="day-plan" key={p.id}><time><b>{new Date(`${p.date}T12:00`).toLocaleDateString("en-US",{weekday:"short"})}</b>{new Date(`${p.date}T12:00`).getDate()}</time><ActivityRow a={a} subtitle={p.childIds.length ? p.childIds.map(id=>childrenData.find(c=>c.id===id)?.first).join(", ") : "No child assigned"} action={<div className="plan-actions"><button onClick={()=>mark(p.id)}><Icon name="check" size={16}/></button><button onClick={()=>setPlans(x=>x.filter(y=>y.id!==p.id))}>×</button></div>}/></article>})}{!planned.length&&<Empty text="No activities planned yet."/>}</>}
-    {tab === "completed" && <>{complete.map(p=>{const a=activities.find(x=>x.id===p.activityId);if(!a)return null;return <ActivityRow a={a} subtitle={`${p.childIds.map(id=>childrenData.find(c=>c.id===id)?.first).join(", ") || "Unassigned"} · ${fmt(p.completedDate || p.date)}`} action={<button onClick={()=>setPlans(x=>[...x,{...p,id:`p-${Date.now()}`,date:isoToday(),completed:false}])}>Repeat</button>} key={p.id}/>})}{!complete.length&&<Empty text="Completed activities will appear here."/>}</>}
-  </div></main>;
-}
-function ActivityRow({a,subtitle,action}:{a:Activity;subtitle?:string;action:React.ReactNode}) { return <div className="activity-row"><img src={a.image} alt=""/><span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${a.area}`}</small><em><Icon name="clock" size={12}/>{a.minutes} min · {a.materialsLabel}</em></span>{action}</div>; }
-
-function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, t }: { screen: Screen; back:()=>void; lang:Lang; setLang:(l:Lang)=>void; appearance:string; setAppearance:(v:string)=>void; t: typeof copy.en }) {
-  const title = screen === "language" ? t.language : screen === "appearance" ? t.appearance : screen === "notes" ? t.myNotes : screen === "notificationPrefs" ? t.notifications : screen === "personal" ? t.personal : screen === "privacy" ? t.privacy : t.help;
-  if(screen==="notes") return <main className="simple-page"><PageHeader title={title} back={back}/><textarea className="notes-pad" defaultValue={localStorage.getItem("rootmap-personal-notes")||""} onChange={e=>localStorage.setItem("rootmap-personal-notes",e.target.value)} placeholder="Planning ideas, reminders, and reflections…"/></main>;
-  const options = screen === "language" ? [["en","English"],["zh","简体中文"]] : [["light",t.light],["dark",t.dark],["system",t.system]];
-  if(screen==="language"||screen==="appearance") return <main className="simple-page"><PageHeader title={title} back={back}/><div className="choice-list">{options.map(([v,l])=><button className={(screen==="language"?lang:appearance)===v?"active":""} onClick={()=>screen==="language"?setLang(v as Lang):setAppearance(v)} key={v}><span>{l}</span>{(screen==="language"?lang:appearance)===v&&<Icon name="check"/>}</button>)}</div></main>;
-  if(screen==="notificationPrefs") return <main className="simple-page"><PageHeader title={title} back={back}/><div className="choice-list">{["Follow-up reminders","Weekly planning reminders","Classroom updates"].map(x=><NotificationToggle label={x} key={x}/>)}</div></main>;
-  return <main className="simple-page"><PageHeader title={title} back={back}/><div className="info-card"><Icon name={screen==="privacy"?"shield":screen==="help"?"help":"user"} size={28}/><h2>{title}</h2><p>{screen==="privacy"?"Your prototype data is stored locally on this device. You can clear it from your browser settings.":screen==="help"?"RootMap prototype support resources and frequently asked questions will appear here.":"Update your name, role, classroom, and contact information."}</p><button className="wide-primary">{screen==="help"?"Contact Support":"Manage"}</button></div></main>;
-}
-function NotificationToggle({label}:{label:string}) { const [on,setOn]=useStored<boolean>(`rootmap-pref-${label}`,true); return <button onClick={()=>setOn(!on)}><span>{label}</span><i className={`switch ${on?"on":""}`}><b/></i></button>; }
-
-function Notifications({ childrenData, back, goChild, t }: { childrenData:Child[];back:()=>void;goChild:(id:string)=>void;t:typeof copy.en }) {
-  const [read,setRead]=useStored<string[]>("rootmap-read-notifications",[]); const [filter,setFilter]=useState("All"); const notes=[{id:"n1",cat:"Follow-ups",childId:"emma",title:"Emma Thompson",text:"Follow up on Pouring Water this week."},{id:"n2",cat:"Follow-ups",childId:"noah",title:"Noah Williams",text:"Review yesterday’s Color Tablets observation."},{id:"n3",cat:"Classroom",title:"Classroom Update",text:"A new child profile has been added."}].filter(n=>filter==="All"||n.cat===filter);
-  return <main className="simple-page notification-page"><PageHeader title="Notifications" back={back} action={<button className="text-action" onClick={()=>setRead(["n1","n2","n3"])}>{t.markAll}</button>}/><div className="notification-tabs">{["All","Follow-ups","Classroom"].map(x=><button className={filter===x?"active":""} onClick={()=>setFilter(x)}>{x}</button>)}</div>{notes.map(n=><button className={`notification-item ${!read.includes(n.id)?"unread":""} ${n.cat==="Follow-ups"?"reminder":""}`} onClick={()=>{setRead([...new Set([...read,n.id])]);if(n.childId)goChild(n.childId)}} key={n.id}>{n.childId?<img src={childrenData.find(c=>c.id===n.childId)?.photo} alt=""/>:<i><Icon name="bell"/></i>}<span><strong>{n.title}</strong><p>{n.text}</p><small>{n.cat}</small></span><Icon name="chevron"/></button>)}</main>;
-}
-
-function RecordForm({ child, save, cancel, t }: { child:Child;save:(r:Omit<LessonRecord,"id"|"childId">)=>void;cancel:()=>void;t:typeof copy.en }) {
-  const [area,setArea]=useState<Area>("Practical Life"),[lesson,setLesson]=useState("Pouring Water"),[date,setDate]=useState("2026-10-08"),[stage,setStage]=useState<Stage>("Practicing"),[notes,setNotes]=useState(`${child.first} repeated the work with careful, deliberate movements.`),[skills,setSkills]=useState<string[]>(["Concentration"]);
-  const changeArea=(a:Area)=>{setArea(a);setLesson(areaLessons[a][0])}; return <main className="form-page"><PageHeader title={`${t.recordLesson} / ${t.addObservation}`} back={cancel}/><section className="form-child"><img src={child.photo}/><span><small>RECORDING FOR</small><strong>{child.first} {child.last}</strong><em>{child.age}</em></span></section><div className="form-fields"><Field label="Learning Area"><select value={area} onChange={e=>changeArea(e.target.value as Area)}>{Object.keys(areaLessons).map(x=><option>{x}</option>)}</select></Field><Field label="Lesson / Activity"><select value={lesson} onChange={e=>setLesson(e.target.value)}>{areaLessons[area].map(x=><option>{x}</option>)}</select></Field><Field label={t.date}><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></Field><fieldset><legend>Learning Stage</legend><div className="stage-choices">{(["Introduced","Practicing","Independent"] as Stage[]).map(x=><button className={stage===x?"active":""} onClick={()=>setStage(x)}>{x}</button>)}</div></fieldset><Field label="Observation Notes"><textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={5}/></Field><fieldset><legend>Skills Observed</legend><div className="chips">{["Hand-eye coordination","Concentration","Independence","Fine motor control","Order"].map(x=><button className={skills.includes(x)?"active":""} onClick={()=>setSkills(skills.includes(x)?skills.filter(y=>y!==x):[...skills,x])}>{x}</button>)}</div></fieldset></div><div className="form-bottom"><button onClick={()=>save({area,lesson,date,stage,notes,skills})}>{t.save}</button><button onClick={cancel}>{t.cancel}</button></div></main>;
-}
-function Field({label,children:content}:{label:string;children:React.ReactNode}){return <label className="field"><span>{label}</span>{content}</label>}
-
-function Overlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveObservation, t }: any) {
-  const [name,setName]=useState(""),[dob,setDob]=useState("2023-01-01"),[group,setGroup]=useState("Primary"),[notes,setNotes]=useState(""),[photo,setPhoto]=useState(""),[date,setDate]=useState(isoToday()),[chosen,setChosen]=useState<string[]>(selectedChild?[selectedChild]:[]),[planNote,setPlanNote]=useState(""),[obsChild,setObsChild]=useState(selectedChild||childrenData[0].id),[obsNotes,setObsNotes]=useState(""),[obsSkills,setObsSkills]=useState<string[]>([]),[nextSteps,setNextSteps]=useState(""),[followUp,setFollowUp]=useState("");
-  useEffect(()=>{if(modal==="plan")setChosen(selectedChild?[selectedChild]:[]);if(modal==="observation")setObsChild(selectedChild||childrenData[0].id)},[modal,selectedChild,childrenData]);
-  if(!modal)return null;
-  const addChild=()=>{const [first,...last]=name.trim().split(" ");if(!first)return;const birth=new Date(dob),now=new Date();const years=Math.max(0,now.getFullYear()-birth.getFullYear());setChildrenData([...childrenData,{id:`c-${Date.now()}`,first,last:last.join(" ")||"Child",age:`${years} years`,shortAge:`${years}y`,ageYears:years,enrolled:"October 2026",lessons:0,group,notes,photo:photo||"https://images.unsplash.com/photo-1606386666595-d135abc1e3b2?auto=format&fit=crop&w=300&q=85"}]);close();};
-  if(modal==="quick")return <Modal title="Quick Add" close={close}><div className="quick-actions"><button onClick={()=>close("record")}><Icon name="book"/>Record Lesson Presentation</button><button onClick={()=>close("observation")}><Icon name="note"/>{t.addObservation}</button><button onClick={()=>close("addChild")}><Icon name="user"/>{t.addChild}</button></div></Modal>;
-  if(modal==="weekAdd")return <Modal title={t.add} close={close}><div className="quick-actions"><button onClick={()=>close("discover")}><Icon name="compass"/>Add Activity From Discover</button><button onClick={()=>{const title=window.prompt("Custom activity name");if(!title)return;const existing=localStorage.getItem("rootmap-personal-notes")||"";localStorage.setItem("rootmap-personal-notes",`${existing}${existing?"\n\n":""}Custom activity: ${title}\nMaterials:\nPlan:`);close("notes")}}><Icon name="plus"/>Create Custom Activity</button><button onClick={()=>close("notes")}><Icon name="note"/>Add Planning Note</button></div></Modal>;
-  if(modal==="filters")return <Modal title={t.filterChildren} close={close}><div className="sheet-fields"><Field label="Age Group"><select value={filters.age} onChange={e=>setFilters({...filters,age:e.target.value})}>{["All Ages","0–3 Years","3–6 Years","6+ Years"].map(x=><option>{x}</option>)}</select></Field><Field label="Classroom / Group"><select value={filters.group} onChange={e=>setFilters({...filters,group:e.target.value})}>{["All Groups","Toddler","Primary","Other"].map(x=><option>{x}</option>)}</select></Field><Field label="Recent Activity"><select value={filters.recent} onChange={e=>setFilters({...filters,recent:e.target.value})}>{["Any Time","Today","This Week","This Month"].map(x=><option>{x}</option>)}</select></Field><Field label="Sort By"><select value={filters.sort} onChange={e=>setFilters({...filters,sort:e.target.value})}>{["Name A–Z","Name Z–A","Age","Most Recently Observed"].map(x=><option>{x}</option>)}</select></Field></div><div className="sheet-buttons"><button onClick={()=>setFilters({age:"All Ages",group:"All Groups",recent:"Any Time",sort:"Name A–Z"})}>{t.reset}</button><button onClick={()=>close()}>{t.showResults}</button></div></Modal>;
-  if(modal==="addChild")return <Modal title={t.addChild} close={close}><div className="sheet-fields"><Field label="Child’s full name"><input value={name} onChange={e=>setName(e.target.value)}/></Field><Field label="Date of birth"><input type="date" value={dob} onChange={e=>setDob(e.target.value)}/></Field><Field label="Profile photo URL (optional)"><input value={photo} onChange={e=>setPhoto(e.target.value)}/></Field><Field label="Classroom / group"><select value={group} onChange={e=>setGroup(e.target.value)}><option>Toddler</option><option>Primary</option><option>Other</option></select></Field><Field label="Notes (optional)"><textarea value={notes} onChange={e=>setNotes(e.target.value)}/></Field></div><button className="modal-primary" onClick={addChild}>{t.addChild}</button></Modal>;
-  if(modal==="plan")return <Modal title={t.addWeek} close={close}><div className="sheet-fields"><div className="plan-activity"><img src={selectedActivity.image}/><strong>{selectedActivity.title}</strong></div><Field label={t.date}><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></Field><fieldset><legend>{t.selectChildren}</legend><div className="child-checks">{childrenData.map((c:Child)=><button className={chosen.includes(c.id)?"active":""} onClick={()=>setChosen(chosen.includes(c.id)?chosen.filter(x=>x!==c.id):[...chosen,c.id])}><img src={c.photo}/>{c.first}</button>)}</div></fieldset><Field label={t.planningNote}><textarea value={planNote} onChange={e=>setPlanNote(e.target.value)}/></Field></div><button className="modal-primary" onClick={()=>{setPlans([...plans,{id:`p-${Date.now()}`,activityId:selectedActivity.id,date,childIds:chosen,note:planNote}]);close("week")}}>{t.addWeek}</button></Modal>;
-  return <Modal title={t.addObservation} close={close}><div className="sheet-fields"><Field label="Child"><select value={obsChild} onChange={e=>setObsChild(e.target.value)}>{childrenData.map((c:Child)=><option value={c.id}>{c.first} {c.last}</option>)}</select></Field><Field label={t.date}><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></Field><Field label="Observation notes"><textarea rows={5} value={obsNotes} onChange={e=>setObsNotes(e.target.value)} placeholder="Describe what you observed objectively…"/></Field><Field label="Associated lesson (optional)"><input value={planNote} onChange={e=>setPlanNote(e.target.value)}/></Field><fieldset><legend>Skills observed</legend><div className="chips">{["Concentration","Independence","Fine motor control","Order"].map(x=><button className={obsSkills.includes(x)?"active":""} onClick={()=>setObsSkills(obsSkills.includes(x)?obsSkills.filter(y=>y!==x):[...obsSkills,x])}>{x}</button>)}</div></fieldset><Field label="Next steps (optional)"><textarea value={nextSteps} onChange={e=>setNextSteps(e.target.value)}/></Field><Field label="Follow-up date (optional)"><input type="date" value={followUp} onChange={e=>setFollowUp(e.target.value)}/></Field></div><button className="modal-primary" onClick={()=>{if(!obsNotes.trim())return;saveObservation({id:`o-${Date.now()}`,childId:obsChild,date,notes:obsNotes,lesson:planNote||undefined,skills:obsSkills,nextSteps,followUp});close("observations")}}>{t.save}</button></Modal>;
-}
-function Modal({title,close,children:content}:{title:string;close:()=>void;children:React.ReactNode}) { return <div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><section className="bottom-sheet"><i/><header><h2>{title}</h2><button onClick={close}>×</button></header>{content}</section></div>; }
-function Empty({text}:{text:string}) { return <div className="empty"><Icon name="compass" size={25}/><p>{text}</p></div>; }
+type ChildFilters = { age: string; group: string; recent: string; sort: string };
 
 export default function App() {
-  const [screen,setScreen]=useState<Screen>("children"),[previous,setPrevious]=useState<Screen>("children"),[modal,setModal]=useState<Modal>(null),[selectedChild,setSelectedChild]=useState("emma"),[selectedActivity,setSelectedActivity]=useState("leaf-transfer");
-  const [childrenData,setChildrenData]=useStored<Child[]>("rootmap-children",initialChildren),[records,setRecords]=useStored<LessonRecord[]>("rootmap-records",initialRecords),[observations,setObservations]=useStored<Observation[]>("rootmap-observations",initialObservations),[saved,setSaved]=useStored<string[]>("rootmap-saved",["leaf-transfer","color-mixing"]),[plans,setPlans]=useStored<Plan[]>("rootmap-plans",[]),[lang,setLang]=useStored<Lang>("rootmap-language","en"),[appearance,setAppearance]=useStored<string>("rootmap-appearance","light"),[view,setView]=useStored<string>("rootmap-child-view","grid"),[filters,setFilters]=useStored<any>("rootmap-child-filters",{age:"All Ages",group:"All Groups",recent:"Any Time",sort:"Name A–Z"}),[weekFilter,setWeekFilter]=useState("all");
-  const t=copy[lang]; const child=childrenData.find(c=>c.id===selectedChild)||childrenData[0]; const activity=activities.find(a=>a.id===selectedActivity)||activities[0];
-  useEffect(()=>{const dark=appearance==="dark"||(appearance==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=dark?"dark":"light"},[appearance]);
-  const go=(s:Screen)=>{setPrevious(screen);setScreen(s);window.scrollTo({top:0,behavior:"smooth"})}; const topLevel=["children","discover","observations","profile"].includes(screen);
-  const closeModal=(destination?:Screen|Modal)=>{setModal(null);if(destination==="record")go("record");else if(destination==="observation")setModal("observation");else if(destination==="addChild")setModal("addChild");else if(destination&&destination!=="quick"&&destination!=="filters"&&destination!=="plan"&&destination!=="weekAdd")go(destination as Screen)};
-  const content=()=>{
-    if(screen==="children")return <ChildrenPage childrenData={childrenData} records={records} observations={observations} goChild={id=>{setSelectedChild(id);go("child")}} openFilters={()=>setModal("filters")} openNotifications={()=>go("notifications")} view={view} setView={setView} filters={filters} t={t}/>;
-    if(screen==="discover")return <Discover saved={saved} toggleSaved={id=>setSaved(saved.includes(id)?saved.filter(x=>x!==id):[...saved,id])} open={id=>{setSelectedActivity(id);go("activity")}} t={t}/>;
-    if(screen==="activity")return <ActivityDetail activity={activity} saved={saved.includes(activity.id)} toggleSaved={()=>setSaved(saved.includes(activity.id)?saved.filter(x=>x!==activity.id):[...saved,activity.id])} back={()=>go(previous==="week"?"week":"discover")} openPlan={()=>setModal("plan")} t={t}/>;
-    if(screen==="observations")return <ObservationsPage observations={observations} childrenData={childrenData} openForm={()=>setModal("observation")} goChild={id=>{setSelectedChild(id);go("child")}} t={t}/>;
-    if(screen==="profile")return <ProfilePage go={go} lang={lang} appearance={appearance} t={t}/>;
-    if(screen==="child")return <ChildProfile child={child} records={records} observations={observations} edit={()=>{const fullName=window.prompt("Child’s full name",`${child.first} ${child.last}`);if(!fullName?.trim())return;const [first,...last]=fullName.trim().split(" ");setChildrenData(childrenData.map(c=>c.id===child.id?{...c,first,last:last.join(" ")||c.last}:c))}} back={()=>go("children")} record={()=>go("record")} t={t}/>;
-    if(screen==="record")return <RecordForm child={child} cancel={()=>go("child")} t={t} save={r=>{const item={...r,id:`r-${Date.now()}`,childId:child.id};setRecords([item,...records]);setObservations([{id:`o-${Date.now()}`,childId:child.id,date:r.date,notes:r.notes||"",area:r.area,lesson:r.lesson,skills:r.skills||[],nextSteps:r.nextSteps},...observations]);go("child")}}/>;
-    if(screen==="week")return <MyWeek saved={saved} plans={plans} setPlans={setPlans} childFilter={weekFilter} setChildFilter={setWeekFilter} childrenData={childrenData} openActivity={id=>{setSelectedActivity(id);go("activity")}} openAdd={()=>setModal("weekAdd")} back={()=>go("profile")} t={t}/>;
-    if(screen==="saved")return <main className="simple-page"><PageHeader title={t.savedActivities} back={()=>go("profile")}/><div className="week-list">{saved.map(id=>{const a=activities.find(x=>x.id===id)!;return <ActivityRow a={a} action={<button onClick={()=>{setSelectedActivity(id);go("activity")}}><Icon name="chevron"/></button>} key={id}/>})}</div></main>;
-    if(screen==="notifications")return <Notifications childrenData={childrenData} back={()=>go("children")} goChild={id=>{setSelectedChild(id);go("child")}} t={t}/>;
-    return <SettingsPage screen={screen} back={()=>go("profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} t={t}/>;
+  const [screen, setScreen] = useState<Screen>("children");
+  const [previous, setPrevious] = useState<Screen>("children");
+  const [modal, setModal] = useState<ModalKind>(null);
+  const [selectedChild, setSelectedChild] = useState("emma");
+  const [selectedActivity, setSelectedActivity] = useState("leaf-transfer");
+
+  const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
+  const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
+  const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
+  const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["leaf-transfer", "color-mixing"]);
+  const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
+  const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
+  const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
+  const [view, setView] = useStored<string>("rootmap-child-view", "grid");
+  const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
+  const [weekFilter, setWeekFilter] = useState("all");
+
+  const t = copy[lang];
+  const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
+  const activity = activities.find(a => a.id === selectedActivity) || activities[0];
+
+  useEffect(() => {
+    const dark = appearance === "dark" || (appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }, [appearance]);
+
+  const go = (s: Screen) => {
+    setPrevious(screen);
+    setScreen(s);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  return <div className="app-shell"><Shell active={screen} go={go} openQuick={()=>setModal("quick")} t={t} nav={topLevel}>{content()}</Shell><Overlay modal={modal} close={closeModal} childrenData={childrenData} setChildrenData={setChildrenData} filters={filters} setFilters={setFilters} selectedActivity={activity} plans={plans} setPlans={setPlans} selectedChild={selectedChild} saveObservation={(o:Observation)=>setObservations([o,...observations])} t={t}/></div>;
+  const topLevel = ["children", "discover", "observations", "profile"].includes(screen);
+
+  const closeModal = (destination?: Screen | ModalKind) => {
+    setModal(null);
+    if (destination === "record") go("record");
+    else if (destination === "observation") setModal("observation");
+    else if (destination === "addChild") setModal("addChild");
+    else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
+  };
+
+  const content = () => {
+    if (screen === "children") {
+      return (
+        <ChildrenPage
+          childrenData={childrenData}
+          records={records}
+          observations={observations}
+          goChild={id => { setSelectedChild(id); go("child"); }}
+          openFilters={() => setModal("filters")}
+          openNotifications={() => go("notifications")}
+          view={view}
+          setView={setView}
+          filters={filters}
+          t={t}
+        />
+      );
+    }
+    if (screen === "discover") {
+      return <DiscoverPage saved={saved} toggleSaved={id => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id])} open={id => { setSelectedActivity(id); go("activity"); }} t={t} />;
+    }
+    if (screen === "activity") {
+      return (
+        <ActivityDetailPage
+          activity={activity}
+          saved={saved.includes(activity.id)}
+          toggleSaved={() => setSaved(saved.includes(activity.id) ? saved.filter(x => x !== activity.id) : [...saved, activity.id])}
+          back={() => go(previous === "week" ? "week" : "discover")}
+          openPlan={() => setModal("plan")}
+          t={t}
+        />
+      );
+    }
+    if (screen === "observations") {
+      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
+    }
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} t={t} />;
+    if (screen === "child") {
+      return (
+        <ChildProfilePage
+          child={child}
+          records={records}
+          observations={observations}
+          edit={() => {
+            const fullName = window.prompt(t.childFullName, `${child.first} ${child.last}`);
+            if (!fullName?.trim()) return;
+            const [first, ...last] = fullName.trim().split(" ");
+            setChildrenData(childrenData.map(c => (c.id === child.id ? { ...c, first, last: last.join(" ") || c.last } : c)));
+          }}
+          back={() => go("children")}
+          record={() => go("record")}
+          t={t}
+        />
+      );
+    }
+    if (screen === "record") {
+      return (
+        <RecordFormPage
+          child={child}
+          cancel={() => go("child")}
+          t={t}
+          save={r => {
+            const item = { ...r, id: `r-${Date.now()}`, childId: child.id };
+            setRecords([item, ...records]);
+            setObservations([{ id: `o-${Date.now()}`, childId: child.id, date: r.date, notes: r.notes || "", area: r.area, lesson: r.lesson, skills: r.skills || [], nextSteps: r.nextSteps }, ...observations]);
+            go("child");
+          }}
+        />
+      );
+    }
+    if (screen === "week") {
+      return (
+        <MyWeekPage
+          saved={saved}
+          plans={plans}
+          setPlans={setPlans}
+          childFilter={weekFilter}
+          setChildFilter={setWeekFilter}
+          childrenData={childrenData}
+          openActivity={id => { setSelectedActivity(id); go("activity"); }}
+          openAdd={() => setModal("weekAdd")}
+          back={() => go("profile")}
+          t={t}
+        />
+      );
+    }
+    if (screen === "saved") {
+      return (
+        <main className="simple-page">
+          <PageHeader title={t.savedActivities} back={() => go("profile")} />
+          <div className="week-list">
+            {saved.map(id => {
+              const a = activities.find(x => x.id === id)!;
+              return <ActivityRow a={a} t={t} action={<button onClick={() => { setSelectedActivity(id); go("activity"); }}><Icon name="chevron" /></button>} key={id} />;
+            })}
+          </div>
+        </main>
+      );
+    }
+    if (screen === "notifications") {
+      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
+    }
+    return <SettingsPage screen={screen} back={() => go("profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} t={t} />;
+  };
+
+  return (
+    <div className="app-shell">
+      <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel}>
+        {content()}
+      </Shell>
+      <ModalOverlay
+        modal={modal}
+        close={closeModal}
+        childrenData={childrenData}
+        setChildrenData={setChildrenData}
+        filters={filters}
+        setFilters={setFilters}
+        selectedActivity={activity}
+        plans={plans}
+        setPlans={setPlans}
+        selectedChild={selectedChild}
+        saveObservation={(o: Observation) => setObservations([o, ...observations])}
+        t={t}
+      />
+    </div>
+  );
 }
