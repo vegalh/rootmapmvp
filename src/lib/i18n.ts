@@ -139,6 +139,8 @@ export function notificationTabLabel(tab: string, t: Copy): string {
   return tab === "All" ? t.all : tab === "Follow-ups" ? t.followUps : tab === "Classroom" ? t.classroom : tab;
 }
 
+import { ageFromDob } from "./dates";
+
 // Chinese names for the fixed lesson options offered per learning area (see `areaLessons` in data/progress.ts).
 const lessonNamesZh: Record<string, string> = {
   "Pouring Water": "倒水练习", Spooning: "勺子舀取", "Transferring Objects": "物品转移", "Folding Cloths": "折布练习", "Washing a Table": "擦桌子", "Dressing Frames": "穿衣框架",
@@ -153,13 +155,19 @@ export function lessonLabel(lesson: string, t: Copy): string {
   return t.code === "zh" ? lessonNamesZh[lesson] || lesson : lesson;
 }
 
-// Returns a Chinese display age/enrollment date for a child when available, otherwise the stored English value.
-export function childAge(child: { age: string; ageZh?: string }, t: Copy): string {
-  return t.code === "zh" ? child.ageZh || child.age : child.age;
+// Formats a child's current age (computed from their birthdate) as a full phrase, e.g. "3 years, 2 months" / "3岁2个月".
+export function childAge(child: { dob: string }, t: Copy): string {
+  const { years, months } = ageFromDob(child.dob);
+  if (t.code === "zh") return months > 0 ? `${years}岁${months}个月` : `${years}岁`;
+  if (years === 0) return months === 1 ? "1 month" : `${months} months`;
+  return months > 0 ? `${years} year${years === 1 ? "" : "s"}, ${months} month${months === 1 ? "" : "s"}` : `${years} year${years === 1 ? "" : "s"}`;
 }
 
-export function childShortAge(child: { shortAge: string; shortAgeZh?: string }, t: Copy): string {
-  return t.code === "zh" ? child.shortAgeZh || child.shortAge : child.shortAge;
+// Formats a child's current age as a short badge, e.g. "3y 2m" / "3岁2月".
+export function childShortAge(child: { dob: string }, t: Copy): string {
+  const { years, months } = ageFromDob(child.dob);
+  if (t.code === "zh") return months > 0 ? `${years}岁${months}月` : `${years}岁`;
+  return months > 0 ? `${years}y ${months}m` : `${years}y`;
 }
 
 export function childEnrolled(child: { enrolled: string; enrolledZh?: string }, t: Copy): string {

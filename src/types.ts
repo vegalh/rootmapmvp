@@ -5,17 +5,14 @@ export type Child = {
   id: string;
   first: string;
   last: string;
-  age: string;
-  shortAge: string;
-  ageYears: number;
+  // ISO birthdate ("2023-08-10"); age is computed from this relative to today.
+  dob: string;
   enrolled: string;
   lessons: number;
   group: string;
   photo: string;
   notes?: string;
-  // Chinese display variants; falls back to the English fields above when absent.
-  ageZh?: string;
-  shortAgeZh?: string;
+  // Chinese display variant; falls back to the English field above when absent.
   enrolledZh?: string;
 };
 

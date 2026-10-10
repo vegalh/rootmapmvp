@@ -43,16 +43,11 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   const addChild = () => {
     const [first, ...last] = name.trim().split(" ");
     if (!first) return;
-    const birth = new Date(dob);
-    const now = new Date();
-    const years = Math.max(0, now.getFullYear() - birth.getFullYear());
     setChildrenData([...childrenData, {
       id: `c-${Date.now()}`,
       first,
       last: last.join(" ") || "Child",
-      age: `${years} years`,
-      shortAge: `${years}y`,
-      ageYears: years,
+      dob,
       enrolled: "October 2026",
       lessons: 0,
       group,

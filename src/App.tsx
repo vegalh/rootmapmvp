@@ -14,6 +14,7 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
 import { useStored } from "./lib/storage";
 import { copy } from "./lib/i18n";
+import { isoToday } from "./lib/dates";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
@@ -38,6 +39,19 @@ export default function App() {
   const [view, setView] = useStored<string>("rootmap-child-view", "grid");
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
+
+  // One-time migration for data persisted before `dob` existed (older records only had `ageYears`).
+  useEffect(() => {
+    const needsMigration = childrenData.some(c => !c.dob);
+    if (!needsMigration) return;
+    setChildrenData(childrenData.map(c => {
+      if (c.dob) return c;
+      const seed = initialChildren.find(s => s.id === c.id);
+      const legacyYears = (c as unknown as { ageYears?: number }).ageYears;
+      const fallbackDob = seed?.dob || (legacyYears ? new Date(new Date().setFullYear(new Date().getFullYear() - Math.round(legacyYears))).toISOString().slice(0, 10) : isoToday());
+      return { ...c, dob: fallbackDob };
+    }));
+  }, [childrenData, setChildrenData]);
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];

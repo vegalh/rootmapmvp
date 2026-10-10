@@ -3,7 +3,7 @@ import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
 import { Empty } from "../components/ui";
 import { initialRecords } from "../data/progress";
-import { fmt } from "../lib/dates";
+import { ageFromDob, fmt } from "../lib/dates";
 import type { Child, LessonRecord, Observation } from "../types";
 import { childAge, childShortAge, lessonLabel, noteText, type Copy } from "../lib/i18n";
 
@@ -24,9 +24,9 @@ export function ChildrenPage({ childrenData, records, observations, goChild, ope
   const [query, setQuery] = useState("");
   const result = useMemo(() => {
     let list = childrenData.filter(c => `${c.first} ${c.last}`.toLowerCase().includes(query.toLowerCase()));
-    if (filters.age === "0–3 Years") list = list.filter(c => c.ageYears < 3);
-    if (filters.age === "3–6 Years") list = list.filter(c => c.ageYears >= 3 && c.ageYears < 6);
-    if (filters.age === "6+ Years") list = list.filter(c => c.ageYears >= 6);
+    if (filters.age === "0–3 Years") list = list.filter(c => ageFromDob(c.dob).totalYears < 3);
+    if (filters.age === "3–6 Years") list = list.filter(c => ageFromDob(c.dob).totalYears >= 3 && ageFromDob(c.dob).totalYears < 6);
+    if (filters.age === "6+ Years") list = list.filter(c => ageFromDob(c.dob).totalYears >= 6);
     if (filters.group !== "All Groups") list = list.filter(c => c.group === filters.group);
     if (filters.recent !== "Any Time") {
       const latestDate = observations.reduce((max, o) => (o.date > max ? o.date : max), "");
@@ -40,7 +40,7 @@ export function ChildrenPage({ childrenData, records, observations, goChild, ope
     }
     return [...list].sort((a, b) =>
       filters.sort === "Name Z–A" ? b.first.localeCompare(a.first) :
-      filters.sort === "Age" ? a.ageYears - b.ageYears :
+      filters.sort === "Age" ? ageFromDob(a.dob).totalYears - ageFromDob(b.dob).totalYears :
       filters.sort === "Most Recently Observed" ? (observations.find(o => o.childId === b.id)?.date || "").localeCompare(observations.find(o => o.childId === a.id)?.date || "") :
       a.first.localeCompare(b.first)
     );
