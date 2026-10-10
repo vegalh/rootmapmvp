@@ -1,5 +1,7 @@
 import type { Activity } from "../types";
 import mopping from "../assets/activities/mopping.jpg";
+import washingTable from "../assets/activities/washing-table.jpg";
+import wateringPlant from "../assets/activities/watering-plant.jpg";
 
 // Unsplash image helper: pass just the photo id segment (after "images.unsplash.com/").
 const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
@@ -231,6 +233,56 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "大肌肉协调", "专注力", "独立性"],
       materials: ["儿童专用拖把", "指定的地面区域"],
       steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何用双手握住拖把。", "展示缓慢而从容地来回拖地的动作。", "邀请孩子从区域的一侧开始尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+    },
+  },
+  {
+    id: "washing-table",
+    title: "Washing Table",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 15,
+    materialsLabel: "4 materials",
+    image: washingTable,
+    description: "Children learn to care for their environment by washing a table, building sequencing, concentration, and a sense of responsibility.",
+    domains: ["Care of Environment", "Sequencing", "Concentration", "Independence"],
+    materials: ["Small basin of water", "Sponge", "Soap", "Drying cloth"],
+    steps: ["Invite the child to the activity and name the materials.", "Demonstrate wetting the sponge and wringing out excess water.", "Show wiping the table surface in a circular motion.", "Dry the table with the cloth.", "Invite the child to try, then repeat until the child is satisfied."],
+    keywords: "washing table cleaning care of environment practical life",
+    zh: {
+      title: "洗桌子",
+      age: "2–3岁",
+      materialsLabel: "4种材料",
+      description: "孩子们通过洗桌子练习照顾周围环境，培养顺序感、专注力和责任感。",
+      domains: ["照顾环境", "顺序感", "专注力", "独立性"],
+      materials: ["小盆水", "海绵", "肥皂", "擦干布"],
+      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何浸湿海绵并拧出多余的水分。", "展示以画圈的方式擦拭桌面。", "用布将桌子擦干。", "邀请孩子尝试，并重复练习直到满意为止。"],
+    },
+  },
+  {
+    id: "watering-plant",
+    title: "Watering Plant",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 10,
+    materialsLabel: "2 materials",
+    image: wateringPlant,
+    description: "Children learn to care for their environment by watering a plant, building fine motor control, concentration, and a sense of responsibility.",
+    domains: ["Care of Environment", "Fine Motor Coordination", "Concentration", "Independence"],
+    materials: ["Small watering can", "Potted plant"],
+    steps: ["Invite the child to the activity and name the materials.", "Demonstrate filling the watering can with a small amount of water.", "Show pouring water slowly and carefully around the base of the plant.", "Invite the child to try.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    keywords: "watering plant care of environment practical life nature",
+    zh: {
+      title: "浇花",
+      age: "2–3岁",
+      materialsLabel: "2种材料",
+      description: "孩子们通过给植物浇水练习照顾周围环境，培养精细动作控制、专注力和责任感。",
+      domains: ["照顾环境", "精细动作协调", "专注力", "独立性"],
+      materials: ["小浇水壶", "盆栽植物"],
+      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范在浇水壶中装入少量的水。", "展示缓慢而小心地在植物根部周围浇水。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
     },
   },
 ];
