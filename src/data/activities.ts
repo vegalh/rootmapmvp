@@ -1,4 +1,5 @@
 import type { Activity } from "../types";
+import mopping from "../assets/activities/mopping.jpg";
 
 // Unsplash image helper: pass just the photo id segment (after "images.unsplash.com/").
 const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
@@ -205,6 +206,31 @@ export const activities: Activity[] = [
       domains: ["地理知识", "分类能力", "语言表达"],
       materials: ["大洲卡片", "动物模型", "地标卡片", "垫子", "篮子"],
       steps: ["摆出大洲卡片。", "说出每个大洲的名称。", "选择一个模型。", "讨论它属于哪个大洲。", "放置后重复练习。"],
+    },
+  },
+  {
+    id: "mopping",
+    title: "Mopping",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 15,
+    materialsLabel: "2 materials",
+    image: mopping,
+    description: "Children learn to care for their environment by mopping the floor, building coordination, concentration, and a sense of responsibility.",
+    domains: ["Care of Environment", "Gross Motor Coordination", "Concentration", "Independence"],
+    materials: ["Child-sized mop", "Designated floor area"],
+    steps: ["Invite the child to the activity and name the materials.", "Demonstrate holding the mop with both hands.", "Show slow, deliberate back-and-forth strokes across the floor.", "Invite the child to try, starting from one side of the area.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    keywords: "mopping cleaning floor care of environment practical life",
+    zh: {
+      title: "拖地",
+      age: "2–3岁",
+      materialsLabel: "2种材料",
+      description: "孩子们通过拖地练习照顾周围环境，培养协调能力、专注力和责任感。",
+      domains: ["照顾环境", "大肌肉协调", "专注力", "独立性"],
+      materials: ["儿童专用拖把", "指定的地面区域"],
+      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何用双手握住拖把。", "展示缓慢而从容地来回拖地的动作。", "邀请孩子从区域的一侧开始尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
     },
   },
 ];
