@@ -3,8 +3,11 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 
-import siteConfiguration from './.figma/make/site.json'
-
+const siteConfiguration = {
+  title: 'RootMap',
+  description: 'RootMap MVP',
+  language: 'en',
+}
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
