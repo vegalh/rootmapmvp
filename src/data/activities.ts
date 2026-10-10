@@ -14,6 +14,7 @@ import eggPeelingCutting from "../assets/activities/egg-peeling-cutting.jpg";
 import readingAboutMyself from "../assets/activities/reading-about-myself.jpg";
 import cleaningChalkboard from "../assets/activities/cleaning-chalkboard.jpg";
 import spooningRice from "../assets/activities/spooning-rice.jpg";
+import spooningPasta from "../assets/activities/spooning-pasta.jpg";
 
 // Unsplash image helper: pass just the photo id segment (after "images.unsplash.com/").
 const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
@@ -595,6 +596,31 @@ export const activities: Activity[] = [
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗米", "木勺", "带标记线的罐子"],
       steps: ["邀请孩子参与活动，并说出材料的名称。", "示范从碗中舀出一勺米。", "小心地将米倒入罐中。", "重复操作直到米达到标记线。", "邀请孩子尝试，然后将米倒回碗中以便重复练习。"],
+    },
+  },
+  {
+    id: "spooning-pasta",
+    title: "Spooning Pasta",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 10,
+    materialsLabel: "3 materials",
+    image: spooningPasta,
+    description: "Children practice fine motor control and concentration by spooning pasta from one bowl into another.",
+    domains: ["Fine Motor Coordination", "Concentration", "Independence"],
+    materials: ["Bowl of dry pasta", "Spoon", "Empty bowl"],
+    steps: ["Invite the child to the activity and name the materials.", "Demonstrate scooping a spoonful of pasta from the full bowl.", "Pour the pasta carefully into the empty bowl.", "Repeat until all the pasta is transferred.", "Invite the child to try, then transfer the pasta back for repetition."],
+    keywords: "spooning pasta transfer fine motor practical life",
+    zh: {
+      title: "舀意面练习",
+      age: "2–3岁",
+      materialsLabel: "3种材料",
+      description: "孩子们通过用勺子将意面从一个碗舀到另一个碗中，练习精细动作控制和专注力。",
+      domains: ["精细动作协调", "专注力", "独立性"],
+      materials: ["一碗干意面", "勺子", "空碗"],
+      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范从装满的碗中舀出一勺意面。", "小心地将意面倒入空碗中。", "重复操作直到所有意面都转移完毕。", "邀请孩子尝试，然后将意面倒回原碗以便重复练习。"],
     },
   },
 ];
