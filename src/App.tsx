@@ -33,7 +33,7 @@ export default function App() {
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["leaf-transfer", "color-mixing"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
-  const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
+  const [lang, setLang] = useStored<Lang>("rootmap-language", "zh");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
   const [view, setView] = useStored<string>("rootmap-child-view", "grid");
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
