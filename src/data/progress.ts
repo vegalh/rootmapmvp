@@ -6,7 +6,6 @@ export const initialRecords: LessonRecord[] = [
   { id: "r2", childId: "emma", lesson: "Pink Tower", area: "Sensorial", stage: "Independent", date: "2026-10-05" },
   { id: "r3", childId: "emma", lesson: "Color Tablets", area: "Sensorial", stage: "Introduced", date: "2026-10-02" },
   { id: "r4", childId: "noah", lesson: "Color Tablets", area: "Sensorial", stage: "Practicing", date: "2026-10-07", notes: "Noah matched three pairs and returned the tablets to the box.", notesZh: "Noah配对了三组色板，并将色板放回盒子。" },
-  { id: "r5", childId: "sophia", lesson: "Pink Tower", area: "Sensorial", stage: "Independent", date: "2026-10-06" },
 ];
 
 // Seed observations shown on the Observations feed and each child's profile.
