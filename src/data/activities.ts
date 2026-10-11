@@ -20,6 +20,7 @@ import exploringFallVegetables from "../assets/activities/exploring-fall-vegetab
 import pouringToCups from "../assets/activities/pouring-to-cups.jpg";
 import rollingInTheLeaves from "../assets/activities/rolling-in-the-leaves.jpg";
 import duckWalk from "../assets/activities/duck-walk.jpg";
+import pouringStars from "../assets/activities/pouring-stars.jpg";
 
 // To add a new lesson/activity, append an object here with a unique `id`.
 // `area` groups it under a Discover category; `ageKey` must match one of the
@@ -548,6 +549,31 @@ export const activities: Activity[] = [
       domains: ["大肌肉协调", "平衡感", "专注力"],
       materials: ["开阔的户外空间"],
       steps: ["邀请孩子蹲低身体，像鸭子一样。", "示范如何保持低姿势向前摇摆走路。", "鼓励孩子尝试走几步，保持平衡。", "一起发出鸭子的叫声，让过程充满乐趣。", "给孩子空间，让他们按自己喜欢的方式重复练习并走得更远。"],
+    },
+  },
+  {
+    id: "pouring-stars",
+    title: "Pouring Stars",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 10,
+    materialsLabel: "3 materials",
+    image: pouringStars,
+    description: "Children build coordination and concentration by pouring water from a small pitcher into a star-shaped cup.",
+    domains: ["Care of Environment", "Coordination", "Concentration"],
+    materials: ["Small pitcher", "Star-shaped cup", "Tray"],
+    steps: ["Invite your child to try pouring, and name the materials together.", "Show how to hold the pitcher steady with both hands.", "Demonstrate pouring slowly into the star-shaped cup.", "Let your child try pouring at their own pace.", "Give your child space to repeat as many times as they like."],
+    keywords: "pouring stars water practical life coordination",
+    zh: {
+      title: "倒水入星形杯",
+      age: "2–3岁",
+      materialsLabel: "3种材料",
+      description: "孩子们通过将水从小水壶倒入星形杯子，培养协调能力和专注力。",
+      domains: ["照顾环境", "协调能力", "专注力"],
+      materials: ["小水壶", "星形杯子", "托盘"],
+      steps: ["邀请孩子一起试试倒水练习，并说出材料的名称。", "示范如何用双手稳稳握住水壶。", "展示缓慢地倒入星形杯子。", "让孩子按自己的节奏尝试倒水。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
 ];
