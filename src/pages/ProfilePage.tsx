@@ -1,10 +1,9 @@
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
-import type { Lang, Screen } from "../types";
+import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
-import profilePhoto from "../assets/profile/haowei.jpg";
 
-export function ProfilePage({ go, lang, appearance, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; t: Copy }) {
+export function ProfilePage({ go, lang, appearance, profile, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; profile: ProfileInfo; t: Copy }) {
   const groups: [string, [string, string, string, string?][]][] = [
     [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["notes", "note", t.myNotes]]],
     [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications]]],
@@ -14,8 +13,8 @@ export function ProfilePage({ go, lang, appearance, t }: { go: (s: Screen) => vo
     <main className="page-content profile-page">
       <PageHeader title={t.profile} subtitle={t.profileSubtitle} />
       <section className="user-summary">
-        <img src={profilePhoto} alt="" />
-        <div><h2>{t.parentName}</h2><p>{t.teacherRole}</p></div>
+        <img src={profile.photo} alt="" />
+        <div><h2>{profile.name}</h2><p>{t.teacherRole}</p></div>
       </section>
       {groups.map(([title, items]) => (
         <section className="menu-section" key={title}>

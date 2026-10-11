@@ -18,7 +18,8 @@ import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, Screen } from "./types";
+import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
+import haoweiPhoto from "./assets/profile/haowei.jpg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
 
@@ -33,6 +34,7 @@ export default function App() {
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
   const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
+  const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "HaoWei", photo: haoweiPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["leaf-transfer", "color-mixing"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "zh");
@@ -110,7 +112,7 @@ export default function App() {
     if (screen === "observations") {
       return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} t={t} />;
     if (screen === "child") {
       return (
         <ChildProfilePage
@@ -181,7 +183,7 @@ export default function App() {
     if (screen === "notifications") {
       return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
     }
-    return <SettingsPage screen={screen} back={() => go("profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} t={t} />;
+    return <SettingsPage screen={screen} back={() => go("profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
 
   return (

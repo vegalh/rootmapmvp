@@ -16,6 +16,12 @@ export type Child = {
   enrolledZh?: string;
 };
 
+export type ProfileInfo = {
+  name: string;
+  photo: string;
+  contact: string;
+};
+
 export type LessonRecord = {
   id: string;
   childId: string;

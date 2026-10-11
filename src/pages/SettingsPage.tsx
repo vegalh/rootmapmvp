@@ -1,17 +1,23 @@
+import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { PageHeader, NotificationToggle } from "../components/ui";
-import type { Lang, Screen } from "../types";
+import { PageHeader, NotificationToggle, Field } from "../components/ui";
+import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 
-export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, t }: {
+export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, t }: {
   screen: Screen;
   back: () => void;
   lang: Lang;
   setLang: (l: Lang) => void;
   appearance: string;
   setAppearance: (v: string) => void;
+  profile: ProfileInfo;
+  setProfile: (p: ProfileInfo) => void;
   t: Copy;
 }) {
+  const [name, setName] = useState(profile.name);
+  const [photo, setPhoto] = useState(profile.photo);
+  const [contact, setContact] = useState(profile.contact);
   const title = screen === "language" ? t.language
     : screen === "appearance" ? t.appearance
     : screen === "notes" ? t.myNotes
@@ -61,18 +67,34 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
     );
   }
 
+  if (screen === "personal") {
+    return (
+      <main className="simple-page">
+        <PageHeader title={title} back={back} />
+        <div className="info-card">
+          <img className="profile-edit-photo" src={photo} alt="" />
+          <p>{t.personalText}</p>
+        </div>
+        <div className="form-fields">
+          <Field label={t.profilePhotoUrl}><input type="text" value={photo} onChange={e => setPhoto(e.target.value)} /></Field>
+          <Field label={t.fullNameLabel}><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
+          <Field label={t.contactInfoLabel}><input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder={t.contactPlaceholder} /></Field>
+        </div>
+        <button className="wide-primary" onClick={() => setProfile({ name: name.trim() || profile.name, photo: photo.trim() || profile.photo, contact: contact.trim() })}>{t.save}</button>
+      </main>
+    );
+  }
+
   return (
     <main className="simple-page">
       <PageHeader title={title} back={back} />
       <div className="info-card">
-        <Icon name={screen === "privacy" ? "shield" : screen === "help" ? "help" : "user"} size={28} />
+        <Icon name={screen === "privacy" ? "shield" : "help"} size={28} />
         <h2>{title}</h2>
         <p>
           {screen === "privacy"
             ? t.privacyText
-            : screen === "help"
-            ? t.helpText
-            : t.personalText}
+            : t.helpText}
         </p>
         <button className="wide-primary">{screen === "help" ? t.contactSupport : t.manageButton}</button>
       </div>
