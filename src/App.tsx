@@ -64,6 +64,10 @@ export default function App() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [appearance]);
 
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  }, [lang]);
+
   const go = (s: Screen) => {
     setPrevious(screen);
     setScreen(s);

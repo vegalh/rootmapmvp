@@ -14,3 +14,90 @@
   /* Body copy, buttons, nav, form fields */
   --font-body: 'Nunito', system-ui, sans-serif;
 }
+
+/* ============================================================
+   Chinese (Simplified) typography
+   Scoped entirely to :lang(zh) so the English experience (fonts,
+   sizes, weights, the RootMap logo) is completely untouched.
+
+   Font choice: Gen Jyuu Gothic (源柔黑体) was requested, but it has
+   no production-ready WOFF2 build anywhere — only raw, unsubset
+   TTF files (~10MB each) via an npm/CDN mirror explicitly marked
+   "not for font downloading". With no subsetting tooling available,
+   it can't be reliably loaded on the web. Noto Sans SC is used
+   instead: same soft/rounded/humanist feel, officially hosted on
+   Google Fonts with proper WOFF2 delivery and variable weights.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap');
+
+:root {
+  --font-heading-zh: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body-zh: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* Base Chinese font + comfortable body line-height (1.6–1.75) */
+html:lang(zh) {
+  font-family: var(--font-body-zh);
+  line-height: 1.65;
+}
+
+/* Main page titles (26–28px), medium weight instead of the English
+   Caveat script's bold 38px/29px treatment, which reads as too heavy
+   in a Chinese sans. */
+.page-header h1:lang(zh),
+.hero-title h1:lang(zh),
+.detail-content h1:lang(zh),
+.profile-hero h1:lang(zh) {
+  font-family: var(--font-heading-zh);
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Section headings (19–21px) */
+.section-title h2:lang(zh),
+.detail-content h2:lang(zh),
+.bottom-sheet h2:lang(zh),
+.user-summary h2:lang(zh),
+.info-card h2:lang(zh) {
+  font-family: var(--font-heading-zh);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Child names (20–24px) */
+.child-select-info strong:lang(zh),
+.form-child strong:lang(zh) {
+  font-family: var(--font-heading-zh);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Activity / lesson titles (17–20px) */
+.activity-name:lang(zh),
+.learning-card > strong:lang(zh),
+.activity-row strong:lang(zh),
+.plan-activity strong:lang(zh),
+.add-child-card strong:lang(zh) {
+  font-family: var(--font-heading-zh);
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Bottom navigation labels (11–12px) so Chinese labels never wrap or clip */
+.bottom-nav button span:lang(zh) {
+  font-size: 12px;
+  letter-spacing: normal;
+}
+.bottom-nav button.active:lang(zh) {
+  font-weight: 600;
+}
+
+/* Chinese characters don't use Latin-style letter tracking */
+.menu-section h3:lang(zh),
+.form-child small:lang(zh) {
+  letter-spacing: normal;
+}
