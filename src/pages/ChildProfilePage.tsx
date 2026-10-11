@@ -14,13 +14,14 @@ const baseStats: Record<string, [number, number, number, number]> = {
   Mathematics: [4, 2, 2, 0],
 };
 
-export function ChildProfilePage({ child, records, observations, edit, back, record, t }: {
+export function ChildProfilePage({ child, records, observations, edit, back, record, remove, t }: {
   child: Child;
   records: LessonRecord[];
   observations: Observation[];
   edit: () => void;
   back: () => void;
   record: () => void;
+  remove: () => void;
   t: Copy;
 }) {
   const [tab, setTab] = useState("Overview");
@@ -31,7 +32,10 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
       <header className="child-header">
         <button onClick={back}><Icon name="back" size={18} /> {t.classroom}</button>
         <TreeLogo />
-        <button onClick={edit}>{t.edit}</button>
+        <div className="child-header-actions">
+          <button onClick={edit}>{t.edit}</button>
+          <button onClick={remove}><Icon name="trash" size={18} /></button>
+        </div>
       </header>
       <section className="profile-hero">
         <img src={child.photo} alt="" />

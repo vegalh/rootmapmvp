@@ -21,6 +21,7 @@ export const copy = {
     notificationsTitle: "Notifications", followUps: "Follow-ups", notesPlaceholder: "Planning ideas, reminders, and reflections…", min: "min", searchActivities: "Search activities…", childrenWord: "children",
     teacherRole: "Teacher · Primary Classroom", minutesWord: "minutes", copiedToClipboard: "Activity details copied to clipboard.", defaultRecordNoteTemplate: "{name} repeated the work with careful, deliberate movements.", classroomUpdateTitle: "Classroom Update", parentName: "HaoWei",
     recordingFor: "Recording for", notifyEmmaFollowUp: "Follow up on Pouring Water this week.", notifyNoahFollowUp: "Review yesterday’s Color Tablets observation.", notifyClassroomUpdate: "A new child profile has been added.", customActivityLabel: "Custom activity", materialsLabelShort: "Materials", planLabel: "Plan",
+    deleteChild: "Delete Child", confirmDeleteChild: "Delete {name}'s profile? This cannot be undone.",
     code: "en",
   },
   zh: {
@@ -44,6 +45,7 @@ export const copy = {
     notificationsTitle: "通知", followUps: "跟进事项", notesPlaceholder: "计划想法、提醒和反思…", min: "分钟", searchActivities: "搜索活动…", childrenWord: "个孩子",
     teacherRole: "教师 · 基础班教室", minutesWord: "分钟", copiedToClipboard: "活动详情已复制到剪贴板。", defaultRecordNoteTemplate: "{name}以专注而从容的动作重复了这项工作。", classroomUpdateTitle: "教室更新", parentName: "郝伟",
     recordingFor: "记录对象", notifyEmmaFollowUp: "跟进本周的倒水练习。", notifyNoahFollowUp: "回顾昨天的颜色色片观察。", notifyClassroomUpdate: "已添加一位新孩子档案。", customActivityLabel: "自定义活动", materialsLabelShort: "所需材料", planLabel: "计划",
+    deleteChild: "删除孩子", confirmDeleteChild: "删除{name}的档案？此操作无法撤销。",
     code: "zh",
   },
 };

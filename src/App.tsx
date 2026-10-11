@@ -125,6 +125,11 @@ export default function App() {
             const [first, ...last] = fullName.trim().split(" ");
             setChildrenData(childrenData.map(c => (c.id === child.id ? { ...c, first, last: last.join(" ") || c.last } : c)));
           }}
+          remove={() => {
+            if (!window.confirm(t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`))) return;
+            setChildrenData(childrenData.filter(c => c.id !== child.id));
+            go("children");
+          }}
           back={() => go("children")}
           record={() => go("record")}
           t={t}
