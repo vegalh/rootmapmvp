@@ -2,19 +2,21 @@ import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
 import { Empty } from "../components/ui";
 import { fmt } from "../lib/dates";
-import type { Child, LessonRecord, Observation } from "../types";
-import { childAge, lessonLabel, noteText, type Copy } from "../lib/i18n";
+import { entryText, newestFirst } from "../lib/entries";
+import type { Child, Entry } from "../types";
+import { childAge, type Copy } from "../lib/i18n";
 
-export function ChildrenPage({ childrenData, observations, goChild, openAddChild, openNotifications, t }: {
+export function ChildrenPage({ childrenData, entries, goChild, openAddChild, openNotifications, t }: {
   childrenData: Child[];
-  records: LessonRecord[];
-  observations: Observation[];
+  // The shared Moments collection.
+  entries: Entry[];
   goChild: (id: string) => void;
   openAddChild: () => void;
   openNotifications: () => void;
   t: Copy;
 }) {
-  const latest = (id: string) => observations.filter(o => o.childId === id).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const recent = entries.filter(e => childrenData.some(c => c.id === e.childId)).sort(newestFirst);
+  const latest = (id: string) => recent.find(e => e.childId === id);
 
   return (
     <>
@@ -53,13 +55,13 @@ export function ChildrenPage({ childrenData, observations, goChild, openAddChild
           <>
             <div className="section-title recent-title"><h2>{t.recentMomentsLabel}</h2></div>
             <div className="recent-activity">
-              {observations.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(o => {
+              {recent.slice(0, 3).map(o => {
                 const c = childrenData.find(x => x.id === o.childId);
                 if (!c) return null;
                 return (
                   <button onClick={() => goChild(c.id)} key={o.id}>
                     <img src={c.photo} alt="" />
-                    <span><strong>{c.first} {c.last}</strong><small>{o.lesson ? lessonLabel(o.lesson, t) : t.independentObservation} · {fmt(o.date)}</small><p>{noteText(o.notes, o.notesZh, t)}</p></span>
+                    <span><strong>{c.first} {c.last}</strong><small>{o.title || t.independentObservation} · {fmt(o.date)}</small><p>{entryText(o, t.code === "zh" ? "zh" : "en")}</p></span>
                     <Icon name="chevron" size={16} />
                   </button>
                 );

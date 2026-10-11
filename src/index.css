@@ -240,6 +240,30 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .journal-entry-photos img { width: 100%; display: block; border-radius: 20px; box-shadow: var(--shadow); }
 .journal-entry-text { margin: 18px 0 0; font-size: 17px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
 
+/* Moments + Journal share one entry collection; Moments cards also name the child. */
+.moments-page .page-header { min-height: 125px; }
+.moments-controls { display: flex; align-items: center; gap: 8px; }
+.moments-controls .mini-select { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 11px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
+.moments-controls .mini-select span { display: none; }
+.moments-controls .mini-select select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; font-weight: 600; }
+.moments-controls .icon-button { flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
+.entry-child { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.entry-child img { width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
+.entry-child > span { min-width: 0; }
+.entry-child strong, .journal-card .entry-child strong { display: block; margin: 0; font: 700 15.5px/1.3 var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-child time, .journal-card .entry-child time { display: block; margin-top: 1px; font-size: 13px; letter-spacing: .3px; color: var(--muted); }
+.journal-entry > .entry-child { margin-bottom: 4px; }
+.journal-card .entry-child + strong, .journal-card .entry-child + p { margin-top: 10px; }
+.entry-child-pick { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
+.entry-child-pick img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+.entry-child-pick > span { flex: 1; min-width: 0; }
+.entry-child-pick small { display: block; font-size: 12.5px; color: var(--muted); }
+.entry-child-pick strong { display: block; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-child-pick svg { color: var(--muted); }
+.entry-child-pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.toast { position: fixed; z-index: 60; left: 50%; bottom: 112px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px; color: white; background: var(--dark-purple); font-size: 14.5px; font-weight: 600; box-shadow: var(--shadow); text-align: center; }
+:root[data-theme="dark"] .toast { color: #17131e; }
+
 /* My Goals: the parent's own short list of intentions. */
 .goals-page .goals-add { margin-top: 4px; }
 .goal-section { margin-top: 24px; }

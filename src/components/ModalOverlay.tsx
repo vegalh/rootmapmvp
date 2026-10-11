@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { Modal, Field } from "./ui";
 import { isoToday } from "../lib/dates";
-import type { Activity, Child, ModalKind, Observation, Plan, Screen } from "../types";
-import { groupOptionLabel, localizeActivity, recentOptionLabel, skillLabel, sortOptionLabel, type Copy } from "../lib/i18n";
+import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
+import { groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 
-export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveObservation, t }: {
+export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, t }: {
   modal: ModalKind;
   close: (destination?: Screen | ModalKind) => void;
   childrenData: Child[];
@@ -16,7 +16,6 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   plans: Plan[];
   setPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
   selectedChild: string;
-  saveObservation: (o: Observation) => void;
   t: Copy;
 }) {
   const [name, setName] = useState("");
@@ -27,16 +26,10 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   const [date, setDate] = useState(isoToday());
   const [chosen, setChosen] = useState<string[]>(selectedChild ? [selectedChild] : []);
   const [planNote, setPlanNote] = useState("");
-  const [obsChild, setObsChild] = useState(selectedChild || childrenData[0].id);
-  const [obsNotes, setObsNotes] = useState("");
-  const [obsSkills, setObsSkills] = useState<string[]>([]);
-  const [nextSteps, setNextSteps] = useState("");
-  const [followUp, setFollowUp] = useState("");
 
   useEffect(() => {
     if (modal === "plan") setChosen(selectedChild ? [selectedChild] : []);
-    if (modal === "observation") setObsChild(selectedChild || childrenData[0].id);
-  }, [modal, selectedChild, childrenData]);
+  }, [modal, selectedChild]);
 
   if (!modal) return null;
 
@@ -69,7 +62,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
       <Modal title={t.quickAdd} close={close}>
         <div className="quick-actions">
           <button onClick={() => close("record")}><Icon name="book" />{t.recordLessonPresentation}</button>
-          <button onClick={() => close("observation")}><Icon name="note" />{t.addObservation}</button>
+          <button onClick={() => close("entryEdit")}><Icon name="note" />{t.addMoment}</button>
           <button onClick={() => close("addChild")}><Icon name="user" />{t.addChild}</button>
         </div>
       </Modal>
@@ -135,53 +128,26 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
     );
   }
 
-  if (modal === "plan") {
-    const planActivity = localizeActivity(selectedActivity, t);
-    return (
-      <Modal title={t.addWeek} close={close}>
-        <div className="sheet-fields">
-          <div className="plan-activity"><img src={planActivity.image} alt="" /><strong>{planActivity.title}</strong></div>
-          <Field label={t.date}><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
-          <fieldset>
-            <legend>{t.selectChildren}</legend>
-            <div className="child-checks">
-              {childrenData.map(c => (
-                <button className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
-                  <img src={c.photo} alt="" />{c.first}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <Field label={t.planningNote}><textarea value={planNote} onChange={e => setPlanNote(e.target.value)} /></Field>
-        </div>
-        <button className="modal-primary" onClick={() => { setPlans([...plans, { id: `p-${Date.now()}`, activityId: selectedActivity.id, date, childIds: chosen, note: planNote }]); close("week"); }}>{t.addWeek}</button>
-      </Modal>
-    );
-  }
-
+  // modal === "plan"
+  const planActivity = localizeActivity(selectedActivity, t);
   return (
-    <Modal title={t.addObservation} close={close}>
+    <Modal title={t.addWeek} close={close}>
       <div className="sheet-fields">
-        <Field label={t.childLabel}><select value={obsChild} onChange={e => setObsChild(e.target.value)}>{childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}</select></Field>
+        <div className="plan-activity"><img src={planActivity.image} alt="" /><strong>{planActivity.title}</strong></div>
         <Field label={t.date}><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
-        <Field label={t.observationNotesField}><textarea rows={5} value={obsNotes} onChange={e => setObsNotes(e.target.value)} placeholder={t.observationNotesPlaceholder} /></Field>
-        <Field label={t.associatedLesson}><input value={planNote} onChange={e => setPlanNote(e.target.value)} /></Field>
         <fieldset>
-          <legend>{t.skillsObserved}</legend>
-          <div className="chips">
-            {["Concentration", "Independence", "Fine motor control", "Order"].map(x => (
-              <button className={obsSkills.includes(x) ? "active" : ""} onClick={() => setObsSkills(obsSkills.includes(x) ? obsSkills.filter(y => y !== x) : [...obsSkills, x])} key={x}>{skillLabel(x, t)}</button>
+          <legend>{t.selectChildren}</legend>
+          <div className="child-checks">
+            {childrenData.map(c => (
+              <button className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
+                <img src={c.photo} alt="" />{c.first}
+              </button>
             ))}
           </div>
         </fieldset>
-        <Field label={t.nextStepsOptional}><textarea value={nextSteps} onChange={e => setNextSteps(e.target.value)} /></Field>
-        <Field label={t.followUpDateOptional}><input type="date" value={followUp} onChange={e => setFollowUp(e.target.value)} /></Field>
+        <Field label={t.planningNote}><textarea value={planNote} onChange={e => setPlanNote(e.target.value)} /></Field>
       </div>
-      <button className="modal-primary" onClick={() => {
-        if (!obsNotes.trim()) return;
-        saveObservation({ id: `o-${Date.now()}`, childId: obsChild, date, notes: obsNotes, lesson: planNote || undefined, skills: obsSkills, nextSteps, followUp });
-        close("observations");
-      }}>{t.saveMoment}</button>
+      <button className="modal-primary" onClick={() => { setPlans([...plans, { id: `p-${Date.now()}`, activityId: selectedActivity.id, date, childIds: chosen, note: planNote }]); close("week"); }}>{t.addWeek}</button>
     </Modal>
   );
 }

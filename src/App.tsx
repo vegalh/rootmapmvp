@@ -5,27 +5,32 @@ import { Icon } from "./components/Icon";
 import { ChildrenPage } from "./pages/ChildrenPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { ActivityDetailPage } from "./pages/ActivityDetailPage";
-import { ObservationsPage } from "./pages/ObservationsPage";
+import { MomentsPage } from "./pages/MomentsPage";
 import { ChildProfilePage } from "./pages/ChildProfilePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { MyWeekPage, ActivityRow } from "./pages/MyWeekPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
-import { JournalEditorPage } from "./pages/JournalEditorPage";
-import { JournalEntryPage } from "./pages/JournalEntryPage";
+import { EntryEditorPage } from "./pages/EntryEditorPage";
+import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { tryStore, useStored } from "./lib/storage";
-import { localIsoToday } from "./lib/dates";
+import { ENTRIES_KEY, MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy } from "./lib/i18n";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { Child, Goal, JournalEntry, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
+import type { Child, Entry, Goal, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
+
+// Refreshes seed-owned items (matched by id) to the bundled seed while keeping everything the parent added.
+function refreshSeed<T extends { id: string }>(current: T[], seed: T[]): T[] {
+  return [...seed, ...current.filter(x => !seed.some(s => s.id === x.id))];
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("children");
@@ -33,9 +38,15 @@ export default function App() {
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
   const [selectedActivity, setSelectedActivity] = useState("water-pouring");
-  const [childTab, setChildTab] = useState("Moments");
-  // Journal entry being viewed/edited; undefined in the editor means "new entry".
+  const [childTab, setChildTab] = useState("Journal");
+  // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
+  // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal).
+  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child">("moments");
+  // Child preselected for a new entry.
+  const [editorChild, setEditorChild] = useState<string | undefined>();
+  const [momentsFilter, setMomentsFilter] = useState("All");
+  const [toast, setToast] = useState("");
 
   const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
@@ -44,8 +55,9 @@ export default function App() {
   const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
-  // Journal entries (per child) and goals (per parent) use their own keys, so seed-version resets never touch them.
-  const [journal, setJournal] = useStored<JournalEntry[]>("rootmap-journal", []);
+  // Moments/Journal entries (per child) and goals (per parent) use their own keys, so seed-version resets never touch them.
+  const [entries, setEntries] = useStored<Entry[]>(ENTRIES_KEY, []);
+  const [migrated, setMigrated] = useStored<string[]>(MIGRATED_KEY, []);
   const [goals, setGoals] = useStored<Goal[]>("rootmap-goals", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
@@ -53,13 +65,16 @@ export default function App() {
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
 
-  // When the bundled seed data changes (SEED_VERSION bumped), reset saved children/lessons/observations
-  // to the new seed so every device picks up the update instead of keeping its old cached copy.
+  // When the bundled seed data changes (SEED_VERSION bumped), refresh the seed children/lessons/observations
+  // so every device picks up the update, without dropping anything the parent created or renamed.
   useEffect(() => {
     if (seedVersion >= SEED_VERSION) return;
-    setChildrenData(initialChildren);
-    setRecords(initialRecords);
-    setObservations(initialObservations);
+    setChildrenData(current => refreshSeed(current, initialChildren).map(c => {
+      const mine = current.find(x => x.id === c.id);
+      return mine ? { ...c, first: mine.first, last: mine.last, notes: mine.notes } : c;
+    }));
+    setRecords(current => refreshSeed(current, initialRecords));
+    setObservations(current => refreshSeed(current, initialObservations));
     setProfile({ name: "Alex Hao", photo: alexPhoto, contact: "" });
     // Drop any saved-activity ids that no longer exist, which previously caused a white-screen crash.
     setSaved(current => current.filter(id => activities.some(a => a.id === id)));
@@ -69,14 +84,29 @@ export default function App() {
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
   const activity = activities.find(a => a.id === selectedActivity) || activities[0];
-  const entry = journal.find(e => e.id === selectedEntry);
+  const entry = entries.find(e => e.id === selectedEntry);
 
   // Writes synchronously first so a full device (large photos) is reported instead of silently losing the entry.
-  const storeJournal = (next: JournalEntry[]) => {
-    if (!tryStore("rootmap-journal", next)) return false;
-    setJournal(next);
+  const storeEntries = (next: Entry[]) => {
+    if (!tryStore(ENTRIES_KEY, next)) return false;
+    setEntries(next);
     return true;
   };
+
+  // Copies legacy observations into the entry collection once each (tracked in MIGRATED_KEY). Safe to run on
+  // every load; the observations themselves stay in "rootmap-observations". If storage is full it retries next load.
+  useEffect(() => {
+    const result = importObservations(entries, observations, migrated);
+    if (!result || !tryStore(ENTRIES_KEY, result.entries)) return;
+    setEntries(result.entries);
+    setMigrated(result.migrated);
+  }, [entries, observations, migrated, setEntries, setMigrated]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(""), 2200);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   useEffect(() => {
     const dark = appearance === "dark" || (appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -93,11 +123,21 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const topLevel = ["children", "discover", "observations", "profile"].includes(screen);
+  const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
+  const originScreen: Screen = entryOrigin === "child" ? "child" : "observations";
+  const openEntry = (id: string, origin: "moments" | "child") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
+  const startEntry = (origin: "moments" | "child", childId?: string) => {
+    if (!childrenData.length) { setModal("addChild"); return; }
+    setSelectedEntry(undefined);
+    setEntryOrigin(origin);
+    setEditorChild(childId);
+    go("entryEdit");
+  };
 
   const closeModal = (destination?: Screen | ModalKind) => {
     setModal(null);
     if (destination === "record") go("record");
-    else if (destination === "observation") setModal("observation");
+    else if (destination === "entryEdit") startEntry("moments", momentsFilter === "All" ? undefined : momentsFilter);
     else if (destination === "addChild") setModal("addChild");
     else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
   };
@@ -107,9 +147,8 @@ export default function App() {
       return (
         <ChildrenPage
           childrenData={childrenData}
-          records={records}
-          observations={observations}
-          goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }}
+          entries={entries}
+          goChild={goChild}
           openAddChild={() => setModal("addChild")}
           openNotifications={() => go("notifications")}
           t={t}
@@ -132,7 +171,18 @@ export default function App() {
       );
     }
     if (screen === "observations") {
-      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }} t={t} />;
+      return (
+        <MomentsPage
+          entries={entries}
+          childrenData={childrenData}
+          childFilter={momentsFilter}
+          setChildFilter={setMomentsFilter}
+          lang={lang}
+          open={id => openEntry(id, "moments")}
+          write={childId => startEntry("moments", childId)}
+          t={t}
+        />
+      );
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} t={t} />;
     if (screen === "child") {
@@ -140,17 +190,19 @@ export default function App() {
         <ChildProfilePage
           child={child}
           records={records}
-          observations={observations}
-          journal={journal}
+          entries={entries}
+          pendingNotes={hasPendingNotes(child, entries, migrated)}
           tab={childTab}
           setTab={setChildTab}
           lang={lang}
-          openEntry={id => { setSelectedEntry(id); go("journalEntry"); }}
-          writeEntry={() => { setSelectedEntry(undefined); go("journalEdit"); }}
+          openEntry={id => openEntry(id, "child")}
+          writeEntry={() => startEntry("child", child.id)}
           importNotes={() => {
-            // Copies the legacy note into the journal; `child.notes` itself is left untouched.
-            const now = new Date().toISOString();
-            storeJournal([{ id: `j-${Date.now()}`, childId: child.id, date: localIsoToday(), text: child.notes?.trim(), photos: [], createdAt: now, updatedAt: now, fromNotes: true }, ...journal]);
+            // Copies the legacy note into the collection once; `child.notes` itself is left untouched.
+            if (!hasPendingNotes(child, entries, migrated)) return;
+            if (!storeEntries([notesEntry(child), ...entries])) { setToast(t.journalStorageFull); return; }
+            setMigrated([...migrated, `notes:${child.id}`]);
+            setToast(t.entrySaved);
           }}
           edit={() => {
             const fullName = window.prompt(t.childFullName, `${child.first} ${child.last}`);
@@ -177,44 +229,53 @@ export default function App() {
           t={t}
           save={r => {
             const item = { ...r, id: `r-${Date.now()}`, childId: child.id };
+            // Activity notes stay on the activity record (Activities tab); memories are recorded through Moments.
             setRecords([item, ...records]);
-            setObservations([{ id: `o-${Date.now()}`, childId: child.id, date: r.date, notes: r.notes || "", area: r.area, lesson: r.lesson, skills: r.skills || [], nextSteps: r.nextSteps }, ...observations]);
             go("child");
           }}
         />
       );
     }
-    if (screen === "journalEntry") {
+    if (screen === "entry") {
       if (!entry) return null;
       return (
-        <JournalEntryPage
+        <EntryDetailPage
           entry={entry}
+          child={childrenData.find(c => c.id === entry.childId)}
           lang={lang}
-          back={() => go("child")}
-          edit={() => go("journalEdit")}
-          remove={() => { storeJournal(journal.filter(e => e.id !== entry.id)); go("child"); }}
+          back={() => go(originScreen)}
+          edit={() => go("entryEdit")}
+          remove={() => {
+            if (!storeEntries(entries.filter(e => e.id !== entry.id))) { setToast(t.journalStorageFull); return; }
+            setToast(t.entryDeleted);
+            go(originScreen);
+          }}
           t={t}
         />
       );
     }
-    if (screen === "journalEdit") {
+    if (screen === "entryEdit") {
       return (
-        <JournalEditorPage
-          key={`${child.id}:${entry?.id || "new"}`}
-          child={child}
+        <EntryEditorPage
+          key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}`}
+          childrenData={childrenData}
+          childId={entry?.childId || (editorChild && childrenData.some(c => c.id === editorChild) ? editorChild : childrenData[0]?.id || "")}
+          lockChild={entryOrigin === "child"}
           entry={entry}
           lang={lang}
-          back={() => go(entry ? "journalEntry" : "child")}
+          back={() => go(entry ? "entry" : originScreen)}
           save={f => {
             const now = new Date().toISOString();
-            const fields = { date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
+            const fields = { childId: f.childId, date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
             if (entry) {
-              if (!storeJournal(journal.map(e => (e.id === entry.id ? { ...e, ...fields, updatedAt: now } : e)))) return false;
-              go("journalEntry");
+              // Same id and createdAt; a translated seed text no longer matches once the text is edited.
+              const textZh = (entry.text || "") === (fields.text || "") ? entry.textZh : undefined;
+              if (!storeEntries(entries.map(e => (e.id === entry.id ? { ...e, ...fields, textZh, updatedAt: now } : e)))) return false;
             } else {
-              if (!storeJournal([{ id: `j-${Date.now()}`, childId: child.id, ...fields, createdAt: now, updatedAt: now }, ...journal])) return false;
-              go("child");
+              if (!storeEntries([{ id: `m-${Date.now()}`, ...fields, createdAt: now, updatedAt: now }, ...entries])) return false;
             }
+            setToast(t.entrySaved);
+            go(originScreen);
             return true;
           }}
           t={t}
@@ -255,7 +316,7 @@ export default function App() {
       );
     }
     if (screen === "notifications") {
-      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }} t={t} />;
+      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={goChild} t={t} />;
     }
     return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
@@ -276,9 +337,9 @@ export default function App() {
         plans={plans}
         setPlans={setPlans}
         selectedChild={selectedChild}
-        saveObservation={(o: Observation) => setObservations([o, ...observations])}
         t={t}
       />
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
 }

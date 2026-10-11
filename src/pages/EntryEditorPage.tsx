@@ -3,36 +3,41 @@ import { Icon } from "../components/Icon";
 import { draftKey, readDraft, writeDraft } from "../lib/journalDrafts";
 import { fmtLong, localIsoToday } from "../lib/dates";
 import { resizePhoto } from "../lib/photos";
-import type { Child, JournalDraft, JournalEntry, Lang } from "../types";
+import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
-type Fields = Omit<JournalDraft, "savedAt">;
+type Fields = Required<Omit<EntryDraft, "savedAt">>;
 type DraftStatus = "idle" | "saving" | "saved" | "failed";
 
 const sameFields = (a: Fields, b: Fields) =>
-  a.date === b.date && a.title === b.title && a.text === b.text && a.photos.length === b.photos.length && a.photos.every((p, i) => p === b.photos[i]);
+  a.childId === b.childId && a.date === b.date && a.title === b.title && a.text === b.text && a.photos.length === b.photos.length && a.photos.every((p, i) => p === b.photos[i]);
 const hasContent = (f: Fields) => Boolean(f.title.trim() || f.text.trim() || f.photos.length);
 
-// Distraction-free editor for creating or editing one journal entry. Unsaved changes are autosaved
-// as a local draft; the published entry is only changed when the parent taps Save.
-export function JournalEditorPage({ child, entry, lang, save, back, t }: {
-  child: Child;
-  entry?: JournalEntry;
+// The one editor for every memory, whether started from Moments or a child's Journal. Unsaved changes are
+// autosaved as a local draft; the published entry is only changed when the parent taps Save.
+export function EntryEditorPage({ childrenData, childId, lockChild, entry, lang, save, back, t }: {
+  childrenData: Child[];
+  // Preselected child (the Journal's child, or the Moments filter); ignored when editing.
+  childId: string;
+  // From a child's Journal the child is shown as read-only context instead of a picker.
+  lockChild: boolean;
+  entry?: Entry;
   lang: Lang;
   // Returns false when the entry couldn't be stored (e.g. device out of space).
   save: (fields: Fields) => boolean;
   back: () => void;
   t: Copy;
 }) {
-  const key = draftKey(child.id, entry?.id);
+  // An edit's draft stays under the entry's original child even if the parent picks another child.
+  const keyFor = (f: Fields) => (entry ? draftKey(entry.childId, entry.id) : draftKey(f.childId));
   const base: Fields = entry
-    ? { date: entry.date, title: entry.title || "", text: entry.text || "", photos: entry.photos }
-    : { date: localIsoToday(), title: "", text: "", photos: [] };
+    ? { childId: entry.childId, date: entry.date, title: entry.title || "", text: entry.text || "", photos: entry.photos }
+    : { childId, date: localIsoToday(), title: "", text: "", photos: [] };
   // A new-entry draft is only worth keeping once it has content; an edit draft once it differs from the entry.
   const isDirty = (f: Fields) => (entry ? !sameFields(f, base) : hasContent(f));
 
-  const [initialDraft] = useState(() => readDraft(key));
-  const [fields, setFields] = useState<Fields>(() => (initialDraft ? { date: initialDraft.date, title: initialDraft.title, text: initialDraft.text, photos: initialDraft.photos } : base));
+  const [initialDraft] = useState(() => readDraft(keyFor(base)));
+  const [fields, setFields] = useState<Fields>(() => (initialDraft ? { childId: initialDraft.childId || base.childId, date: initialDraft.date, title: initialDraft.title, text: initialDraft.text, photos: initialDraft.photos } : base));
   const [restored, setRestored] = useState(Boolean(initialDraft));
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [error, setError] = useState("");
@@ -44,10 +49,16 @@ export function JournalEditorPage({ child, entry, lang, save, back, t }: {
 
   const persistDraft = (f: Fields): DraftStatus => {
     if (!isDirty(f)) {
-      writeDraft(key, null);
+      writeDraft(keyFor(f), null);
       return "idle";
     }
-    return writeDraft(key, { ...f, savedAt: new Date().toISOString() }) ? "saved" : "failed";
+    return writeDraft(keyFor(f), { ...f, savedAt: new Date().toISOString() }) ? "saved" : "failed";
+  };
+
+  // A new entry's draft follows the chosen child, so move it rather than leaving a copy behind.
+  const chooseChild = (id: string) => {
+    if (!entry) writeDraft(draftKey(fields.childId), null);
+    set({ childId: id });
   };
 
   // Debounced autosave after each change.
@@ -91,11 +102,11 @@ export function JournalEditorPage({ child, entry, lang, save, back, t }: {
     if (!canSave) return;
     if (!save(fields)) { setError(t.journalStorageFull); return; }
     done.current = true;
-    writeDraft(key, null);
+    writeDraft(keyFor(fields), null);
   };
 
   const discard = () => {
-    writeDraft(key, null);
+    writeDraft(keyFor(fields), null);
     setRestored(false);
     setStatus("idle");
     // Skip the autosave pass for this reset.
@@ -103,12 +114,30 @@ export function JournalEditorPage({ child, entry, lang, save, back, t }: {
     setFields(base);
   };
 
+  const child = childrenData.find(c => c.id === fields.childId);
+
   return (
     <main className="journal-editor">
       <header className="journal-editor-bar">
         <button onClick={back}><Icon name="back" size={18} />{t.back}</button>
-        <button className="journal-save" onClick={submit} disabled={!canSave}>{t.saveEntry}</button>
+        <button className="journal-save" onClick={submit} disabled={!canSave}>{t.save}</button>
       </header>
+
+      {lockChild ? (
+        <div className="entry-child-pick">
+          {child && <img src={child.photo} alt="" />}
+          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
+        </div>
+      ) : (
+        <label className="entry-child-pick">
+          {child && <img src={child.photo} alt="" />}
+          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
+          <Icon name="down" size={16} />
+          <select value={fields.childId} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
+            {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}
+          </select>
+        </label>
+      )}
 
       <label className="journal-date">
         <span>{fmtLong(fields.date, lang)}</span>
@@ -149,4 +178,4 @@ export function JournalEditorPage({ child, entry, lang, save, back, t }: {
   );
 }
 
-export default JournalEditorPage;
+export default EntryEditorPage;

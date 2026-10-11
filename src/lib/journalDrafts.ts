@@ -1,13 +1,13 @@
-import type { JournalDraft } from "../types";
+import type { EntryDraft } from "../types";
 import { tryStore } from "./storage";
 
-// Unsaved journal editor state lives under one localStorage key, keyed by "<childId>:<entryId|new>".
+// Unsaved editor state lives under one localStorage key, keyed by "<childId>:<entryId|new>".
 // Drafts never touch published entries; they are only applied when the parent taps Save.
 const KEY = "rootmap-journal-drafts";
 
 export const draftKey = (childId: string, entryId?: string) => `${childId}:${entryId || "new"}`;
 
-function readAll(): Record<string, JournalDraft> {
+function readAll(): Record<string, EntryDraft> {
   try {
     return JSON.parse(localStorage.getItem(KEY) || "{}");
   } catch {
@@ -15,12 +15,20 @@ function readAll(): Record<string, JournalDraft> {
   }
 }
 
-export function readDraft(key: string): JournalDraft | undefined {
+export function readDraft(key: string): EntryDraft | undefined {
   return readAll()[key];
 }
 
+// Most recent unfinished new entry for any of `childIds`, so the Moments page can offer to continue it.
+export function latestNewDraft(childIds: string[]): { childId: string; draft: EntryDraft } | undefined {
+  return Object.entries(readAll())
+    .filter(([k]) => k.endsWith(":new") && childIds.includes(k.slice(0, -4)))
+    .map(([k, draft]) => ({ childId: k.slice(0, -4), draft }))
+    .sort((a, b) => b.draft.savedAt.localeCompare(a.draft.savedAt))[0];
+}
+
 // Stores (or with `null`, clears) a draft. Returns false when storage is full.
-export function writeDraft(key: string, draft: JournalDraft | null): boolean {
+export function writeDraft(key: string, draft: EntryDraft | null): boolean {
   const all = readAll();
   if (draft) all[key] = draft;
   else delete all[key];

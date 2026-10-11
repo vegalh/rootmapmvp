@@ -24,13 +24,16 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `i18n.ts` - English/Chinese translation strings (`copy`) and the `Copy` type.
   - `storage.ts` - `useStored` hook (localStorage-backed `useState`).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
+  - `entries.ts` - The unified Moments/Journal entry collection (`rootmap-journal`): search, month grouping, and the idempotent import of legacy observations and child notes.
+  - `journalDrafts.ts` - Autosaved editor drafts (`rootmap-journal-drafts`).
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
   - `TreeLogo.tsx` - RootMap brand logo.
   - `ui.tsx` - Shared UI atoms: `PageHeader`, `BottomNav`, `Shell`, `FilterSelect`, `Field`, `Modal`, `Empty`, `NotificationToggle`.
-  - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, observation, week-add).
+  - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
+  - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
-  - `ChildrenPage.tsx`, `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `ObservationsPage.tsx`, `ChildProfilePage.tsx`, `ProfilePage.tsx`, `MyWeekPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx`.
+  - `ChildrenPage.tsx`, `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts

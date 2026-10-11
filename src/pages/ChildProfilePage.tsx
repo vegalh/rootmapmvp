@@ -1,17 +1,21 @@
+import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { JournalTimeline } from "../components/JournalTimeline";
+import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
-import { Empty } from "../components/ui";
+import { draftKey, readDraft } from "../lib/journalDrafts";
+import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt } from "../lib/dates";
-import type { Child, JournalEntry, Lang, LessonRecord, Observation } from "../types";
-import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
+import type { Child, Entry, Lang, LessonRecord } from "../types";
+import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, type Copy } from "../lib/i18n";
 
-export function ChildProfilePage({ child, records, observations, journal, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
+export function ChildProfilePage({ child, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
   child: Child;
   records: LessonRecord[];
-  observations: Observation[];
-  journal: JournalEntry[];
-  // Active tab is owned by App so returning from a journal entry lands back on the Journal tab.
+  // The shared Moments collection; the Journal tab shows this child's part of it.
+  entries: Entry[];
+  // Legacy `child.notes` not yet saved as an entry.
+  pendingNotes: boolean;
+  // Active tab is owned by App so returning from an entry lands back on the Journal tab.
   tab: string;
   setTab: (tab: string) => void;
   lang: Lang;
@@ -25,7 +29,6 @@ export function ChildProfilePage({ child, records, observations, journal, tab, s
   t: Copy;
 }) {
   const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date));
-  const obs = observations.filter(o => o.childId === child.id);
   return (
     <main className="child-profile">
       <header className="child-header">
@@ -43,33 +46,66 @@ export function ChildProfilePage({ child, records, observations, journal, tab, s
         <small>{groupOptionLabel(child.group, t)}</small>
       </section>
       <div className="tabs">
-        {["Moments", "Activities", "Journal"].map(x => (
+        {["Journal", "Activities"].map(x => (
           <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{childTabLabel(x, t)}</button>
         ))}
       </div>
       <div className="child-body">
-        {tab === "Activities" && (
+        {tab === "Activities" ? (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
             <LessonList records={lessons} t={t} />
+            <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
           </>
+        ) : (
+          <ChildJournal child={child} entries={entries} pendingNotes={pendingNotes} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />
         )}
-        {tab === "Moments" && (
-          <div className="observation-feed">
-            {!obs.length && <Empty text={t.noObservationsYet} />}
-            {obs.map(o => (
-              <article className="observation-card" key={o.id}>
-                <small>{fmt(o.date)}</small>
-                <p>{noteText(o.notes, o.notesZh, t)}</p>
-                <div className="skill-tags">{o.skills.map(s => <span key={s}>{skillLabel(s, t)}</span>)}</div>
-              </article>
-            ))}
-          </div>
-        )}
-        {tab === "Journal" && <JournalTimeline child={child} entries={journal} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />}
-        {tab !== "Journal" && <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>}
       </div>
     </main>
+  );
+}
+
+// One child's view of the shared Moments collection, read like a memory book.
+function ChildJournal({ child, entries, pendingNotes, lang, open, write, importNotes, t }: {
+  child: Child;
+  entries: Entry[];
+  pendingNotes: boolean;
+  lang: Lang;
+  open: (id: string) => void;
+  write: () => void;
+  importNotes: () => void;
+  t: Copy;
+}) {
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const mine = entries.filter(e => e.childId === child.id).sort(newestFirst);
+  const shown = mine.filter(e => matchesQuery(e, query));
+  const legacyNotes = pendingNotes ? child.notes?.trim() : "";
+
+  return (
+    <div className="journal">
+      <div className="journal-head">
+        <h2>{t.journalOf.replace("{name}", child.first)}</h2>
+        <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
+          <Icon name={searching ? "close" : "search"} />
+        </button>
+      </div>
+      {searching && <SearchField query={query} setQuery={setQuery} t={t} />}
+      {!searching && <WriteButton label={t.writeEntry} draft={readDraft(draftKey(child.id))} write={write} lang={lang} t={t} />}
+
+      {mine.length === 0 && !legacyNotes && !searching && <p className="journal-empty">{t.journalEmpty}</p>}
+      {searching && query.trim() && shown.length === 0 && <p className="journal-empty">{t.journalNoResults}</p>}
+      <EntryTimeline entries={shown} lang={lang} open={open} />
+
+      {legacyNotes && !searching && (
+        <section className="journal-legacy">
+          <h3>{t.earlierNotes}</h3>
+          <p className="journal-legacy-hint">{t.earlierNotesHint}</p>
+          <p className="journal-legacy-text">{legacyNotes}</p>
+          <button onClick={importNotes}>{t.saveToJournal}</button>
+        </section>
+      )}
+    </div>
   );
 }
 

@@ -1,17 +1,20 @@
 import { Icon } from "../components/Icon";
 import { fmtLong } from "../lib/dates";
-import type { JournalEntry, Lang } from "../types";
+import { entryText } from "../lib/entries";
+import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
-// Full view of a single journal entry: large photos and the complete written memory.
-export function JournalEntryPage({ entry, lang, back, edit, remove, t }: {
-  entry: JournalEntry;
+// Full view of a single entry: who it's about, large photos and the complete written memory.
+export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
+  entry: Entry;
+  child?: Child;
   lang: Lang;
   back: () => void;
   edit: () => void;
   remove: () => void;
   t: Copy;
 }) {
+  const text = entryText(entry, lang);
   return (
     <main className="journal-entry">
       <header className="journal-editor-bar">
@@ -21,16 +24,22 @@ export function JournalEntryPage({ entry, lang, back, edit, remove, t }: {
           <button aria-label={t.deleteEntry} onClick={() => { if (window.confirm(t.confirmDeleteEntry)) remove(); }}><Icon name="trash" size={18} /></button>
         </div>
       </header>
-      <time>{fmtLong(entry.date, lang)}</time>
+      {child && (
+        <div className="entry-child">
+          <img src={child.photo} alt="" />
+          <span><strong>{child.first} {child.last}</strong><time>{fmtLong(entry.date, lang)}</time></span>
+        </div>
+      )}
+      {!child && <time>{fmtLong(entry.date, lang)}</time>}
       {entry.title && <h1>{entry.title}</h1>}
       {entry.photos.length > 0 && (
         <div className="journal-entry-photos">
           {entry.photos.map((p, i) => <img src={p} alt="" key={i} />)}
         </div>
       )}
-      {entry.text && <p className="journal-entry-text">{entry.text}</p>}
+      {text && <p className="journal-entry-text">{text}</p>}
     </main>
   );
 }
 
-export default JournalEntryPage;
+export default EntryDetailPage;

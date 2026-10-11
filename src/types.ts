@@ -89,25 +89,32 @@ export type Plan = {
   observation?: string;
 };
 
-// A parent-written diary entry about one child. Stored separately from observations/lessons
-// (localStorage "rootmap-journal"); needs text (title or body) and/or at least one photo.
-export type JournalEntry = {
+// One childhood memory: the single recording model behind both the Moments timeline and each
+// child's Journal (localStorage "rootmap-journal", see lib/entries.ts). Needs text (title or body)
+// and/or at least one photo.
+export type Entry = {
   id: string;
   childId: string;
   // ISO date the memory is about ("2026-10-11").
   date: string;
   title?: string;
   text?: string;
+  // Chinese text carried over from seed observations; dropped once the text is edited.
+  textZh?: string;
   // Downscaled JPEG data URLs.
   photos: string[];
   createdAt: string;
   updatedAt: string;
   // Set when the entry was created from the child's legacy `notes` field.
   fromNotes?: boolean;
+  // Original observation this entry was imported from, kept intact (incl. educational metadata) but not shown.
+  legacyObservation?: Observation;
 };
 
 // Unsaved editor state, autosaved locally per child + entry (see lib/journalDrafts.ts).
-export type JournalDraft = {
+export type EntryDraft = {
+  // Child the draft is for; absent in drafts written before Moments could pick a child.
+  childId?: string;
   date: string;
   title: string;
   text: string;
@@ -139,8 +146,8 @@ export type Screen =
   | "saved"
   | "notes"
   | "goals"
-  | "journalEntry"
-  | "journalEdit"
+  | "entry"
+  | "entryEdit"
   | "language"
   | "appearance"
   | "notifications"
@@ -149,4 +156,4 @@ export type Screen =
   | "privacy"
   | "help";
 
-export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "observation" | "weekAdd" | null;
+export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | null;

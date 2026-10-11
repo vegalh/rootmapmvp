@@ -1,58 +1,56 @@
 import { useState } from "react";
-import { PageHeader, FilterSelect, Empty } from "../components/ui";
+import { PageHeader, FilterSelect } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { fmt } from "../lib/dates";
-import type { Child, Observation } from "../types";
-import { lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
+import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
+import { latestNewDraft } from "../lib/journalDrafts";
+import { matchesQuery, newestFirst } from "../lib/entries";
+import type { Child, Entry, Lang } from "../types";
+import type { Copy } from "../lib/i18n";
 
-export function ObservationsPage({ observations, childrenData, openForm, goChild, t }: {
-  observations: Observation[];
+// Main timeline of every child's entries, the same collection each child's Journal reads from.
+export function MomentsPage({ entries, childrenData, childFilter, setChildFilter, lang, open, write, t }: {
+  entries: Entry[];
   childrenData: Child[];
-  openForm: () => void;
-  goChild: (id: string) => void;
+  // "All" or a child id; owned by App so it survives opening an entry.
+  childFilter: string;
+  setChildFilter: (v: string) => void;
+  lang: Lang;
+  open: (id: string) => void;
+  // Opens the editor for a new entry, preselecting `childId` (e.g. to continue its draft).
+  write: (childId?: string) => void;
   t: Copy;
 }) {
-  const [child, setChild] = useState("All");
-  const [area, setArea] = useState("All");
-  const list = observations
-    .filter(o => (child === "All" || o.childId === child) && (area === "All" || o.area === area))
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const known = childrenData.map(c => c.id);
+  const filter = childFilter === "All" || known.includes(childFilter) ? childFilter : "All";
+  const mine = entries.filter(e => (filter === "All" ? known.includes(e.childId) : e.childId === filter)).sort(newestFirst);
+  const shown = mine.filter(e => matchesQuery(e, query));
+  const pending = latestNewDraft(filter === "All" ? known : [filter]);
+  const name = (id: string) => {
+    const c = childrenData.find(x => x.id === id);
+    return c ? `${c.first} ${c.last}` : id;
+  };
+
   return (
-    <main className="page-content observations-page">
-      <PageHeader title={t.observations} subtitle={t.observationSubtitle} action={<button className="small-primary" onClick={openForm}><Icon name="plus" size={16} />{t.addObservation}</button>} />
-      <div className="observation-filters">
-        <FilterSelect
-          label=""
-          value={child}
-          onChange={setChild}
-          options={["All", ...childrenData.map(c => c.id)]}
-          renderLabel={v => (v === "All" ? t.all : `${childrenData.find(c => c.id === v)?.first} ${childrenData.find(c => c.id === v)?.last}`)}
-        />
-        <FilterSelect
-          label=""
-          value={area}
-          onChange={setArea}
-          options={["All", "Practical Life", "Sensorial", "Language", "Mathematics", "Independent"]}
-          renderLabel={v => (v === "All" ? t.all : recordAreaLabel(v, t))}
-        />
+    <main className="page-content moments-page">
+      <PageHeader title={t.observations} subtitle={t.momentsSubtitle} />
+      <div className="moments-controls">
+        <FilterSelect label="" value={filter} onChange={setChildFilter} options={["All", ...known]} renderLabel={v => (v === "All" ? t.allChildren : name(v))} />
+        <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
+          <Icon name={searching ? "close" : "search"} />
+        </button>
       </div>
-      <div className="observation-feed">
-        {list.map(o => {
-          const c = childrenData.find(x => x.id === o.childId)!;
-          return (
-            <article className="observation-card" key={o.id}>
-              <button className="observation-person" onClick={() => goChild(c.id)}>
-                <img src={c.photo} alt="" /><span><strong>{c.first} {c.last}</strong><small>{fmt(o.date)}</small></span><Icon name="chevron" size={16} />
-              </button>
-              <p>{noteText(o.notes, o.notesZh, t)}</p>
-              {o.lesson && <span className="lesson-tag">{o.area ? recordAreaLabel(o.area, t) : ""} · {lessonLabel(o.lesson, t)}</span>}
-              <div className="skill-tags">{o.skills.map(s => <span key={s}>{skillLabel(s, t)}</span>)}</div>
-              {o.nextSteps && <footer><strong>{t.followUpWord}</strong>{noteText(o.nextSteps, o.nextStepsZh, t)}</footer>}
-            </article>
-          );
-        })}
-      </div>
-      {!list.length && <Empty text={t.noResults} />}
+      {searching && <SearchField query={query} setQuery={setQuery} t={t} />}
+      {!searching && childrenData.length > 0 && (
+        <WriteButton label={t.addMoment} draft={pending?.draft} write={() => write(pending?.childId ?? (filter === "All" ? undefined : filter))} lang={lang} t={t} />
+      )}
+
+      {mine.length === 0 && !searching && <p className="journal-empty">{t.momentsEmpty}</p>}
+      {searching && query.trim() && shown.length === 0 && <p className="journal-empty">{t.journalNoResults}</p>}
+      <EntryTimeline entries={shown} childrenData={childrenData} lang={lang} open={open} />
     </main>
   );
 }
+
+export default MomentsPage;
