@@ -8,8 +8,8 @@ import { notificationTabLabel, type Copy } from "../lib/i18n";
 // Prototype notification feed; wire this to a real backend when available.
 // `text`/`titleKey` reference translation keys in `copy` so the notification feed is bilingual.
 const NOTES = [
-  { id: "n1", cat: "Follow-ups", childId: "emma", title: "Emma Thompson", textKey: "notifyEmmaFollowUp" as const },
-  { id: "n2", cat: "Follow-ups", childId: "noah", title: "Noah Williams", textKey: "notifyNoahFollowUp" as const },
+  { id: "n1", cat: "Follow-ups", childId: "emma", title: "Maya Hao", textKey: "notifyMayaFollowUp" as const },
+  { id: "n2", cat: "Follow-ups", childId: "noah", title: "Leo Hao", textKey: "notifyLeoFollowUp" as const },
   { id: "n3", cat: "Classroom", titleKey: "classroomUpdateTitle" as const, textKey: "notifyClassroomUpdate" as const },
 ];
 
