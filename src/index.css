@@ -181,15 +181,9 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
   .app-shell { width: 402px; min-height: 874px; margin: 18px auto; border-radius: 34px; overflow: hidden; box-shadow: 0 20px 70px rgba(56,38,79,.24); position: relative; }
   .screen { min-height: 874px; }.bottom-nav,.sticky-action,.form-bottom { position: absolute; }.overlay { position: absolute; border-radius: 34px; overflow: hidden; }
 }
-/* Larger desktop viewports: scale the whole phone mockup up (via zoom, not resize) so it fills more of the screen without reflowing its fixed-px internal layout. */
+/* Larger desktop viewports: keep the phone mockup at its true phone size instead of zooming it up. */
 @media (min-width: 900px) {
-  .app-shell { zoom: 1.25; margin-top: 3vh; }
-}
-@media (min-width: 1280px) {
-  .app-shell { zoom: 1.5; margin-top: 4vh; }
-}
-@media (min-width: 1680px) {
-  .app-shell { zoom: 1.75; margin-top: 5vh; }
+  .app-shell { margin-top: 3vh; }
 }
 @media (max-width: 359px) {
   .page-content,.week-page,.simple-page,.form-page { padding-left: 15px; padding-right: 15px; }.children-grid { gap: 6px; }.category-grid { gap-left: 3px; gap-right: 3px; }
