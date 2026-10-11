@@ -89,6 +89,42 @@ export type Plan = {
   observation?: string;
 };
 
+// A parent-written diary entry about one child. Stored separately from observations/lessons
+// (localStorage "rootmap-journal"); needs text (title or body) and/or at least one photo.
+export type JournalEntry = {
+  id: string;
+  childId: string;
+  // ISO date the memory is about ("2026-10-11").
+  date: string;
+  title?: string;
+  text?: string;
+  // Downscaled JPEG data URLs.
+  photos: string[];
+  createdAt: string;
+  updatedAt: string;
+  // Set when the entry was created from the child's legacy `notes` field.
+  fromNotes?: boolean;
+};
+
+// Unsaved editor state, autosaved locally per child + entry (see lib/journalDrafts.ts).
+export type JournalDraft = {
+  date: string;
+  title: string;
+  text: string;
+  photos: string[];
+  savedAt: string;
+};
+
+// A personal intention belonging to the parent/user — unrelated to any child.
+export type Goal = {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  createdAt: string;
+  completedAt?: string;
+};
+
 export type Lang = "en" | "zh";
 
 export type Screen =
@@ -102,6 +138,9 @@ export type Screen =
   | "week"
   | "saved"
   | "notes"
+  | "goals"
+  | "journalEntry"
+  | "journalEdit"
   | "language"
   | "appearance"
   | "notifications"

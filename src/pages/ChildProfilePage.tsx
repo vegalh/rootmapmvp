@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Icon } from "../components/Icon";
+import { JournalTimeline } from "../components/JournalTimeline";
 import { TreeLogo } from "../components/TreeLogo";
 import { initialRecords } from "../data/progress";
 import { fmt } from "../lib/dates";
-import type { Child, LessonRecord, Observation } from "../types";
+import type { Child, JournalEntry, Lang, LessonRecord, Observation } from "../types";
 import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
 
 // Fallback area stats (lessons/introduced/practicing/independent) layered under any lessons the user adds.
@@ -14,17 +14,24 @@ const baseStats: Record<string, [number, number, number, number]> = {
   Mathematics: [4, 2, 2, 0],
 };
 
-export function ChildProfilePage({ child, records, observations, edit, back, record, remove, t }: {
+export function ChildProfilePage({ child, records, observations, journal, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
   child: Child;
   records: LessonRecord[];
   observations: Observation[];
+  journal: JournalEntry[];
+  // Active tab is owned by App so returning from a journal entry lands back on the Journal tab.
+  tab: string;
+  setTab: (tab: string) => void;
+  lang: Lang;
+  openEntry: (id: string) => void;
+  writeEntry: () => void;
+  importNotes: () => void;
   edit: () => void;
   back: () => void;
   record: () => void;
   remove: () => void;
   t: Copy;
 }) {
-  const [tab, setTab] = useState("Overview");
   const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date));
   const obs = observations.filter(o => o.childId === child.id);
   return (
@@ -44,7 +51,7 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
         <small>{groupOptionLabel(child.group, t)}</small>
       </section>
       <div className="tabs">
-        {["Overview", "Activities", "Observations", "Notes"].map(x => (
+        {["Overview", "Activities", "Observations", "Journal"].map(x => (
           <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{childTabLabel(x, t)}</button>
         ))}
       </div>
@@ -90,8 +97,8 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
             ))}
           </div>
         )}
-        {tab === "Notes" && <div className="personal-note">{child.notes || t.noGeneralNotes}</div>}
-        <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
+        {tab === "Journal" && <JournalTimeline child={child} entries={journal} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />}
+        {tab !== "Journal" && <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>}
       </div>
     </main>
   );

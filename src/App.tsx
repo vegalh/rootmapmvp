@@ -12,13 +12,17 @@ import { MyWeekPage, ActivityRow } from "./pages/MyWeekPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
-import { useStored } from "./lib/storage";
+import { JournalEditorPage } from "./pages/JournalEditorPage";
+import { JournalEntryPage } from "./pages/JournalEntryPage";
+import { GoalsPage } from "./pages/GoalsPage";
+import { tryStore, useStored } from "./lib/storage";
+import { localIsoToday } from "./lib/dates";
 import { copy } from "./lib/i18n";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
+import type { Child, Goal, JournalEntry, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -29,6 +33,9 @@ export default function App() {
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
   const [selectedActivity, setSelectedActivity] = useState("water-pouring");
+  const [childTab, setChildTab] = useState("Overview");
+  // Journal entry being viewed/edited; undefined in the editor means "new entry".
+  const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
 
   const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
@@ -37,6 +44,9 @@ export default function App() {
   const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
+  // Journal entries (per child) and goals (per parent) use their own keys, so seed-version resets never touch them.
+  const [journal, setJournal] = useStored<JournalEntry[]>("rootmap-journal", []);
+  const [goals, setGoals] = useStored<Goal[]>("rootmap-goals", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
   const [view, setView] = useStored<string>("rootmap-child-view", "grid");
@@ -59,6 +69,14 @@ export default function App() {
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
   const activity = activities.find(a => a.id === selectedActivity) || activities[0];
+  const entry = journal.find(e => e.id === selectedEntry);
+
+  // Writes synchronously first so a full device (large photos) is reported instead of silently losing the entry.
+  const storeJournal = (next: JournalEntry[]) => {
+    if (!tryStore("rootmap-journal", next)) return false;
+    setJournal(next);
+    return true;
+  };
 
   useEffect(() => {
     const dark = appearance === "dark" || (appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -91,7 +109,7 @@ export default function App() {
           childrenData={childrenData}
           records={records}
           observations={observations}
-          goChild={id => { setSelectedChild(id); go("child"); }}
+          goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }}
           openAddChild={() => setModal("addChild")}
           openNotifications={() => go("notifications")}
           t={t}
@@ -114,7 +132,7 @@ export default function App() {
       );
     }
     if (screen === "observations") {
-      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
+      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }} t={t} />;
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} t={t} />;
     if (screen === "child") {
@@ -123,6 +141,17 @@ export default function App() {
           child={child}
           records={records}
           observations={observations}
+          journal={journal}
+          tab={childTab}
+          setTab={setChildTab}
+          lang={lang}
+          openEntry={id => { setSelectedEntry(id); go("journalEntry"); }}
+          writeEntry={() => { setSelectedEntry(undefined); go("journalEdit"); }}
+          importNotes={() => {
+            // Copies the legacy note into the journal; `child.notes` itself is left untouched.
+            const now = new Date().toISOString();
+            storeJournal([{ id: `j-${Date.now()}`, childId: child.id, date: localIsoToday(), text: child.notes?.trim(), photos: [], createdAt: now, updatedAt: now, fromNotes: true }, ...journal]);
+          }}
           edit={() => {
             const fullName = window.prompt(t.childFullName, `${child.first} ${child.last}`);
             if (!fullName?.trim()) return;
@@ -155,6 +184,46 @@ export default function App() {
         />
       );
     }
+    if (screen === "journalEntry") {
+      if (!entry) return null;
+      return (
+        <JournalEntryPage
+          entry={entry}
+          lang={lang}
+          back={() => go("child")}
+          edit={() => go("journalEdit")}
+          remove={() => { storeJournal(journal.filter(e => e.id !== entry.id)); go("child"); }}
+          t={t}
+        />
+      );
+    }
+    if (screen === "journalEdit") {
+      return (
+        <JournalEditorPage
+          key={`${child.id}:${entry?.id || "new"}`}
+          child={child}
+          entry={entry}
+          lang={lang}
+          back={() => go(entry ? "journalEntry" : "child")}
+          save={f => {
+            const now = new Date().toISOString();
+            const fields = { date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
+            if (entry) {
+              if (!storeJournal(journal.map(e => (e.id === entry.id ? { ...e, ...fields, updatedAt: now } : e)))) return false;
+              go("journalEntry");
+            } else {
+              if (!storeJournal([{ id: `j-${Date.now()}`, childId: child.id, ...fields, createdAt: now, updatedAt: now }, ...journal])) return false;
+              go("child");
+            }
+            return true;
+          }}
+          t={t}
+        />
+      );
+    }
+    if (screen === "goals") {
+      return <GoalsPage goals={goals} setGoals={setGoals} back={() => go("profile")} openNotes={() => go("notes")} t={t} />;
+    }
     if (screen === "week") {
       return (
         <MyWeekPage
@@ -186,9 +255,9 @@ export default function App() {
       );
     }
     if (screen === "notifications") {
-      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); go("child"); }} t={t} />;
+      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }} t={t} />;
     }
-    return <SettingsPage screen={screen} back={() => go("profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
+    return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
 
   return (

@@ -22,6 +22,8 @@ export const copy = {
     teacherRole: "Parent", minutesWord: "minutes", copiedToClipboard: "Activity details copied to clipboard.", defaultRecordNoteTemplate: "{name} repeated the work with careful, deliberate movements.", classroomUpdateTitle: "Family Update", parentName: "Alex Hao",
     recordingFor: "Recording for", notifyMayaFollowUp: "Follow up on Pouring Water this week.", notifyLeoFollowUp: "Review yesterday’s Color Tablets observation.", notifyClassroomUpdate: "A new child profile has been added.", customActivityLabel: "Custom activity", materialsLabelShort: "Materials", planLabel: "Plan",
     deleteChild: "Delete Child", confirmDeleteChild: "Delete {name}'s profile? This cannot be undone.",
+    journalTab: "Journal", journalOf: "{name}'s Journal", writeEntry: "Write Entry", addPhotos: "Add Photos", saveEntry: "Save Entry", searchJournal: "Search Journal", journalSearchPlaceholder: "Search titles and words…", journalTitlePlaceholder: "Title (optional)", journalPrompt: "What would you like to remember today?", journalEmpty: "Your journal is waiting. Capture an everyday moment with a photo, a few words, or both.", journalNoResults: "No entries match your search.", editEntry: "Edit", deleteEntry: "Delete entry", confirmDeleteEntry: "Delete this journal entry? This can't be undone.", removePhoto: "Remove photo", draftSaving: "Saving draft…", draftSaved: "Draft saved on this device", draftRestored: "Your unsaved draft was restored.", discardDraft: "Discard draft", draftFailed: "Couldn't save the draft: this device is out of space.", unfinishedEntry: "Unfinished entry", continueWriting: "Continue writing", entryEmptyHint: "Add a photo or a few words to save this entry.", journalStorageFull: "There isn't enough space on this device to save this entry. Try removing a photo and saving again.", photoUnsupported: "Some photos couldn't be added. Try a JPEG or PNG image.", earlierNotes: "Earlier notes", earlierNotesHint: "Written before the Journal. Kept here so nothing is lost.", saveToJournal: "Save as journal entry", entryChangedHint: "Changes are only applied when you tap Save.",
+    myGoals: "My Goals", goalsSubtitle: "A little intention goes a long way.", addGoal: "Add Goal", editGoal: "Edit Goal", completeGoal: "Complete Goal", reopenGoal: "Reopen goal", activeGoals: "Active", goalTitleLabel: "Goal", goalTitlePlaceholder: "e.g. Read together three times a week", goalDescriptionLabel: "Description (optional)", goalDescriptionPlaceholder: "Why it matters, or how you'd like to approach it…", noGoals: "No goals yet. Start with one small intention.", noActiveGoals: "No active goals right now.", confirmDeleteGoal: "Delete this goal?", deleteGoal: "Delete", earlierPersonalNotes: "My earlier notes",
     code: "en",
   },
   zh: {
@@ -46,6 +48,8 @@ export const copy = {
     teacherRole: "父亲", minutesWord: "分钟", copiedToClipboard: "活动详情已复制到剪贴板。", defaultRecordNoteTemplate: "{name}以专注而从容的动作重复了这项工作。", classroomUpdateTitle: "家庭动态", parentName: "郝亚历克斯",
     recordingFor: "记录对象", notifyMayaFollowUp: "跟进本周的倒水练习。", notifyLeoFollowUp: "回顾昨天的颜色色片观察。", notifyClassroomUpdate: "已添加一位新孩子档案。", customActivityLabel: "自定义活动", materialsLabelShort: "所需材料", planLabel: "计划",
     deleteChild: "删除孩子", confirmDeleteChild: "删除{name}的档案？此操作无法撤销。",
+    journalTab: "日记", journalOf: "{name}的成长日记", writeEntry: "写日记", addPhotos: "添加照片", saveEntry: "保存日记", searchJournal: "搜索日记", journalSearchPlaceholder: "搜索标题或内容…", journalTitlePlaceholder: "标题（可选）", journalPrompt: "今天有什么想记住的？", journalEmpty: "日记本还空着。用一张照片、几句话，或两者一起，记录下日常的点滴吧。", journalNoResults: "没有找到相关日记。", editEntry: "编辑", deleteEntry: "删除日记", confirmDeleteEntry: "确定删除这篇日记吗？删除后无法恢复。", removePhoto: "移除照片", draftSaving: "正在保存草稿…", draftSaved: "草稿已保存在本设备", draftRestored: "已恢复你未保存的草稿。", discardDraft: "放弃草稿", draftFailed: "草稿保存失败：设备存储空间不足。", unfinishedEntry: "未完成的日记", continueWriting: "继续写", entryEmptyHint: "添加照片或文字后即可保存。", journalStorageFull: "设备存储空间不足，无法保存这篇日记。请移除部分照片后再试。", photoUnsupported: "部分照片无法添加，请使用 JPEG 或 PNG 格式。", earlierNotes: "以前的笔记", earlierNotesHint: "这是日记功能之前写下的笔记，保留在这里，不会丢失。", saveToJournal: "保存为日记", entryChangedHint: "点击保存后，修改才会生效。",
+    myGoals: "我的目标", goalsSubtitle: "小小的心愿，也能带来长久的改变。", addGoal: "添加目标", editGoal: "编辑目标", completeGoal: "完成目标", reopenGoal: "重新开始目标", activeGoals: "进行中", goalTitleLabel: "目标", goalTitlePlaceholder: "例如：每周和孩子一起阅读三次", goalDescriptionLabel: "描述（可选）", goalDescriptionPlaceholder: "它为什么重要，或你打算怎么做…", noGoals: "还没有目标。从一个小小的心愿开始吧。", noActiveGoals: "目前没有进行中的目标。", confirmDeleteGoal: "确定删除这个目标吗？", deleteGoal: "删除", earlierPersonalNotes: "我以前的笔记",
     code: "zh",
   },
 };
@@ -133,7 +137,7 @@ export function childTabLabel(tab: string, t: Copy): string {
   return tab === "Overview" ? t.overview
     : tab === "Activities" || tab === "Lessons" ? t.lessonsTab
     : tab === "Observations" ? t.observationsTab
-    : tab === "Notes" ? t.notesTab
+    : tab === "Journal" || tab === "Notes" ? t.journalTab
     : tab;
 }
 
