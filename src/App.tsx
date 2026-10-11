@@ -87,11 +87,8 @@ export default function App() {
           records={records}
           observations={observations}
           goChild={id => { setSelectedChild(id); go("child"); }}
-          openFilters={() => setModal("filters")}
+          openAddChild={() => setModal("addChild")}
           openNotifications={() => go("notifications")}
-          view={view}
-          setView={setView}
-          filters={filters}
           t={t}
         />
       );

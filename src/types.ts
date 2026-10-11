@@ -14,6 +14,8 @@ export type Child = {
   notes?: string;
   // Chinese display variant; falls back to the English field above when absent.
   enrolledZh?: string;
+  // Things the child is currently interested in; shown on the child-selection card.
+  interests?: string[];
 };
 
 export type ProfileInfo = {

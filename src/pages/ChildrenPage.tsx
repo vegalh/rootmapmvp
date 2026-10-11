@@ -1,51 +1,19 @@
-import { useMemo, useState } from "react";
 import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
 import { Empty } from "../components/ui";
-import { initialRecords } from "../data/progress";
-import { ageFromDob, fmt } from "../lib/dates";
+import { fmt } from "../lib/dates";
 import type { Child, LessonRecord, Observation } from "../types";
-import { childAge, childShortAge, lessonLabel, noteText, type Copy } from "../lib/i18n";
+import { childAge, lessonLabel, noteText, type Copy } from "../lib/i18n";
 
-type ChildFilters = { age: string; group: string; recent: string; sort: string };
-
-export function ChildrenPage({ childrenData, records, observations, goChild, openFilters, openNotifications, view, setView, filters, t }: {
+export function ChildrenPage({ childrenData, observations, goChild, openAddChild, openNotifications, t }: {
   childrenData: Child[];
   records: LessonRecord[];
   observations: Observation[];
   goChild: (id: string) => void;
-  openFilters: () => void;
+  openAddChild: () => void;
   openNotifications: () => void;
-  view: string;
-  setView: (v: string) => void;
-  filters: ChildFilters;
   t: Copy;
 }) {
-  const [query, setQuery] = useState("");
-  const result = useMemo(() => {
-    let list = childrenData.filter(c => `${c.first} ${c.last}`.toLowerCase().includes(query.toLowerCase()));
-    if (filters.age === "0–3 Years") list = list.filter(c => ageFromDob(c.dob).totalYears < 3);
-    if (filters.age === "3–6 Years") list = list.filter(c => ageFromDob(c.dob).totalYears >= 3 && ageFromDob(c.dob).totalYears < 6);
-    if (filters.age === "6+ Years") list = list.filter(c => ageFromDob(c.dob).totalYears >= 6);
-    if (filters.group !== "All Groups") list = list.filter(c => c.group === filters.group);
-    if (filters.recent !== "Any Time") {
-      const latestDate = observations.reduce((max, o) => (o.date > max ? o.date : max), "");
-      const days = filters.recent === "Today" ? 0 : filters.recent === "This Week" ? 7 : 31;
-      const cutoff = new Date(`${latestDate}T12:00:00`);
-      cutoff.setDate(cutoff.getDate() - days);
-      list = list.filter(c => {
-        const recent = observations.filter(o => o.childId === c.id).sort((a, b) => b.date.localeCompare(a.date))[0];
-        return recent && new Date(`${recent.date}T12:00:00`) >= cutoff;
-      });
-    }
-    return [...list].sort((a, b) =>
-      filters.sort === "Name Z–A" ? b.first.localeCompare(a.first) :
-      filters.sort === "Age" ? ageFromDob(a.dob).totalYears - ageFromDob(b.dob).totalYears :
-      filters.sort === "Most Recently Observed" ? (observations.find(o => o.childId === b.id)?.date || "").localeCompare(observations.find(o => o.childId === a.id)?.date || "") :
-      a.first.localeCompare(b.first)
-    );
-  }, [childrenData, observations, query, filters]);
-
   const latest = (id: string) => observations.filter(o => o.childId === id).sort((a, b) => b.date.localeCompare(a.date))[0];
 
   return (
@@ -56,40 +24,32 @@ export function ChildrenPage({ childrenData, records, observations, goChild, ope
       </header>
       <main className="page-content children-page">
         <div className="hero-title"><h1>{t.myChildren}</h1><p>{t.childSubtitle}</p></div>
-        <div className="search-row">
-          <label className="search"><Icon name="search" size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder={`${t.search}…`} /></label>
-          <button className="square-primary" onClick={openFilters}><Icon name="filter" /></button>
-        </div>
-        <div className="section-line">
-          <span>{result.length} {t.childrenWord}</span>
-          <div className="view-toggle">
-            <button className={view === "grid" ? "active" : ""} onClick={() => setView("grid")}><Icon name="grid" size={16} /></button>
-            <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}><Icon name="list" size={17} /></button>
-          </div>
-        </div>
-        {view === "grid" ? (
-          <div className="children-grid">
-            {result.map(c => (
-              <button className="child-card" onClick={() => goChild(c.id)} key={c.id}>
-                <img src={c.photo} alt="" /><i />
-                <strong>{c.first}</strong><span>{childShortAge(c, t)}</span>
-                <small>{c.lessons + records.filter(r => r.childId === c.id && !initialRecords.some(x => x.id === r.id)).length} {t.lessonsWord}</small>
-              </button>
-            ))}
+        {childrenData.length ? (
+          <div className="children-carousel">
+            {childrenData.map(c => {
+              const lastObs = latest(c.id);
+              const interests = c.interests?.length ? c.interests.join("、") : t.notAddedYet;
+              return (
+                <button className="child-select-card" onClick={() => goChild(c.id)} key={c.id}>
+                  <div className="child-select-photo"><img src={c.photo} alt="" /></div>
+                  <div className="child-select-info">
+                    <strong>{c.first}</strong>
+                    <span className="child-select-age">{childAge(c, t)}</span>
+                    <p><em>{t.interestedInLabel}</em> {interests}</p>
+                    <p><em>{t.lastObservationLabel}</em> {lastObs ? fmt(lastObs.date) : t.noObservationsYet}</p>
+                  </div>
+                </button>
+              );
+            })}
+            <button className="child-select-card add-child-card" onClick={openAddChild}>
+              <span className="add-child-plus"><Icon name="plus" size={28} /></span>
+              <strong>{t.addChild}</strong>
+            </button>
           </div>
         ) : (
-          <div className="children-list">
-            {result.map(c => (
-              <button className="child-list-card" onClick={() => goChild(c.id)} key={c.id}>
-                <img src={c.photo} alt="" />
-                <div><strong>{c.first} {c.last}</strong><span>{childAge(c, t)} · {c.lessons} {t.lessonsWord}</span><small>{noteText(latest(c.id)?.notes, latest(c.id)?.notesZh, t) || t.noRecentObservation}</small></div>
-                <Icon name="chevron" />
-              </button>
-            ))}
-          </div>
+          <Empty text={t.noResults} />
         )}
-        {!result.length && <Empty text={t.noResults} />}
-        {!!result.length && (
+        {!!childrenData.length && (
           <>
             <div className="section-title recent-title"><h2>{t.recentActivityLabel}</h2></div>
             <div className="recent-activity">
