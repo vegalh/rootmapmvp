@@ -77,7 +77,6 @@ html:lang(zh) {
 
 /* Activity / lesson titles (17–20px) */
 .activity-name:lang(zh),
-.learning-card > strong:lang(zh),
 .activity-row strong:lang(zh),
 .plan-activity strong:lang(zh),
 .add-child-card strong:lang(zh) {

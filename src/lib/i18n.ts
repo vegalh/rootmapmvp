@@ -2,7 +2,7 @@
 export const copy = {
   en: {
     myChildren: "My Children", discover: "Discover", observations: "My Moments", momentsNav: "Moments", profile: "Profile", myWeek: "My Week", saved: "Saved", weeklyPlan: "Weekly Plan", completed: "Completed", language: "Language", appearance: "Appearance", settings: "Settings", light: "Light", dark: "Dark", system: "System Default", practical: "Practical Life", sensorial: "Sensorial", mathematics: "Mathematics", addWeek: "Add to My Week", recordLesson: "Try This Activity", addObservation: "Capture a Moment", saveMoment: "Save Moment", save: "Save", cancel: "Cancel", back: "Back", search: "Search", reset: "Reset", all: "All", profileSubtitle: "Your personal workspace", weekSubtitle: "Plan, save, and revisit meaningful ideas.", discoverSubtitle: "Meaningful activities for curious minds", observationSubtitle: "Capture and revisit your child’s special moments.", childSubtitle: "Follow each child’s unique learning journey.", popular: "Popular This Week", exploreActivities: "Explore Activities", materials: "What You'll Need", how: "How to Do It", age: "Age", topic: "Topic", area: "Area", noResults: "No results found.", preferences: "Preferences", account: "Account", myActivities: "My Activities", savedActivities: "Saved Activities", myNotes: "My Notes", notifications: "Notification Preferences", personal: "Personal Information", privacy: "Privacy & Data", help: "Help & Support", addChild: "Add Child", showResults: "Show Results", filterChildren: "Filter", markAll: "Mark all as read", add: "Add", share: "Share", details: "View Activity", remove: "Remove", markComplete: "Mark completed", selectChildren: "Choose children", planningNote: "Planning note (optional)", date: "Date",
-    overview: "Overview", lessonsTab: "Activities", observationsTab: "Moments", notesTab: "Notes", classroom: "Updates", backToChildren: "My Children", edit: "Edit", enrolledSince: "Enrolled since", learningAreas: "Learning Areas", recentLessons: "Recent activities", lessonHistory: "Activity history", noGeneralNotes: "No general notes have been added.",
+    lessonsTab: "Activities", observationsTab: "Moments", notesTab: "Notes", classroom: "Updates", backToChildren: "My Children", edit: "Edit", enrolledSince: "Enrolled since", lessonHistory: "Activity history", noGeneralNotes: "No general notes have been added.",
     introduced: "Introduced", practicing: "Practicing", independent: "Independent",
     learningArea: "Learning Area", lessonActivityLabel: "Activity", learningStage: "Learning Stage", observationNotesLabel: "Parent Notes", skillsObserved: "Skills Observed",
     handEyeCoordination: "Hand-eye coordination", concentration: "Concentration", independence: "Independence", fineMotorControl: "Fine motor control", order: "Order", visualDiscrimination: "Visual discrimination",
@@ -28,7 +28,7 @@ export const copy = {
   },
   zh: {
     myChildren: "我的孩子们", discover: "发现活动", observations: "我的成长点滴", momentsNav: "成长", profile: "个人中心", myWeek: "我的计划", saved: "已收藏", weeklyPlan: "每周计划", completed: "已完成", language: "语言", appearance: "外观", settings: "设置", light: "浅色模式", dark: "深色模式", system: "跟随系统", practical: "日常生活", sensorial: "感官教育", mathematics: "数学", addWeek: "添加到计划", recordLesson: "试试这个活动", addObservation: "记录这一刻", saveMoment: "保存记录", save: "保存", cancel: "取消", back: "返回", search: "搜索", reset: "重置", all: "全部", profileSubtitle: "您的个人工作空间", weekSubtitle: "规划、收藏并实现灵感。", discoverSubtitle: "为好奇心准备的有意义活动", observationSubtitle: "记录并回顾孩子成长中的小点滴。", childSubtitle: "关注每个孩子独特的学习旅程。", popular: "本周热门", exploreActivities: "探索活动", materials: "所需材料", how: "活动步骤", age: "年龄", topic: "主题", area: "领域", noResults: "未找到结果。", preferences: "偏好设置", account: "账户", myActivities: "我的活动", savedActivities: "已收藏活动", myNotes: "我的笔记", notifications: "通知偏好", personal: "个人信息", privacy: "隐私与数据", help: "帮助与支持", addChild: "添加孩子", showResults: "显示结果", filterChildren: "筛选孩子", markAll: "全部标为已读", add: "添加", share: "分享", details: "查看活动", remove: "移除", markComplete: "标记完成", selectChildren: "选择孩子", planningNote: "计划备注（可选）", date: "日期",
-    overview: "总览", lessonsTab: "活动", observationsTab: "成长点滴", notesTab: "笔记", classroom: "更新", backToChildren: "我的孩子们", edit: "编辑", enrolledSince: "入学时间", learningAreas: "学习领域", recentLessons: "最近的活动", lessonHistory: "活动记录", noGeneralNotes: "尚未添加任何笔记。",
+    lessonsTab: "活动", observationsTab: "成长", notesTab: "笔记", classroom: "更新", backToChildren: "我的孩子们", edit: "编辑", enrolledSince: "入学时间", lessonHistory: "活动记录", noGeneralNotes: "尚未添加任何笔记。",
     introduced: "已介绍", practicing: "练习中", independent: "已独立",
     learningArea: "学习领域", lessonActivityLabel: "活动", learningStage: "学习阶段", observationNotesLabel: "家长笔记", skillsObserved: "观察到的技能",
     handEyeCoordination: "手眼协调", concentration: "专注力", independence: "独立性", fineMotorControl: "精细动作控制", order: "秩序感", visualDiscrimination: "视觉辨别",
@@ -134,9 +134,8 @@ export function sortOptionLabel(v: string, t: Copy): string {
 }
 
 export function childTabLabel(tab: string, t: Copy): string {
-  return tab === "Overview" ? t.overview
-    : tab === "Activities" || tab === "Lessons" ? t.lessonsTab
-    : tab === "Observations" ? t.observationsTab
+  return tab === "Activities" || tab === "Lessons" ? t.lessonsTab
+    : tab === "Moments" || tab === "Observations" ? t.observationsTab
     : tab === "Journal" || tab === "Notes" ? t.journalTab
     : tab;
 }

@@ -1,18 +1,10 @@
 import { Icon } from "../components/Icon";
 import { JournalTimeline } from "../components/JournalTimeline";
 import { TreeLogo } from "../components/TreeLogo";
-import { initialRecords } from "../data/progress";
+import { Empty } from "../components/ui";
 import { fmt } from "../lib/dates";
 import type { Child, JournalEntry, Lang, LessonRecord, Observation } from "../types";
 import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
-
-// Fallback area stats (lessons/introduced/practicing/independent) layered under any lessons the user adds.
-const baseStats: Record<string, [number, number, number, number]> = {
-  "Practical Life": [12, 5, 5, 2],
-  Sensorial: [8, 3, 4, 1],
-  Language: [6, 4, 2, 0],
-  Mathematics: [4, 2, 2, 0],
-};
 
 export function ChildProfilePage({ child, records, observations, journal, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
   child: Child;
@@ -51,43 +43,20 @@ export function ChildProfilePage({ child, records, observations, journal, tab, s
         <small>{groupOptionLabel(child.group, t)}</small>
       </section>
       <div className="tabs">
-        {["Overview", "Activities", "Observations", "Journal"].map(x => (
+        {["Moments", "Activities", "Journal"].map(x => (
           <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{childTabLabel(x, t)}</button>
         ))}
       </div>
       <div className="child-body">
-        {tab === "Overview" && (
-          <>
-            <div className="section-title"><h2>{t.learningAreas}</h2></div>
-            <div className="learning-grid">
-              {Object.entries(baseStats).map(([area, s], i) => {
-                const added = lessons.filter(r => r.area === area && !initialRecords.find(x => x.id === r.id));
-                return (
-                  <article className={`learning-card tone-${i}`} key={area}>
-                    <i><Icon name={i === 0 ? "heart" : i === 1 ? "compass" : i === 2 ? "book" : "layers"} /></i>
-                    <strong>{recordAreaLabel(area, t)}</strong>
-                    <small>{s[0] + added.length} {t.lessonsWord}</small>
-                    <div>
-                      <span><b>{s[1] + added.filter(x => x.stage === "Introduced").length}</b>{t.introduced}</span>
-                      <span><b>{s[2] + added.filter(x => x.stage === "Practicing").length}</b>{t.practicing}</span>
-                      <span><b>{s[3] + added.filter(x => x.stage === "Independent").length}</b>{t.independent}</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-            <div className="section-title"><h2>{t.recentLessons}</h2></div>
-            <LessonList records={lessons.slice(0, 3)} t={t} />
-          </>
-        )}
         {tab === "Activities" && (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
             <LessonList records={lessons} t={t} />
           </>
         )}
-        {tab === "Observations" && (
+        {tab === "Moments" && (
           <div className="observation-feed">
+            {!obs.length && <Empty text={t.noObservationsYet} />}
             {obs.map(o => (
               <article className="observation-card" key={o.id}>
                 <small>{fmt(o.date)}</small>

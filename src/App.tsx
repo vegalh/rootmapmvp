@@ -33,7 +33,7 @@ export default function App() {
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
   const [selectedActivity, setSelectedActivity] = useState("water-pouring");
-  const [childTab, setChildTab] = useState("Overview");
+  const [childTab, setChildTab] = useState("Moments");
   // Journal entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
 
@@ -109,7 +109,7 @@ export default function App() {
           childrenData={childrenData}
           records={records}
           observations={observations}
-          goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }}
+          goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }}
           openAddChild={() => setModal("addChild")}
           openNotifications={() => go("notifications")}
           t={t}
@@ -132,7 +132,7 @@ export default function App() {
       );
     }
     if (screen === "observations") {
-      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }} t={t} />;
+      return <ObservationsPage observations={observations} childrenData={childrenData} openForm={() => setModal("observation")} goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }} t={t} />;
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} t={t} />;
     if (screen === "child") {
@@ -255,7 +255,7 @@ export default function App() {
       );
     }
     if (screen === "notifications") {
-      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); setChildTab("Overview"); go("child"); }} t={t} />;
+      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={id => { setSelectedChild(id); setChildTab("Moments"); go("child"); }} t={t} />;
     }
     return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
