@@ -42,7 +42,8 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
       </div>
       <div className="week-list">
         {tab === "saved" && saved.map(id => {
-          const a = activities.find(x => x.id === id)!;
+          const a = activities.find(x => x.id === id);
+          if (!a) return null;
           return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)}><Icon name="chevron" /></button>} key={id} />;
         })}
         {tab === "plan" && (

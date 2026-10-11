@@ -28,14 +28,14 @@ export default function App() {
   const [previous, setPrevious] = useState<Screen>("children");
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
-  const [selectedActivity, setSelectedActivity] = useState("leaf-transfer");
+  const [selectedActivity, setSelectedActivity] = useState("water-pouring");
 
   const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
   const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
   const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "HaoWei", photo: haoweiPhoto, contact: "" });
-  const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["leaf-transfer", "color-mixing"]);
+  const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "zh");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
@@ -50,8 +50,10 @@ export default function App() {
     setChildrenData(initialChildren);
     setRecords(initialRecords);
     setObservations(initialObservations);
+    // Drop any saved-activity ids that no longer exist, which previously caused a white-screen crash.
+    setSaved(current => current.filter(id => activities.some(a => a.id === id)));
     setSeedVersion(SEED_VERSION);
-  }, [seedVersion, setChildrenData, setRecords, setObservations, setSeedVersion]);
+  }, [seedVersion, setChildrenData, setRecords, setObservations, setSaved, setSeedVersion]);
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
@@ -173,7 +175,8 @@ export default function App() {
           <PageHeader title={t.savedActivities} back={() => go("profile")} />
           <div className="week-list">
             {saved.map(id => {
-              const a = activities.find(x => x.id === id)!;
+              const a = activities.find(x => x.id === id);
+              if (!a) return null;
               return <ActivityRow a={a} t={t} action={<button onClick={() => { setSelectedActivity(id); go("activity"); }}><Icon name="chevron" /></button>} key={id} />;
             })}
           </div>
