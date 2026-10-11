@@ -19,7 +19,7 @@ import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
 import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
-import haoweiPhoto from "./assets/profile/haowei.jpg";
+import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
 
@@ -34,7 +34,7 @@ export default function App() {
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
   const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
-  const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "HaoWei", photo: haoweiPhoto, contact: "" });
+  const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
@@ -50,10 +50,11 @@ export default function App() {
     setChildrenData(initialChildren);
     setRecords(initialRecords);
     setObservations(initialObservations);
+    setProfile({ name: "Alex Hao", photo: alexPhoto, contact: "" });
     // Drop any saved-activity ids that no longer exist, which previously caused a white-screen crash.
     setSaved(current => current.filter(id => activities.some(a => a.id === id)));
     setSeedVersion(SEED_VERSION);
-  }, [seedVersion, setChildrenData, setRecords, setObservations, setSaved, setSeedVersion]);
+  }, [seedVersion, setChildrenData, setRecords, setObservations, setProfile, setSaved, setSeedVersion]);
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
