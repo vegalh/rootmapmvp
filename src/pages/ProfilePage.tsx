@@ -2,9 +2,7 @@ import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
 import type { Lang, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
-
-// Profile photo for the signed-in teacher; swap this URL to change it.
-const PROFILE_PHOTO = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80";
+import profilePhoto from "../assets/profile/haowei.jpg";
 
 export function ProfilePage({ go, lang, appearance, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; t: Copy }) {
   const groups: [string, [string, string, string, string?][]][] = [
@@ -16,8 +14,8 @@ export function ProfilePage({ go, lang, appearance, t }: { go: (s: Screen) => vo
     <main className="page-content profile-page">
       <PageHeader title={t.profile} subtitle={t.profileSubtitle} />
       <section className="user-summary">
-        <img src={PROFILE_PHOTO} alt="" />
-        <div><h2>Olivia Bennett</h2><p>{t.teacherRole}</p></div>
+        <img src={profilePhoto} alt="" />
+        <div><h2>{t.parentName}</h2><p>{t.teacherRole}</p></div>
       </section>
       {groups.map(([title, items]) => (
         <section className="menu-section" key={title}>
