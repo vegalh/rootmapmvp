@@ -14,10 +14,10 @@ import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
 import { useStored } from "./lib/storage";
 import { copy } from "./lib/i18n";
-import { isoToday } from "./lib/dates";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
+import { SEED_VERSION } from "./data/seedVersion";
 import type { Child, LessonRecord, Lang, ModalKind, Observation, Plan, Screen } from "./types";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -32,6 +32,7 @@ export default function App() {
   const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
   const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
+  const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["leaf-transfer", "color-mixing"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
   const [lang, setLang] = useStored<Lang>("rootmap-language", "zh");
@@ -40,18 +41,15 @@ export default function App() {
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
 
-  // One-time migration for data persisted before `dob` existed (older records only had `ageYears`).
+  // When the bundled seed data changes (SEED_VERSION bumped), reset saved children/lessons/observations
+  // to the new seed so every device picks up the update instead of keeping its old cached copy.
   useEffect(() => {
-    const needsMigration = childrenData.some(c => !c.dob);
-    if (!needsMigration) return;
-    setChildrenData(childrenData.map(c => {
-      if (c.dob) return c;
-      const seed = initialChildren.find(s => s.id === c.id);
-      const legacyYears = (c as unknown as { ageYears?: number }).ageYears;
-      const fallbackDob = seed?.dob || (legacyYears ? new Date(new Date().setFullYear(new Date().getFullYear() - Math.round(legacyYears))).toISOString().slice(0, 10) : isoToday());
-      return { ...c, dob: fallbackDob };
-    }));
-  }, [childrenData, setChildrenData]);
+    if (seedVersion >= SEED_VERSION) return;
+    setChildrenData(initialChildren);
+    setRecords(initialRecords);
+    setObservations(initialObservations);
+    setSeedVersion(SEED_VERSION);
+  }, [seedVersion, setChildrenData, setRecords, setObservations, setSeedVersion]);
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
