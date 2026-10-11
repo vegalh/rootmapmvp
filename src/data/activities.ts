@@ -33,7 +33,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by mopping the floor, building coordination, concentration, and a sense of responsibility.",
     domains: ["Care of Environment", "Gross Motor Coordination", "Concentration", "Independence"],
     materials: ["Child-sized mop", "Designated floor area"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate holding the mop with both hands.", "Show slow, deliberate back-and-forth strokes across the floor.", "Invite the child to try, starting from one side of the area.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    steps: ["Invite your child to try mopping, and name the materials together.", "Show how to hold the mop with both hands.", "Demonstrate slow, deliberate back-and-forth strokes across the floor.", "Let your child try, starting from one side of the area.", "Give your child space to repeat the motion as many times as they like."],
     keywords: "mopping cleaning floor care of environment practical life",
     zh: {
       title: "拖地",
@@ -42,7 +42,7 @@ export const activities: Activity[] = [
       description: "孩子们通过拖地练习照顾周围环境，培养协调能力、专注力和责任感。",
       domains: ["照顾环境", "大肌肉协调", "专注力", "独立性"],
       materials: ["儿童专用拖把", "指定的地面区域"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何用双手握住拖把。", "展示缓慢而从容地来回拖地的动作。", "邀请孩子从区域的一侧开始尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+      steps: ["邀请孩子一起试试拖地，并说出材料的名称。", "示范如何用双手握住拖把。", "展示缓慢而从容地来回拖地的动作。", "让孩子从区域的一侧开始尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
   {
@@ -58,7 +58,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by washing a table, building sequencing, concentration, and a sense of responsibility.",
     domains: ["Care of Environment", "Sequencing", "Concentration", "Independence"],
     materials: ["Small basin of water", "Sponge", "Soap", "Drying cloth"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate wetting the sponge and wringing out excess water.", "Show wiping the table surface in a circular motion.", "Dry the table with the cloth.", "Invite the child to try, then repeat until the child is satisfied."],
+    steps: ["Invite your child to try washing the table, and name the materials together.", "Show how to wet the sponge and wring out excess water.", "Demonstrate wiping the table surface in a circular motion.", "Dry the table together with the cloth.", "Let your child try, and repeat as many times as they'd like."],
     keywords: "washing table cleaning care of environment practical life",
     zh: {
       title: "洗桌子",
@@ -67,7 +67,7 @@ export const activities: Activity[] = [
       description: "孩子们通过洗桌子练习照顾周围环境，培养顺序感、专注力和责任感。",
       domains: ["照顾环境", "顺序感", "专注力", "独立性"],
       materials: ["小盆水", "海绵", "肥皂", "擦干布"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何浸湿海绵并拧出多余的水分。", "展示以画圈的方式擦拭桌面。", "用布将桌子擦干。", "邀请孩子尝试，并重复练习直到满意为止。"],
+      steps: ["邀请孩子一起试试洗桌子，并说出材料的名称。", "示范如何浸湿海绵并拧出多余的水分。", "展示以画圈的方式擦拭桌面。", "一起用布把桌子擦干。", "让孩子尝试，并按自己的节奏重复练习。"],
     },
   },
   {
@@ -83,7 +83,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by watering a plant, building fine motor control, concentration, and a sense of responsibility.",
     domains: ["Care of Environment", "Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Small watering can", "Potted plant"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate filling the watering can with a small amount of water.", "Show pouring water slowly and carefully around the base of the plant.", "Invite the child to try.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    steps: ["Invite your child to try watering the plant, and name the materials together.", "Show how to fill the watering can with a small amount of water.", "Demonstrate pouring water slowly and carefully around the base of the plant.", "Let your child try.", "Give your child space to repeat as many times as they like."],
     keywords: "watering plant care of environment practical life nature",
     zh: {
       title: "浇花",
@@ -92,7 +92,7 @@ export const activities: Activity[] = [
       description: "孩子们通过给植物浇水练习照顾周围环境，培养精细动作控制、专注力和责任感。",
       domains: ["照顾环境", "精细动作协调", "专注力", "独立性"],
       materials: ["小浇水壶", "盆栽植物"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范在浇水壶中装入少量的水。", "展示缓慢而小心地在植物根部周围浇水。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+      steps: ["邀请孩子一起试试给植物浇水，并说出材料的名称。", "示范在浇水壶中装入少量的水。", "展示缓慢而小心地在植物根部周围浇水。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
   {
@@ -108,7 +108,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by sweeping the floor, building gross motor coordination, concentration, and a sense of responsibility.",
     domains: ["Care of Environment", "Gross Motor Coordination", "Concentration", "Independence"],
     materials: ["Child-sized broom", "Dustpan"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate holding the broom with both hands.", "Show sweeping small, deliberate strokes toward a pile.", "Use the dustpan to collect the debris.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    steps: ["Invite your child to try sweeping, and name the materials together.", "Show how to hold the broom with both hands.", "Demonstrate small, deliberate strokes toward a pile.", "Use the dustpan together to collect the debris.", "Give your child space to repeat as many times as they like."],
     keywords: "sweeping broom cleaning care of environment practical life",
     zh: {
       title: "扫地",
@@ -117,7 +117,7 @@ export const activities: Activity[] = [
       description: "孩子们通过扫地练习照顾周围环境，培养大肌肉协调能力、专注力和责任感。",
       domains: ["照顾环境", "大肌肉协调", "专注力", "独立性"],
       materials: ["儿童专用扫把", "簸箕"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范如何用双手握住扫把。", "展示以小而从容的动作将灰尘扫成一堆。", "用簸箕收集灰尘。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+      steps: ["邀请孩子一起试试扫地，并说出材料的名称。", "示范如何用双手握住扫把。", "展示以小而从容的动作将灰尘扫成一堆。", "一起用簸箕收集灰尘。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
   {
@@ -133,7 +133,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by cleaning a mirror, building sequencing, concentration, and a sense of responsibility.",
     domains: ["Care of Environment", "Sequencing", "Concentration", "Independence"],
     materials: ["Spray bottle with water", "Small cloth"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate spraying the mirror lightly.", "Show wiping the mirror in circular motions from top to bottom.", "Invite the child to try.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    steps: ["Invite your child to try cleaning the mirror, and name the materials together.", "Show how to spray the mirror lightly.", "Demonstrate wiping the mirror in circular motions from top to bottom.", "Let your child try.", "Give your child space to repeat as many times as they like."],
     keywords: "cleaning mirror care of environment practical life",
     zh: {
       title: "擦镜子",
@@ -142,7 +142,7 @@ export const activities: Activity[] = [
       description: "孩子们通过擦镜子练习照顾周围环境，培养顺序感、专注力和责任感。",
       domains: ["照顾环境", "顺序感", "专注力", "独立性"],
       materials: ["喷水瓶", "小布巾"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范轻轻喷洒镜子。", "展示从上到下以画圈的方式擦拭镜子。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+      steps: ["邀请孩子一起试试擦镜子，并说出材料的名称。", "示范轻轻喷洒镜子。", "展示从上到下以画圈的方式擦拭镜子。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
   {
@@ -158,7 +158,7 @@ export const activities: Activity[] = [
     description: "Children practice self-care and independence by washing their own hands at a child-sized basin.",
     domains: ["Care of Self", "Sequencing", "Independence"],
     materials: ["Small basin of water", "Soap", "Hand towel"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate wetting hands, applying soap, and rubbing them together.", "Rinse the hands in the basin.", "Dry hands with the towel.", "Invite the child to try the full sequence independently."],
+    steps: ["Invite your child to try washing their hands, and name the materials together.", "Show how to wet hands, apply soap, and rub them together.", "Rinse the hands in the basin together.", "Dry hands with the towel.", "Let your child try the full sequence on their own."],
     keywords: "hand washing care of self practical life hygiene",
     zh: {
       title: "洗手",
@@ -167,7 +167,7 @@ export const activities: Activity[] = [
       description: "孩子们在儿童专用水盆前练习洗手，培养自理能力和独立性。",
       domains: ["自我照顾", "顺序感", "独立性"],
       materials: ["小盆水", "肥皂", "毛巾"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范弄湿双手、抹上肥皂并搓洗。", "在水盆中冲洗双手。", "用毛巾擦干双手。", "邀请孩子独立尝试完整的流程。"],
+      steps: ["邀请孩子一起试试洗手，并说出材料的名称。", "示范弄湿双手、抹上肥皂并搓洗。", "一起在水盆中冲洗双手。", "用毛巾擦干双手。", "让孩子独立尝试完整的流程。"],
     },
   },
   {
@@ -183,7 +183,7 @@ export const activities: Activity[] = [
     description: "Children explore mark-making and fine motor control by pressing a dotting tool onto paper.",
     domains: ["Fine Motor Coordination", "Creativity", "Concentration"],
     materials: ["Dotting tool or dauber", "Paint", "Paper"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate pressing the dotting tool onto the paper to make a mark.", "Lift and move to a new spot for the next dot.", "Invite the child to try.", "Allow uninterrupted exploration and repetition."],
+    steps: ["Invite your child to try dotting, and name the materials together.", "Show how to press the dotting tool onto the paper to make a mark.", "Lift and move to a new spot for the next dot.", "Let your child try.", "Give your child space to explore and repeat freely."],
     keywords: "dotting painting fine motor art creativity",
     zh: {
       title: "点画",
@@ -192,7 +192,7 @@ export const activities: Activity[] = [
       description: "孩子们通过用点画工具按压纸张，探索标记制作和精细动作控制。",
       domains: ["精细动作协调", "创造力", "专注力"],
       materials: ["点画工具或蘸料棒", "颜料", "纸张"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范将点画工具按压在纸上做出标记。", "抬起并移动到新的位置点下一个点。", "邀请孩子尝试。", "允许孩子不受打扰地探索和重复练习。"],
+      steps: ["邀请孩子一起试试点画，并说出材料的名称。", "示范将点画工具按压在纸上做出标记。", "抬起并移动到新的位置点下一个点。", "让孩子尝试。", "给孩子空间自由探索和重复练习。"],
     },
   },
   {
@@ -208,7 +208,7 @@ export const activities: Activity[] = [
     description: "Children practice fine motor control and composition by gluing paper pieces onto a background.",
     domains: ["Fine Motor Coordination", "Creativity", "Concentration"],
     materials: ["Glue stick", "Paper pieces", "Background paper"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate rubbing the glue stick on the back of a paper piece.", "Press the piece onto the background paper.", "Invite the child to try with the remaining pieces.", "Allow the collage to dry undisturbed."],
+    steps: ["Invite your child to try this collage activity, and name the materials together.", "Show how to rub the glue stick on the back of a paper piece.", "Press the piece onto the background paper together.", "Let your child try with the remaining pieces.", "Let the collage dry undisturbed."],
     keywords: "paper collage glue art creativity fine motor",
     zh: {
       title: "纸张拼贴",
@@ -217,7 +217,7 @@ export const activities: Activity[] = [
       description: "孩子们通过将纸片粘贴到背景纸上，练习精细动作控制和构图能力。",
       domains: ["精细动作协调", "创造力", "专注力"],
       materials: ["胶棒", "纸片", "背景纸"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范在纸片背面涂抹胶棒。", "将纸片按压到背景纸上。", "邀请孩子尝试粘贴剩余的纸片。", "让拼贴画不受打扰地晾干。"],
+      steps: ["邀请孩子一起试试纸张拼贴，并说出材料的名称。", "示范在纸片背面涂抹胶棒。", "一起将纸片按压到背景纸上。", "让孩子尝试粘贴剩余的纸片。", "让拼贴画不受打扰地晾干。"],
     },
   },
   {
@@ -233,7 +233,7 @@ export const activities: Activity[] = [
     description: "Children build coordination and care for their environment by filling a bucket from a water dispenser.",
     domains: ["Care of Environment", "Coordination", "Concentration", "Independence"],
     materials: ["Water dispenser", "Small bucket"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate holding the bucket steady under the dispenser.", "Show pressing the dispenser slowly to fill the bucket.", "Invite the child to try.", "Allow uninterrupted repetition until the child is satisfied with the work."],
+    steps: ["Invite your child to try filling the bucket, and name the materials together.", "Show how to hold the bucket steady under the dispenser.", "Demonstrate pressing the dispenser slowly to fill the bucket.", "Let your child try.", "Give your child space to repeat as many times as they like."],
     keywords: "water pouring dispenser bucket practical life care of environment",
     zh: {
       title: "接水练习",
@@ -242,7 +242,7 @@ export const activities: Activity[] = [
       description: "孩子们通过从饮水机接水到水桶中，培养协调能力和照顾环境的意识。",
       domains: ["照顾环境", "协调能力", "专注力", "独立性"],
       materials: ["饮水机", "小水桶"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范将水桶稳稳地放在饮水机出水口下方。", "展示缓慢按压饮水机为水桶接水。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到满意为止。"],
+      steps: ["邀请孩子一起试试接水练习，并说出材料的名称。", "示范将水桶稳稳地放在饮水机出水口下方。", "展示缓慢按压饮水机为水桶接水。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
   {
@@ -258,7 +258,7 @@ export const activities: Activity[] = [
     description: "Children practice food preparation and independence by juicing an orange with a child-sized juicer.",
     domains: ["Food Preparation", "Fine Motor Coordination", "Independence"],
     materials: ["Orange halves", "Child-sized juicer", "Small cup"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate placing an orange half on the juicer.", "Show pressing and twisting to extract the juice.", "Pour the juice into the cup.", "Invite the child to try the remaining halves."],
+    steps: ["Invite your child to try juicing, and name the materials together.", "Show how to place an orange half on the juicer.", "Demonstrate pressing and twisting to extract the juice.", "Pour the juice into the cup together.", "Let your child try the remaining halves."],
     keywords: "orange juicing food preparation practical life independence",
     zh: {
       title: "榨橙汁",
@@ -267,7 +267,7 @@ export const activities: Activity[] = [
       description: "孩子们使用儿童专用榨汁器榨橙汁，练习食物准备能力和独立性。",
       domains: ["食物准备", "精细动作协调", "独立性"],
       materials: ["半个橙子", "儿童专用榨汁器", "小杯子"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范将半个橙子放在榨汁器上。", "展示按压和旋转以榨出果汁。", "将果汁倒入杯中。", "邀请孩子尝试剩余的橙子。"],
+      steps: ["邀请孩子一起试试榨橙汁，并说出材料的名称。", "示范将半个橙子放在榨汁器上。", "展示按压和旋转以榨出果汁。", "一起将果汁倒入杯中。", "让孩子尝试剩余的橙子。"],
     },
   },
   {
@@ -283,7 +283,7 @@ export const activities: Activity[] = [
     description: "Children practice food preparation by peeling leaves from a bok choy and sorting them into bowls.",
     domains: ["Food Preparation", "Fine Motor Coordination", "Concentration"],
     materials: ["Bok choy", "Small bowls"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate gently peeling one leaf at a time from the base.", "Place the peeled leaf into a bowl.", "Invite the child to try.", "Allow uninterrupted repetition until all leaves are peeled."],
+    steps: ["Invite your child to try peeling bok choy, and name the materials together.", "Show how to gently peel one leaf at a time from the base.", "Place the peeled leaf into a bowl together.", "Let your child try.", "Give your child space to repeat until all the leaves are peeled."],
     keywords: "bok choy peeling food preparation practical life vegetables",
     zh: {
       title: "剥白菜",
@@ -292,7 +292,7 @@ export const activities: Activity[] = [
       description: "孩子们通过从小白菜上剥下叶子并分类放入碗中，练习食物准备能力。",
       domains: ["食物准备", "精细动作协调", "专注力"],
       materials: ["小白菜", "小碗"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范从根部轻轻剥下一片叶子。", "将剥下的叶子放入碗中。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到所有叶子都剥完。"],
+      steps: ["邀请孩子一起试试剥白菜，并说出材料的名称。", "示范从根部轻轻剥下一片叶子。", "一起将剥下的叶子放入碗中。", "让孩子尝试。", "给孩子空间，重复练习直到所有叶子都剥完。"],
     },
   },
   {
@@ -308,7 +308,7 @@ export const activities: Activity[] = [
     description: "Children practice food preparation and fine motor control by peeling a hard-boiled egg and cutting it with a child-safe cutter.",
     domains: ["Food Preparation", "Fine Motor Coordination", "Independence"],
     materials: ["Hard-boiled egg", "Small bowl for shells", "Child-safe egg cutter"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate peeling the shell piece by piece into the bowl.", "Place the peeled egg into the cutter and press down.", "Arrange the egg slices on a plate.", "Invite the child to try the full sequence."],
+    steps: ["Invite your child to try this activity, and name the materials together.", "Show how to peel the shell piece by piece into the bowl.", "Place the peeled egg into the cutter and press down together.", "Arrange the egg slices on a plate.", "Let your child try the full sequence."],
     keywords: "egg peeling cutting food preparation practical life",
     zh: {
       title: "剥蛋切蛋",
@@ -317,7 +317,7 @@ export const activities: Activity[] = [
       description: "孩子们通过剥煮熟的鸡蛋并用儿童安全切蛋器切蛋，练习食物准备能力和精细动作控制。",
       domains: ["食物准备", "精细动作协调", "独立性"],
       materials: ["煮熟的鸡蛋", "装蛋壳的小碗", "儿童安全切蛋器"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范一片一片地将蛋壳剥入碗中。", "将剥好的鸡蛋放入切蛋器中按压。", "将蛋片摆放在盘子上。", "邀请孩子尝试完整的流程。"],
+      steps: ["邀请孩子一起试试剥蛋切蛋，并说出材料的名称。", "示范一片一片地将蛋壳剥入碗中。", "一起将剥好的鸡蛋放入切蛋器中按压。", "将蛋片摆放在盘子上。", "让孩子尝试完整的流程。"],
     },
   },
   {
@@ -333,7 +333,7 @@ export const activities: Activity[] = [
     description: "A caregiver-made book of photos and simple sentences about the child, read together and revisited whenever the child is interested.",
     domains: ["Vocabulary", "Self-recognition", "Listening"],
     materials: ["Personalized photo book"],
-    steps: ["Caregiver creates a simple book with the child's photos and short sentences about their day.", "Sit together and read the book slowly, pointing to each photo.", "Name the people, places, and actions shown.", "Pause for the child's reactions and questions.", "Leave the book accessible so the child can look through it independently."],
+    steps: ["Create a simple book with your child's photos and short sentences about their day.", "Sit together and read the book slowly, pointing to each photo.", "Name the people, places, and actions shown.", "Pause for your child's reactions and questions.", "Leave the book within reach so your child can look through it anytime."],
     keywords: "reading photo book self recognition language development",
     zh: {
       title: "读我自己的故事书",
@@ -342,7 +342,7 @@ export const activities: Activity[] = [
       description: "由家长或照顾者制作一本关于孩子的照片和简单句子的书，一起阅读，并在孩子感兴趣时随时翻看。",
       domains: ["词汇量", "自我认知", "倾听能力"],
       materials: ["个人照片书"],
-      steps: ["照顾者用孩子的照片和关于日常生活的简短句子制作一本简单的书。", "一起坐下来慢慢阅读，指向每一张照片。", "说出照片中人物、地点和动作的名称。", "停顿一下，关注孩子的反应和问题。", "将书放在孩子可以拿到的地方，方便他们自己翻看。"],
+      steps: ["用孩子的照片和关于日常生活的简短句子制作一本简单的书。", "一起坐下来慢慢阅读，指向每一张照片。", "说出照片中人物、地点和动作的名称。", "停顿一下，关注孩子的反应和问题。", "把书放在孩子随手可拿到的地方，方便他们随时翻看。"],
     },
   },
   {
@@ -358,7 +358,7 @@ export const activities: Activity[] = [
     description: "Children learn to care for their environment by erasing and wiping down a chalkboard after drawing.",
     domains: ["Care of Environment", "Gross Motor Coordination", "Concentration"],
     materials: ["Chalkboard eraser", "Damp cloth"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate wiping the chalkboard in top-to-bottom strokes with the eraser.", "Use the damp cloth to clean any remaining marks.", "Invite the child to try.", "Allow uninterrupted repetition until the chalkboard is clean."],
+    steps: ["Invite your child to try cleaning the chalkboard, and name the materials together.", "Show how to wipe the chalkboard in top-to-bottom strokes with the eraser.", "Use the damp cloth together to clean any remaining marks.", "Let your child try.", "Give your child space to repeat until the chalkboard is clean."],
     keywords: "cleaning chalkboard care of environment practical life",
     zh: {
       title: "擦黑板",
@@ -367,7 +367,7 @@ export const activities: Activity[] = [
       description: "孩子们通过画画后擦拭黑板，练习照顾周围环境。",
       domains: ["照顾环境", "大肌肉协调", "专注力"],
       materials: ["黑板擦", "湿布"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范用黑板擦从上到下擦拭黑板。", "用湿布清理残留的痕迹。", "邀请孩子尝试。", "允许孩子不受打扰地重复练习，直到黑板擦干净为止。"],
+      steps: ["邀请孩子一起试试擦黑板，并说出材料的名称。", "示范用黑板擦从上到下擦拭黑板。", "一起用湿布清理残留的痕迹。", "让孩子尝试。", "给孩子空间，重复练习直到黑板擦干净为止。"],
     },
   },
   {
@@ -383,7 +383,7 @@ export const activities: Activity[] = [
     description: "Children practice fine motor control and concentration by spooning rice from a bowl into a jar, filling it to a marked line.",
     domains: ["Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Bowl of rice", "Wooden spoon", "Jar marked with a fill line"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate scooping a spoonful of rice from the bowl.", "Pour the rice carefully into the jar.", "Repeat until the rice reaches the marked line.", "Invite the child to try, then pour the rice back for repetition."],
+    steps: ["Invite your child to try this activity, and name the materials together.", "Show how to scoop a spoonful of rice from the bowl.", "Pour the rice carefully into the jar together.", "Repeat until the rice reaches the marked line.", "Let your child try, then pour the rice back for more practice."],
     keywords: "spooning rice transfer fine motor practical life",
     zh: {
       title: "舀米练习",
@@ -392,7 +392,7 @@ export const activities: Activity[] = [
       description: "孩子们通过用勺子将米从碗中舀到罐子里，装到标记线为止，练习精细动作控制和专注力。",
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗米", "木勺", "带标记线的罐子"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范从碗中舀出一勺米。", "小心地将米倒入罐中。", "重复操作直到米达到标记线。", "邀请孩子尝试，然后将米倒回碗中以便重复练习。"],
+      steps: ["邀请孩子一起试试舀米练习，并说出材料的名称。", "示范从碗中舀出一勺米。", "一起小心地将米倒入罐中。", "重复操作直到米达到标记线。", "让孩子尝试，然后将米倒回碗中以便重复练习。"],
     },
   },
   {
@@ -408,7 +408,7 @@ export const activities: Activity[] = [
     description: "Children practice fine motor control and concentration by spooning pasta from one bowl into another.",
     domains: ["Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Bowl of dry pasta", "Spoon", "Empty bowl"],
-    steps: ["Invite the child to the activity and name the materials.", "Demonstrate scooping a spoonful of pasta from the full bowl.", "Pour the pasta carefully into the empty bowl.", "Repeat until all the pasta is transferred.", "Invite the child to try, then transfer the pasta back for repetition."],
+    steps: ["Invite your child to try this activity, and name the materials together.", "Show how to scoop a spoonful of pasta from the full bowl.", "Pour the pasta carefully into the empty bowl together.", "Repeat until all the pasta is transferred.", "Let your child try, then transfer the pasta back for more practice."],
     keywords: "spooning pasta transfer fine motor practical life",
     zh: {
       title: "舀意面练习",
@@ -417,7 +417,7 @@ export const activities: Activity[] = [
       description: "孩子们通过用勺子将意面从一个碗舀到另一个碗中，练习精细动作控制和专注力。",
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗干意面", "勺子", "空碗"],
-      steps: ["邀请孩子参与活动，并说出材料的名称。", "示范从装满的碗中舀出一勺意面。", "小心地将意面倒入空碗中。", "重复操作直到所有意面都转移完毕。", "邀请孩子尝试，然后将意面倒回原碗以便重复练习。"],
+      steps: ["邀请孩子一起试试舀意面练习，并说出材料的名称。", "示范从装满的碗中舀出一勺意面。", "一起小心地将意面倒入空碗中。", "重复操作直到所有意面都转移完毕。", "让孩子尝试，然后将意面倒回原碗以便重复练习。"],
     },
   },
 ];

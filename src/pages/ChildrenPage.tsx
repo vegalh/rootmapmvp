@@ -51,7 +51,7 @@ export function ChildrenPage({ childrenData, observations, goChild, openAddChild
         )}
         {!!childrenData.length && (
           <>
-            <div className="section-title recent-title"><h2>{t.recentActivityLabel}</h2></div>
+            <div className="section-title recent-title"><h2>{t.recentMomentsLabel}</h2></div>
             <div className="recent-activity">
               {observations.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(o => {
                 const c = childrenData.find(x => x.id === o.childId);

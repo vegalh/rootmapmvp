@@ -21,7 +21,7 @@ export function RecordFormPage({ child, save, cancel, t }: {
 
   return (
     <main className="form-page">
-      <PageHeader title={`${t.recordLesson} / ${t.addObservation}`} back={cancel} />
+      <PageHeader title={t.recordLesson} back={cancel} />
       <section className="form-child">
         <img src={child.photo} alt="" />
         <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>

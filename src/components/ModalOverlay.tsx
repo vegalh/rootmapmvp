@@ -165,7 +165,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
         if (!obsNotes.trim()) return;
         saveObservation({ id: `o-${Date.now()}`, childId: obsChild, date, notes: obsNotes, lesson: planNote || undefined, skills: obsSkills, nextSteps, followUp });
         close("observations");
-      }}>{t.save}</button>
+      }}>{t.saveMoment}</button>
     </Modal>
   );
 }

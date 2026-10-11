@@ -17,7 +17,7 @@ export function BottomNav({ active, go, openQuick, t }: { active: Screen; go: (s
   const items: [Screen, string, string][] = [
     ["children", "home", t.myChildren],
     ["discover", "compass", t.discover],
-    ["observations", "note", t.observations],
+    ["observations", "note", t.momentsNav],
     ["profile", "user", t.profile],
   ];
   return (

@@ -30,7 +30,7 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
   return (
     <main className="child-profile">
       <header className="child-header">
-        <button onClick={back}><Icon name="back" size={18} /> {t.classroom}</button>
+        <button onClick={back}><Icon name="back" size={18} /> {t.backToChildren}</button>
         <TreeLogo />
         <div className="child-header-actions">
           <button onClick={edit}>{t.edit}</button>
@@ -91,7 +91,7 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
           </div>
         )}
         {tab === "Notes" && <div className="personal-note">{child.notes || t.noGeneralNotes}</div>}
-        <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson} / {t.addObservation}</button>
+        <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
       </div>
     </main>
   );
