@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icon } from "./Icon";
 import { useStored } from "../lib/storage";
 import type { Screen } from "../types";
@@ -66,6 +66,7 @@ export function FilterPill({ label, value, defaultValue, onChange, options, rend
   align?: "left" | "right";
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   const display = (v: string) => (renderLabel ? renderLabel(v) : v);
   const active = value !== defaultValue;
 
@@ -85,6 +86,31 @@ export function FilterPill({ label, value, defaultValue, onChange, options, rend
     };
   }, [isOpen, onOpenChange]);
 
+  // Keep the popover fully on-screen: a middle pill's popover can otherwise be wide
+  // enough to overflow the right (or left) edge of its bounds regardless of align.
+  // Bound against the phone-mockup frame (.app-shell) when present, not the full
+  // browser window, since the frame is narrower than the window on desktop sizes.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const reposition = () => {
+      const pop = popRef.current;
+      if (!pop) return;
+      pop.style.transform = "";
+      const rect = pop.getBoundingClientRect();
+      const bounds = pop.closest(".app-shell")?.getBoundingClientRect();
+      const margin = 16;
+      const left = bounds ? bounds.left + margin : margin;
+      const right = bounds ? bounds.right - margin : window.innerWidth - margin;
+      let shift = 0;
+      if (rect.right > right) shift = right - rect.right;
+      if (rect.left + shift < left) shift = left - rect.left;
+      if (shift) pop.style.transform = `translateX(${shift}px)`;
+    };
+    reposition();
+    window.addEventListener("resize", reposition);
+    return () => window.removeEventListener("resize", reposition);
+  }, [isOpen]);
+
   return (
     <div className={`filter-pill-wrap filter-pill-align-${align}`} ref={wrapRef}>
       <button
@@ -98,7 +124,7 @@ export function FilterPill({ label, value, defaultValue, onChange, options, rend
         <Icon name="down" size={15} />
       </button>
       {isOpen && (
-        <div className="filter-popover" role="listbox" aria-label={label}>
+        <div className="filter-popover" role="listbox" aria-label={label} ref={popRef}>
           <div className={`filter-popover-options cols-${columns}`}>
             {options.map(o => {
               const selected = o === value;

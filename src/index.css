@@ -88,7 +88,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .filter-popover { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: max-content; min-width: 170px; max-width: calc(100vw - 32px); background: #FFFDF9; border: 1px solid #EDE6DD; border-radius: 18px; box-shadow: 0 8px 28px rgba(56, 51, 47, 0.12); padding: 12px; }
 .filter-pill-align-right .filter-popover { left: auto; right: 0; }
 .filter-popover-options { display: grid; grid-template-columns: 1fr; gap: 4px; }
-.filter-popover-options.cols-2 { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
+.filter-popover-options.cols-2 { grid-template-columns: repeat(2, minmax(110px, 140px)); }
 .filter-popover-option { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: #38332F; font-family: var(--font-body); font-size: 13.5px; text-align: left; white-space: normal; line-height: 1.2; overflow-wrap: break-word; }
 .filter-popover-option:hover { background: rgba(94, 143, 114, 0.1); }
 .filter-popover-option.selected { background: #E8EFE6; color: #426B50; font-weight: 700; }
