@@ -1,5 +1,5 @@
 import type { EntryDraft } from "../types";
-import { tryStore } from "./storage";
+import { readStored, tryStore } from "./storage";
 
 // Unsaved editor state lives under one localStorage key, keyed by "<childId>:<entryId|new>".
 // Drafts never touch published entries; they are only applied when the parent taps Save.
@@ -7,12 +7,9 @@ const KEY = "rootmap-journal-drafts";
 
 export const draftKey = (childId: string, entryId?: string) => `${childId}:${entryId || "new"}`;
 
+// An unreadable drafts value is backed up (see readStored) before the next write replaces it.
 function readAll(): Record<string, EntryDraft> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || "{}");
-  } catch {
-    return {};
-  }
+  return readStored<Record<string, EntryDraft>>(KEY, {}).value;
 }
 
 export function readDraft(key: string): EntryDraft | undefined {

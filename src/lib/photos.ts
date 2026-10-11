@@ -1,4 +1,5 @@
-// Reads an image file and downscales it to a JPEG data URL so journal photos stay small enough for localStorage.
+// Reads an image file and downscales it to a JPEG data URL so photos stay small enough for localStorage.
+// Journal photos use the defaults; profile pictures pass a smaller `maxSide`, since they're shown as avatars.
 export function resizePhoto(file: File, maxSide = 1280, quality = 0.78): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -13,8 +14,14 @@ export function resizePhoto(file: File, maxSide = 1280, quality = 0.78): Promise
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext("2d");
         if (!ctx) return resolve(reader.result as string);
+        // JPEG has no transparency; paint a white backdrop so transparent PNGs don't turn black.
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        const resized = canvas.toDataURL("image/jpeg", quality);
+        // A small image can grow when re-encoded; keep the original then.
+        const original = reader.result as string;
+        resolve(scale === 1 && /^data:image\/(jpeg|png|webp);/.test(original) && original.length < resized.length ? original : resized);
       };
       img.src = reader.result as string;
     };

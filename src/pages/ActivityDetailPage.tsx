@@ -3,12 +3,13 @@ import { Icon } from "../components/Icon";
 import type { Activity } from "../types";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 
-export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, t }: {
+export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, openTried, t }: {
   activity: Activity;
   saved: boolean;
   toggleSaved: () => void;
   back: () => void;
   openPlan: () => void;
+  openTried: () => void;
   t: Copy;
 }) {
   const a = localizeActivity(rawActivity, t);
@@ -51,7 +52,10 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
         <h2>{t.how}</h2>
         <ol>{a.steps.map(s => <li key={s}>{s}</li>)}</ol>
       </div>
-      <div className="sticky-action"><button onClick={openPlan}><Icon name="calendar" size={19} />{t.addWeek}</button></div>
+      <div className="sticky-action two">
+        <button className="secondary" onClick={openTried}><Icon name="check" size={19} />{t.markAsTried}</button>
+        <button onClick={openPlan}><Icon name="calendar" size={19} />{t.addWeek}</button>
+      </div>
     </main>
   );
 }

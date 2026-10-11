@@ -15,9 +15,9 @@ import { RecordFormPage } from "./pages/RecordFormPage";
 import { EntryEditorPage } from "./pages/EntryEditorPage";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
-import { tryStore, useStored } from "./lib/storage";
+import { onStorageError, readStored, tryStore, useStored, type StorageFailure } from "./lib/storage";
 import { ENTRIES_KEY, MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
-import { copy } from "./lib/i18n";
+import { copy, localizeActivity } from "./lib/i18n";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
@@ -27,10 +27,29 @@ import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
 
-// Refreshes seed-owned items (matched by id) to the bundled seed while keeping everything the parent added.
-function refreshSeed<T extends { id: string }>(current: T[], seed: T[]): T[] {
-  return [...seed, ...current.filter(x => !seed.some(s => s.id === x.id))];
+// Merges bundled demo data into what's stored without ever overwriting it: a seed item already on the device
+// only gains fields it lacks (the stored values always win), and a seed item is only added if this device has
+// never had it, so a demo child the parent deleted doesn't come back. Nothing is ever removed.
+function mergeSeed<T extends { id: string }>(current: T[], seed: T[], prefix: string, seen: Set<string>): T[] {
+  const merged = current.map(x => {
+    const s = seed.find(y => y.id === x.id);
+    return s ? { ...s, ...x } : x;
+  });
+  const added = seed.filter(s => !seen.has(`${prefix}:${s.id}`) && !current.some(x => x.id === s.id));
+  return [...merged, ...added];
 }
+
+const seedIds = [
+  ...initialChildren.map(x => `child:${x.id}`),
+  ...initialRecords.map(x => `record:${x.id}`),
+  ...initialObservations.map(x => `obs:${x.id}`),
+];
+
+// Unique even when two records are created within the same millisecond.
+const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+// Profiles removed from My Children are kept here (with their photo) so they could be restored later.
+const DELETED_CHILDREN_KEY = "rootmap-deleted-children";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("children");
@@ -41,21 +60,26 @@ export default function App() {
   const [childTab, setChildTab] = useState("Journal");
   // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
-  // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal).
-  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child">("moments");
+  // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal,
+  // "activity" = the activity page a memory was added from after marking it as tried).
+  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity">("moments");
   // Child preselected for a new entry.
   const [editorChild, setEditorChild] = useState<string | undefined>();
+  // Editable starting title/date for a new entry (the activity just marked as tried).
+  const [editorPrefill, setEditorPrefill] = useState<{ title: string; date: string } | undefined>();
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState("");
 
-  const [childrenData, setChildrenData] = useStored<Child[]>("rootmap-children", initialChildren);
-  const [records, setRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
+  const [childrenData, setChildrenData, commitChildren] = useStored<Child[]>("rootmap-children", initialChildren);
+  const [records, setRecords, commitRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
   const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
   const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
+  // Every seed item this device has received ("child:emma", "record:r1", "obs:o1"); see mergeSeed.
+  const [seenSeeds, setSeenSeeds] = useStored<string[]>("rootmap-seed-ids", []);
   const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
-  const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
-  // Moments/Journal entries (per child) and goals (per parent) use their own keys, so seed-version resets never touch them.
+  const [plans, setPlans, commitPlans] = useStored<Plan[]>("rootmap-plans", []);
+  // Moments/Journal entries (per child) and goals (per parent) are never part of the seed merge.
   const [entries, setEntries] = useStored<Entry[]>(ENTRIES_KEY, []);
   const [migrated, setMigrated] = useStored<string[]>(MIGRATED_KEY, []);
   const [goals, setGoals] = useStored<Goal[]>("rootmap-goals", []);
@@ -65,26 +89,38 @@ export default function App() {
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
 
-  // When the bundled seed data changes (SEED_VERSION bumped), refresh the seed children/lessons/observations
-  // so every device picks up the update, without dropping anything the parent created or renamed.
+  // When the bundled seed data changes (SEED_VERSION bumped), merge in new demo items without touching anything
+  // already on the device (see mergeSeed). The parent's profile and all their own data are never reset.
   useEffect(() => {
-    if (seedVersion >= SEED_VERSION) return;
-    setChildrenData(current => refreshSeed(current, initialChildren).map(c => {
-      const mine = current.find(x => x.id === c.id);
-      return mine ? { ...c, first: mine.first, last: mine.last, notes: mine.notes } : c;
-    }));
-    setRecords(current => refreshSeed(current, initialRecords));
-    setObservations(current => refreshSeed(current, initialObservations));
-    setProfile({ name: "Alex Hao", photo: alexPhoto, contact: "" });
-    // Drop any saved-activity ids that no longer exist, which previously caused a white-screen crash.
-    setSaved(current => current.filter(id => activities.some(a => a.id === id)));
-    setSeedVersion(SEED_VERSION);
-  }, [seedVersion, setChildrenData, setRecords, setObservations, setProfile, setSaved, setSeedVersion]);
+    // A device without a seen-list has already received every current seed item (it's on this version, or it
+    // predates the list); treating them all as seen means a demo child the parent deleted is never re-added.
+    const seen = new Set(seenSeeds.length ? seenSeeds : seedIds);
+    if (seedVersion < SEED_VERSION) {
+      setChildrenData(current => mergeSeed(current, initialChildren, "child", seen));
+      setRecords(current => mergeSeed(current, initialRecords, "record", seen));
+      setObservations(current => mergeSeed(current, initialObservations, "obs", seen));
+      // Hide saved-activity ids that no longer exist, which previously caused a white-screen crash.
+      setSaved(current => current.filter(id => activities.some(a => a.id === id)));
+      setSeedVersion(SEED_VERSION);
+    }
+    const all = [...new Set([...seen, ...seedIds])];
+    if (all.length !== seenSeeds.length) setSeenSeeds(all);
+  }, [seedVersion, seenSeeds, setChildrenData, setRecords, setObservations, setSaved, setSeedVersion, setSeenSeeds]);
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
   const activity = activities.find(a => a.id === selectedActivity) || activities[0];
   const entry = entries.find(e => e.id === selectedEntry);
+
+  const storageMessage = (failure: StorageFailure) => (failure === "full" ? t.storageFull : t.storageFailed);
+  // For synchronous saves: shows the storage error and returns false when the write failed.
+  const savedOk = (failure: StorageFailure | null) => {
+    if (failure) setToast(storageMessage(failure));
+    return !failure;
+  };
+
+  // Background writes (goals, profile, edits…) that fail are reported instead of being lost silently.
+  useEffect(() => onStorageError(kind => setToast(kind === "full" ? copy[lang].storageFull : copy[lang].storageFailed)), [lang]);
 
   // Writes synchronously first so a full device (large photos) is reported instead of silently losing the entry.
   const storeEntries = (next: Entry[]) => {
@@ -124,14 +160,22 @@ export default function App() {
   };
   const topLevel = ["children", "discover", "observations", "profile"].includes(screen);
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
-  const originScreen: Screen = entryOrigin === "child" ? "child" : "observations";
+  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? "activity" : "observations";
   const openEntry = (id: string, origin: "moments" | "child") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
-  const startEntry = (origin: "moments" | "child", childId?: string) => {
+  const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
     if (!childrenData.length) { setModal("addChild"); return; }
     setSelectedEntry(undefined);
     setEntryOrigin(origin);
     setEditorChild(childId);
+    setEditorPrefill(prefill);
     go("entryEdit");
+  };
+
+  // "Mark as Tried": one more record in the existing activity history. Repeat attempts are separate records.
+  const saveTried = (childId: string, date: string, notes: string) => {
+    const record: LessonRecord = { id: newId("t"), childId, kind: "tried", activityId: activity.id, lesson: activity.title, date, createdAt: new Date().toISOString(), ...(notes ? { notes } : {}) };
+    const failure = commitRecords([record, ...records]);
+    return failure ? storageMessage(failure) : null;
   };
 
   const closeModal = (destination?: Screen | ModalKind) => {
@@ -166,6 +210,7 @@ export default function App() {
           toggleSaved={() => setSaved(saved.includes(activity.id) ? saved.filter(x => x !== activity.id) : [...saved, activity.id])}
           back={() => go(previous === "week" ? "week" : "discover")}
           openPlan={() => setModal("plan")}
+          openTried={() => setModal("tried")}
           t={t}
         />
       );
@@ -211,8 +256,17 @@ export default function App() {
             setChildrenData(childrenData.map(c => (c.id === child.id ? { ...c, first, last: last.join(" ") || c.last } : c)));
           }}
           remove={() => {
-            if (!window.confirm(t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`))) return;
-            setChildrenData(childrenData.filter(c => c.id !== child.id));
+            // The child's journal entries, activity records, plans and drafts are never deleted with the profile;
+            // the warning says how much is attached so nothing disappears from view unexpectedly.
+            const entryCount = entries.filter(e => e.childId === child.id).length;
+            const recordCount = records.filter(r => r.childId === child.id).length;
+            const message = entryCount || recordCount
+              ? t.confirmDeleteChildWithData.split("{name}").join(child.first).replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))
+              : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`);
+            if (!window.confirm(message)) return;
+            const deleted = readStored<unknown[]>(DELETED_CHILDREN_KEY, []).value;
+            tryStore(DELETED_CHILDREN_KEY, [...deleted, { ...child, deletedAt: new Date().toISOString() }]);
+            if (!savedOk(commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
             go("children");
           }}
           back={() => go("children")}
@@ -228,9 +282,9 @@ export default function App() {
           cancel={() => go("child")}
           t={t}
           save={r => {
-            const item = { ...r, id: `r-${Date.now()}`, childId: child.id };
+            const item = { ...r, id: newId("r"), childId: child.id, createdAt: new Date().toISOString() };
             // Activity notes stay on the activity record (Activities tab); memories are recorded through Moments.
-            setRecords([item, ...records]);
+            if (!savedOk(commitRecords([item, ...records]))) return;
             go("child");
           }}
         />
@@ -257,11 +311,12 @@ export default function App() {
     if (screen === "entryEdit") {
       return (
         <EntryEditorPage
-          key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}`}
+          key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}:${editorPrefill?.title || ""}`}
           childrenData={childrenData}
           childId={entry?.childId || (editorChild && childrenData.some(c => c.id === editorChild) ? editorChild : childrenData[0]?.id || "")}
           lockChild={entryOrigin === "child"}
           entry={entry}
+          prefill={entry ? undefined : editorPrefill}
           lang={lang}
           back={() => go(entry ? "entry" : originScreen)}
           save={f => {
@@ -272,7 +327,7 @@ export default function App() {
               const textZh = (entry.text || "") === (fields.text || "") ? entry.textZh : undefined;
               if (!storeEntries(entries.map(e => (e.id === entry.id ? { ...e, ...fields, textZh, updatedAt: now } : e)))) return false;
             } else {
-              if (!storeEntries([{ id: `m-${Date.now()}`, ...fields, createdAt: now, updatedAt: now }, ...entries])) return false;
+              if (!storeEntries([{ id: newId("m"), ...fields, createdAt: now, updatedAt: now }, ...entries])) return false;
             }
             setToast(t.entrySaved);
             go(originScreen);
@@ -330,13 +385,15 @@ export default function App() {
         modal={modal}
         close={closeModal}
         childrenData={childrenData}
-        setChildrenData={setChildrenData}
+        setChildrenData={next => savedOk(commitChildren(next))}
         filters={filters}
         setFilters={setFilters}
         selectedActivity={activity}
         plans={plans}
-        setPlans={setPlans}
+        setPlans={next => savedOk(commitPlans(next))}
         selectedChild={selectedChild}
+        saveTried={saveTried}
+        addMemory={(childId, date) => { setModal(null); startEntry("activity", childId, { title: localizeActivity(activity, t).title, date }); }}
         t={t}
       />
       {toast && <div className="toast" role="status">{toast}</div>}

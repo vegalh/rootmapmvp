@@ -3,6 +3,8 @@ import { Icon } from "../components/Icon";
 import { PageHeader, NotificationToggle, Field } from "../components/ui";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
+import { readText, storeText } from "../lib/storage";
+import { resizePhoto } from "../lib/photos";
 
 export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, t }: {
   screen: Screen;
@@ -32,8 +34,8 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
         <PageHeader title={title} back={back} />
         <textarea
           className="notes-pad"
-          defaultValue={localStorage.getItem("rootmap-personal-notes") || ""}
-          onChange={e => localStorage.setItem("rootmap-personal-notes", e.target.value)}
+          defaultValue={readText("rootmap-personal-notes")}
+          onChange={e => storeText("rootmap-personal-notes", e.target.value)}
           placeholder={t.notesPlaceholder}
         />
       </main>
@@ -68,11 +70,10 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
   }
 
   if (screen === "personal") {
+    // Downscaled like child photos: it's shown as a small avatar and must fit in local storage.
     const pickPhoto = (file: File | undefined) => {
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setPhoto(reader.result as string);
-      reader.readAsDataURL(file);
+      resizePhoto(file, 640, 0.85).then(setPhoto, () => window.alert(t.photoUnsupported));
     };
     return (
       <main className="simple-page">

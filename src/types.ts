@@ -24,13 +24,21 @@ export type ProfileInfo = {
   contact: string;
 };
 
+// One activity done with a child (localStorage "rootmap-records"), shown on the child's Activities tab.
+// Records from the Record form carry a learning area and stage; "Mark as Tried" records (kind "tried") only
+// say the parent tried a Discover activity on a date, so area and stage are absent there.
 export type LessonRecord = {
   id: string;
   childId: string;
+  // Display name; for tried records the activity's English title, kept in case the activity is later removed.
   lesson: string;
-  area: Area;
-  stage: Stage;
+  area?: Area;
+  stage?: Stage;
   date: string;
+  kind?: "tried";
+  // Discover activity id (src/data/activities.ts), set on tried records.
+  activityId?: string;
+  createdAt?: string;
   notes?: string;
   nextSteps?: string;
   skills?: string[];
@@ -156,4 +164,4 @@ export type Screen =
   | "privacy"
   | "help";
 
-export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | null;
+export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | "tried" | null;

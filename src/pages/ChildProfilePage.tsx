@@ -4,9 +4,10 @@ import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTime
 import { TreeLogo } from "../components/TreeLogo";
 import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
-import { fmt } from "../lib/dates";
+import { fmt, fmtLong } from "../lib/dates";
+import { activities } from "../data/activities";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
-import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, type Copy } from "../lib/i18n";
+import { childAge, childTabLabel, groupOptionLabel, lessonLabel, localizeActivity, noteText, recordAreaLabel, stageLabel, type Copy } from "../lib/i18n";
 
 export function ChildProfilePage({ child, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
   child: Child;
@@ -28,7 +29,8 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
   remove: () => void;
   t: Copy;
 }) {
-  const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date));
+  // Several attempts on the same day keep the order they were recorded in (newest first).
+  const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""));
   return (
     <main className="child-profile">
       <header className="child-header">
@@ -54,7 +56,7 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
         {tab === "Activities" ? (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
-            <LessonList records={lessons} t={t} />
+            <LessonList records={lessons} lang={lang} t={t} />
             <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
           </>
         ) : (
@@ -109,16 +111,32 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
   );
 }
 
-function LessonList({ records, t }: { records: LessonRecord[]; t: Copy }) {
+function LessonList({ records, lang, t }: { records: LessonRecord[]; lang: Lang; t: Copy }) {
   return (
     <div className="lesson-list">
       {records.map(r => {
         const notes = noteText(r.notes, r.notesZh, t);
+        if (r.kind === "tried") {
+          // Parent-friendly: just the activity and when it was tried, no learning stage.
+          const activity = activities.find(a => a.id === r.activityId);
+          const title = activity ? localizeActivity(activity, t).title : r.lesson;
+          const when = t.triedOn.replace("{date}", fmtLong(r.date, lang));
+          return (
+            <button key={r.id} onClick={() => window.alert(`${title}\n${when}${notes ? `\n\n${notes}` : ""}`)}>
+              <i><Icon name="check" size={18} /></i>
+              <span><strong>{title}</strong><small>{when}</small></span>
+              <b className="status tried">{t.tried}</b>
+              <Icon name="chevron" size={15} />
+            </button>
+          );
+        }
+        const area = r.area ? recordAreaLabel(r.area, t) : "";
+        const stage = r.stage ? stageLabel(r.stage, t) : "";
         return (
-          <button key={r.id} onClick={() => window.alert(`${lessonLabel(r.lesson, t)}\n${recordAreaLabel(r.area, t)} · ${t[r.stage.toLowerCase() as "introduced" | "practicing" | "independent"]}\n${fmt(r.date)}${notes ? `\n\n${notes}` : ""}`)}>
+          <button key={r.id} onClick={() => window.alert(`${lessonLabel(r.lesson, t)}\n${[area, stage].filter(Boolean).join(" · ")}\n${fmt(r.date)}${notes ? `\n\n${notes}` : ""}`)}>
             <i><Icon name="book" size={18} /></i>
-            <span><strong>{lessonLabel(r.lesson, t)}</strong><small>{recordAreaLabel(r.area, t)} · {fmt(r.date)}</small></span>
-            <b className={`status ${r.stage.toLowerCase()}`}>{t[r.stage.toLowerCase() as "introduced" | "practicing" | "independent"]}</b>
+            <span><strong>{lessonLabel(r.lesson, t)}</strong><small>{area ? `${area} · ` : ""}{fmt(r.date)}</small></span>
+            {stage ? <b className={`status ${r.stage!.toLowerCase()}`}>{stage}</b> : <b />}
             <Icon name="chevron" size={15} />
           </button>
         );

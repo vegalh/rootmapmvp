@@ -15,13 +15,15 @@ const hasContent = (f: Fields) => Boolean(f.title.trim() || f.text.trim() || f.p
 
 // The one editor for every memory, whether started from Moments or a child's Journal. Unsaved changes are
 // autosaved as a local draft; the published entry is only changed when the parent taps Save.
-export function EntryEditorPage({ childrenData, childId, lockChild, entry, lang, save, back, t }: {
+export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefill, lang, save, back, t }: {
   childrenData: Child[];
   // Preselected child (the Journal's child, or the Moments filter); ignored when editing.
   childId: string;
   // From a child's Journal the child is shown as read-only context instead of a picker.
   lockChild: boolean;
   entry?: Entry;
+  // Starting text for a new entry (e.g. the activity just marked as tried); freely editable, never saved on its own.
+  prefill?: { title: string; date: string };
   lang: Lang;
   // Returns false when the entry couldn't be stored (e.g. device out of space).
   save: (fields: Fields) => boolean;
@@ -32,9 +34,9 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, lang,
   const keyFor = (f: Fields) => (entry ? draftKey(entry.childId, entry.id) : draftKey(f.childId));
   const base: Fields = entry
     ? { childId: entry.childId, date: entry.date, title: entry.title || "", text: entry.text || "", photos: entry.photos }
-    : { childId, date: localIsoToday(), title: "", text: "", photos: [] };
-  // A new-entry draft is only worth keeping once it has content; an edit draft once it differs from the entry.
-  const isDirty = (f: Fields) => (entry ? !sameFields(f, base) : hasContent(f));
+    : { childId, date: prefill?.date || localIsoToday(), title: prefill?.title || "", text: "", photos: [] };
+  // A new-entry draft is only worth keeping once it has content beyond any prefill; an edit draft once it differs from the entry.
+  const isDirty = (f: Fields) => (entry ? !sameFields(f, base) : hasContent(f) && !(prefill && sameFields(f, base)));
 
   const [initialDraft] = useState(() => readDraft(keyFor(base)));
   const [fields, setFields] = useState<Fields>(() => (initialDraft ? { childId: initialDraft.childId || base.childId, date: initialDraft.date, title: initialDraft.title, text: initialDraft.text, photos: initialDraft.photos } : base));
@@ -71,10 +73,20 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, lang,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields]);
 
-  // Flush the latest edits if the parent leaves before the debounce fires.
-  useEffect(() => () => { if (!done.current) persistDraft(latest.current); },
+  // Flush the latest edits if the parent leaves before the debounce fires: navigating away within the app,
+  // or refreshing / closing / backgrounding the page (where unmount cleanup never runs).
+  useEffect(() => {
+    const flush = () => { if (!done.current) persistDraft(latest.current); };
+    const onHidden = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+      flush();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []);
+  }, []);
 
   // Grow the writing area with its content so long entries read like a page, not a scroll box.
   useEffect(() => {
