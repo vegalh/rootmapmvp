@@ -18,6 +18,8 @@ import spooningPasta from "../assets/activities/spooning-pasta.jpg";
 import cuttingCelery from "../assets/activities/cutting-celery.jpg";
 import exploringFallVegetables from "../assets/activities/exploring-fall-vegetables.jpg";
 import pouringToCups from "../assets/activities/pouring-to-cups.jpg";
+import rollingInTheLeaves from "../assets/activities/rolling-in-the-leaves.jpg";
+import duckWalk from "../assets/activities/duck-walk.jpg";
 
 // To add a new lesson/activity, append an object here with a unique `id`.
 // `area` groups it under a Discover category; `ageKey` must match one of the
@@ -496,6 +498,56 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "协调能力", "专注力", "独立性"],
       materials: ["小水壶", "三个不同的杯子", "托盘"],
       steps: ["邀请孩子一起试试倒水练习，并说出材料的名称。", "示范如何用双手握住水壶。", "展示缓慢地倒入第一个杯子，再倒入下一个。", "让孩子尝试倒入这三个杯子。", "给孩子空间，让他们按自己的节奏重复练习。"],
+    },
+  },
+  {
+    id: "rolling-in-the-leaves",
+    title: "Rolling in the Leaves",
+    age: "1–3 years",
+    ageKey: "2–3",
+    area: "Movement",
+    topic: "Nature",
+    minutes: 15,
+    materialsLabel: "1 material",
+    image: rollingInTheLeaves,
+    description: "Children build gross motor coordination and sensory awareness by rolling, reaching, and playing freely in a pile of fallen leaves.",
+    domains: ["Gross Motor Coordination", "Sensorial Exploration", "Independence"],
+    materials: ["A pile of fallen leaves"],
+    steps: ["Invite your child to explore the leaves, and name what you see together.", "Let your child reach out and touch the leaves with their hands.", "Encourage your child to lie down and roll through the pile at their own pace.", "Join in and describe the sounds and textures you both notice.", "Give your child space to keep playing and repeating as they like."],
+    keywords: "rolling leaves nature seasons gross motor movement outdoor",
+    zh: {
+      title: "在落叶中打滚",
+      age: "1–3岁",
+      materialsLabel: "1种材料",
+      description: "孩子们通过在落叶堆中打滚、伸手触摸和自由玩耍，培养大肌肉协调能力和感官意识。",
+      domains: ["大肌肉协调", "感官探索", "独立性"],
+      materials: ["一堆落叶"],
+      steps: ["邀请孩子一起探索落叶，并说出你们看到的东西。", "让孩子伸手用手触摸落叶。", "鼓励孩子按自己的节奏躺下并在叶堆中打滚。", "一起加入，描述你们注意到的声音和质地。", "给孩子空间，让他们按喜欢的方式继续玩耍和重复。"],
+    },
+  },
+  {
+    id: "duck-walk",
+    title: "Duck Walk",
+    age: "1–3 years",
+    ageKey: "2–3",
+    area: "Movement",
+    topic: "Nature",
+    minutes: 10,
+    materialsLabel: "1 material",
+    image: duckWalk,
+    description: "Children build leg strength, balance, and coordination by squatting low and waddling forward like a duck.",
+    domains: ["Gross Motor Coordination", "Balance", "Concentration"],
+    materials: ["Open outdoor space"],
+    steps: ["Invite your child to squat down low like a duck.", "Show how to waddle forward while staying low to the ground.", "Encourage your child to try a few steps, holding their balance.", "Quack together and make it playful as you move.", "Give your child space to repeat and waddle as far as they'd like."],
+    keywords: "duck walk squat walking gross motor balance movement outdoor",
+    zh: {
+      title: "鸭子走路",
+      age: "1–3岁",
+      materialsLabel: "1种材料",
+      description: "孩子们通过蹲低身体像鸭子一样摇摆前行，培养腿部力量、平衡感和协调能力。",
+      domains: ["大肌肉协调", "平衡感", "专注力"],
+      materials: ["开阔的户外空间"],
+      steps: ["邀请孩子蹲低身体，像鸭子一样。", "示范如何保持低姿势向前摇摆走路。", "鼓励孩子尝试走几步，保持平衡。", "一起发出鸭子的叫声，让过程充满乐趣。", "给孩子空间，让他们按自己喜欢的方式重复练习并走得更远。"],
     },
   },
 ];
