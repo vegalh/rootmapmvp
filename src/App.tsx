@@ -37,7 +37,7 @@ export default function App() {
   const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "HaoWei", photo: haoweiPhoto, contact: "" });
   const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
   const [plans, setPlans] = useStored<Plan[]>("rootmap-plans", []);
-  const [lang, setLang] = useStored<Lang>("rootmap-language", "zh");
+  const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
   const [view, setView] = useStored<string>("rootmap-child-view", "grid");
   const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });

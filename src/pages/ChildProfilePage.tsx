@@ -4,7 +4,7 @@ import { TreeLogo } from "../components/TreeLogo";
 import { initialRecords } from "../data/progress";
 import { fmt } from "../lib/dates";
 import type { Child, LessonRecord, Observation } from "../types";
-import { childAge, childEnrolled, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
+import { childAge, childTabLabel, groupOptionLabel, lessonLabel, noteText, recordAreaLabel, skillLabel, type Copy } from "../lib/i18n";
 
 // Fallback area stats (lessons/introduced/practicing/independent) layered under any lessons the user adds.
 const baseStats: Record<string, [number, number, number, number]> = {
@@ -41,10 +41,10 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
         <img src={child.photo} alt="" />
         <h1>{child.first} {child.last}</h1>
         <p>{childAge(child, t)}</p>
-        <small>{t.enrolledSince} {childEnrolled(child, t)} · {groupOptionLabel(child.group, t)}</small>
+        <small>{groupOptionLabel(child.group, t)}</small>
       </section>
       <div className="tabs">
-        {["Overview", "Lessons", "Observations", "Notes"].map(x => (
+        {["Overview", "Activities", "Observations", "Notes"].map(x => (
           <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{childTabLabel(x, t)}</button>
         ))}
       </div>
@@ -73,7 +73,7 @@ export function ChildProfilePage({ child, records, observations, edit, back, rec
             <LessonList records={lessons.slice(0, 3)} t={t} />
           </>
         )}
-        {tab === "Lessons" && (
+        {tab === "Activities" && (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
             <LessonList records={lessons} t={t} />

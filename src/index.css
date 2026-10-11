@@ -34,7 +34,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-shell, .screen { width: 100%; min-height: 100vh; background: var(--bg); }
 .screen { position: relative; }
 .screen.has-nav { padding-bottom: 96px; }
-.page-content { padding: 0 20px 28px; }
+.page-content { padding: 0 20px 120px; }
+.discover-page { padding-bottom: 140px; }
 .page-header { min-height: 130px; padding: var(--safe-top) 0 16px; display: flex; align-items: flex-end; gap: 10px; position: relative; }
 .page-header.with-back { padding-left: 42px; }
 .page-header > .icon-button { position: absolute; left: 0; bottom: 18px; }
@@ -107,7 +108,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .activity-card p { margin: 5px 0 7px; color: var(--muted); font-size: 15px; }
 .activity-card small { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted); }
 
-.detail-page { padding-bottom: 95px; background: var(--bg); }
+.detail-page { padding-bottom: 172px; background: var(--bg); }
 .detail-actions { height: 93px; padding: var(--safe-top) 19px 8px; display: flex; align-items: center; justify-content: space-between; }
 .detail-actions button { width: 34px; height: 34px; border: 0; background: var(--card); color: var(--primary); border-radius: 50%; display: grid; place-items: center; box-shadow: var(--shadow); }
 .detail-actions div { display: flex; gap: 8px; }.detail-actions button.saved { color: var(--orange); }
@@ -121,7 +122,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .material-list { display: flex; flex-direction: column; gap: 8px; }.material-list button { border: 0; background: transparent; padding: 0; text-align: left; display: flex; align-items: center; gap: 9px; font-size: 15px; }
 .material-list i { width: 17px; height: 17px; border: 1px solid var(--silver); border-radius: 5px; display: grid; place-items: center; color: white; font-style: normal; }.material-list .checked i { background: var(--primary); border-color: var(--primary); }
 .detail-content ol { list-style: none; padding: 0; counter-reset: steps; }.detail-content li { counter-increment: steps; font-size: 15px; line-height: 1.5; padding: 0 0 9px 31px; position: relative; }.detail-content li:before { content: counter(steps); position: absolute; left: 0; width: 21px; height: 21px; border-radius: 50%; background: var(--lavender); color: var(--primary); display: grid; place-items: center; font-size: 15px; font-weight: 700; }
-.sticky-action { position: fixed; z-index: 20; bottom: 0; left: 0; right: 0; padding: 12px 20px max(13px,env(safe-area-inset-bottom)); background: color-mix(in srgb,var(--card) 96%,transparent); border-top: 1px solid var(--border); }
+.sticky-action { position: fixed; z-index: 25; bottom: 88px; left: 0; right: 0; padding: 12px 20px max(12px,env(safe-area-inset-bottom)); background: color-mix(in srgb,var(--card) 96%,transparent); border-top: 1px solid var(--border); backdrop-filter: blur(12px); }
 .sticky-action button { width: 100%; height: 50px; border: 0; border-radius: 15px; color: white; background: var(--primary); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
 
 .small-primary { height: 34px; padding: 0 10px; font-size: 15px; white-space: nowrap; }

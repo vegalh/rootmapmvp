@@ -1,5 +1,6 @@
 {
   "name": "rootmapmvp1.1",
+  "description": "RootMap MVP is a parent-facing Montessori companion for tracking a child’s learning, weekly activities, and meaningful growth moments.",
   "private": true,
   "version": "1.0.0",
   "type": "module",
