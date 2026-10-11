@@ -1,0 +1,16 @@
+/* RootMap typography system.
+   Reference: https://vegalh.github.io/peninsula-montessori-lessons-site/
+   That site's CSS defines:
+     --font-heading: 'Caveat', cursive;   (used for: site-header h1 logo, section-title h2,
+       lesson-card-title, detail-title, account-name, login-name, week-quote)
+     --font-body: 'Nunito', system-ui, sans-serif;  (used for: body copy, nav-item, buttons,
+       filter-pill, week-tab, history-title)
+   RootMap adopts the same two-font hierarchy in place of the previous Playfair Display / Inter pairing. */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+:root {
+  /* Logo, main headings, section headings, activity/card titles */
+  --font-heading: 'Caveat', cursive;
+  /* Body copy, buttons, nav, form fields */
+  --font-body: 'Nunito', system-ui, sans-serif;
+}
