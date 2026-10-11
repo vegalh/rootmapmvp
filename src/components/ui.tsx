@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Icon } from "./Icon";
 import { useStored } from "../lib/storage";
 import type { Screen } from "../types";
@@ -48,6 +49,77 @@ export function FilterSelect({ label, value, onChange, options, renderLabel }: {
       <span>{label}</span>
       <select value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option value={o} key={o}>{renderLabel ? renderLabel(o) : o}</option>)}</select>
     </label>
+  );
+}
+
+// Compact pill button that opens an accessible popover of options. Used by the Discover page filters.
+export function FilterPill({ label, value, defaultValue, onChange, options, renderLabel, columns = 2, isOpen, onOpenChange, align = "left" }: {
+  label: string;
+  value: string;
+  defaultValue: string;
+  onChange: (v: string) => void;
+  options: string[];
+  renderLabel?: (option: string) => string;
+  columns?: 1 | 2;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  align?: "left" | "right";
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const display = (v: string) => (renderLabel ? renderLabel(v) : v);
+  const active = value !== defaultValue;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) onOpenChange(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, onOpenChange]);
+
+  return (
+    <div className={`filter-pill-wrap filter-pill-align-${align}`} ref={wrapRef}>
+      <button
+        type="button"
+        className={`filter-pill ${active ? "active" : ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => onOpenChange(!isOpen)}
+      >
+        <span>{label}: {display(value)}</span>
+        <Icon name="down" size={15} />
+      </button>
+      {isOpen && (
+        <div className="filter-popover" role="listbox" aria-label={label}>
+          <div className={`filter-popover-options cols-${columns}`}>
+            {options.map(o => {
+              const selected = o === value;
+              return (
+                <button
+                  type="button"
+                  key={o}
+                  role="option"
+                  aria-selected={selected}
+                  className={`filter-popover-option ${selected ? "selected" : ""}`}
+                  onClick={() => { onChange(o); onOpenChange(false); }}
+                >
+                  <span>{display(o)}</span>
+                  {selected && <Icon name="check" size={15} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
