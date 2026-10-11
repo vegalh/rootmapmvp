@@ -68,19 +68,28 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
   }
 
   if (screen === "personal") {
+    const pickPhoto = (file: File | undefined) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setPhoto(reader.result as string);
+      reader.readAsDataURL(file);
+    };
     return (
       <main className="simple-page">
         <PageHeader title={title} back={back} />
         <div className="info-card">
           <img className="profile-edit-photo" src={photo} alt="" />
           <p>{t.personalText}</p>
+          <label className="wide-primary photo-upload-button">
+            {t.uploadPhoto}
+            <input type="file" accept="image/*" hidden onChange={e => pickPhoto(e.target.files?.[0])} />
+          </label>
         </div>
         <div className="form-fields">
-          <Field label={t.profilePhotoUrl}><input type="text" value={photo} onChange={e => setPhoto(e.target.value)} /></Field>
           <Field label={t.fullNameLabel}><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
           <Field label={t.contactInfoLabel}><input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder={t.contactPlaceholder} /></Field>
         </div>
-        <button className="wide-primary" onClick={() => setProfile({ name: name.trim() || profile.name, photo: photo.trim() || profile.photo, contact: contact.trim() })}>{t.save}</button>
+        <button className="wide-primary" onClick={() => setProfile({ name: name.trim() || profile.name, photo, contact: contact.trim() })}>{t.save}</button>
       </main>
     );
   }
