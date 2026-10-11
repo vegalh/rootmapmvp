@@ -40,6 +40,13 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
 
   if (!modal) return null;
 
+  const pickPhoto = (file: File | undefined, onLoad: (dataUrl: string) => void) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onLoad(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const addChild = () => {
     const [first, ...last] = name.trim().split(" ");
     if (!first) return;
@@ -110,7 +117,16 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
         <div className="sheet-fields">
           <Field label={t.childFullName}><input value={name} onChange={e => setName(e.target.value)} /></Field>
           <Field label={t.dateOfBirth}><input type="date" value={dob} onChange={e => setDob(e.target.value)} /></Field>
-          <Field label={t.profilePhotoUrl}><input value={photo} onChange={e => setPhoto(e.target.value)} /></Field>
+          <div className="field child-photo-field">
+            <span>{t.childPhotoLabel}</span>
+            <div className="child-photo-row">
+              {photo ? <img src={photo} alt="" className="child-photo-row-preview" /> : <i className="child-photo-row-placeholder"><Icon name="user" size={20} /></i>}
+              <label className="wide-primary photo-upload-button">
+                {t.uploadPhoto}
+                <input type="file" accept="image/*" hidden onChange={e => pickPhoto(e.target.files?.[0], setPhoto)} />
+              </label>
+            </div>
+          </div>
           <Field label={t.classroomGroupLabel}><select value={group} onChange={e => setGroup(e.target.value)}><option value="Toddler">{t.toddler}</option><option value="Primary">{t.primaryGroup}</option><option value="Other">{t.otherGroup}</option></select></Field>
           <Field label={t.notesOptional}><textarea value={notes} onChange={e => setNotes(e.target.value)} /></Field>
         </div>
