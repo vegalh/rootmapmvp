@@ -15,6 +15,9 @@ import readingAboutMyself from "../assets/activities/reading-about-myself.jpg";
 import cleaningChalkboard from "../assets/activities/cleaning-chalkboard.jpg";
 import spooningRice from "../assets/activities/spooning-rice.jpg";
 import spooningPasta from "../assets/activities/spooning-pasta.jpg";
+import cuttingCelery from "../assets/activities/cutting-celery.jpg";
+import exploringFallVegetables from "../assets/activities/exploring-fall-vegetables.jpg";
+import pouringToCups from "../assets/activities/pouring-to-cups.jpg";
 
 // To add a new lesson/activity, append an object here with a unique `id`.
 // `area` groups it under a Discover category; `ageKey` must match one of the
@@ -418,6 +421,81 @@ export const activities: Activity[] = [
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗干意面", "勺子", "空碗"],
       steps: ["邀请孩子一起试试舀意面练习，并说出材料的名称。", "示范从装满的碗中舀出一勺意面。", "一起小心地将意面倒入空碗中。", "重复操作直到所有意面都转移完毕。", "让孩子尝试，然后将意面倒回原碗以便重复练习。"],
+    },
+  },
+  {
+    id: "cutting-celery",
+    title: "Cutting Celery",
+    age: "2–4 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 12,
+    materialsLabel: "2 materials",
+    image: cuttingCelery,
+    description: "Children practice food preparation and fine motor control by cutting celery stalks with a crinkle cutter.",
+    domains: ["Food Preparation", "Fine Motor Coordination", "Concentration", "Independence"],
+    materials: ["Celery stalks", "Crinkle cutter"],
+    steps: ["Invite your child to try cutting celery, and name the materials together.", "Show how to hold the celery steady on the cutting board.", "Demonstrate pressing the crinkle cutter down firmly to cut a piece.", "Let your child try cutting a stalk.", "Give your child space to repeat until all the celery is cut."],
+    keywords: "cutting celery food preparation practical life fine motor",
+    zh: {
+      title: "切芹菜",
+      age: "2–4岁",
+      materialsLabel: "2种材料",
+      description: "孩子们通过用波浪刀切芹菜，练习食物准备能力和精细动作控制。",
+      domains: ["食物准备", "精细动作协调", "专注力", "独立性"],
+      materials: ["芹菜", "波浪刀"],
+      steps: ["邀请孩子一起试试切芹菜，并说出材料的名称。", "示范如何将芹菜稳稳地放在砧板上。", "展示用力按压波浪刀切下一段。", "让孩子尝试切一段芹菜。", "给孩子空间，重复练习直到所有芹菜都切完。"],
+    },
+  },
+  {
+    id: "exploring-fall-vegetables",
+    title: "Exploring Fall Vegetables",
+    age: "2–4 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Seasons",
+    minutes: 10,
+    materialsLabel: "3 materials",
+    image: exploringFallVegetables,
+    description: "Children use their senses to explore a tray of fall vegetables, noticing their shapes, textures, and weight.",
+    domains: ["Sensorial Exploration", "Language Development", "Concentration"],
+    materials: ["Onion", "Mini pumpkin", "Scallions"],
+    steps: ["Invite your child to explore the tray of vegetables, and name each one together.", "Let your child pick up and hold each vegetable one at a time.", "Describe what you both notice about its shape, color, and texture.", "Encourage your child to compare the vegetables to one another.", "Give your child space to keep exploring at their own pace."],
+    keywords: "fall vegetables seasons sensorial exploration onion pumpkin scallions",
+    zh: {
+      title: "探索秋季蔬菜",
+      age: "2–4岁",
+      materialsLabel: "3种材料",
+      description: "孩子们通过感官探索一盘秋季蔬菜，感受它们的形状、质地和重量。",
+      domains: ["感官探索", "语言发展", "专注力"],
+      materials: ["洋葱", "迷你南瓜", "小葱"],
+      steps: ["邀请孩子一起探索这盘蔬菜，并说出每种蔬菜的名称。", "让孩子一次拿起并感受一种蔬菜。", "一起描述你们注意到的形状、颜色和质地。", "鼓励孩子比较不同的蔬菜。", "给孩子空间，让他们按自己的节奏继续探索。"],
+    },
+  },
+  {
+    id: "pouring-to-cups",
+    title: "Pouring to 3 Cups",
+    age: "2–3 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 12,
+    materialsLabel: "4 materials",
+    image: pouringToCups,
+    description: "Children build coordination and concentration by pouring water from a pitcher into three different cups.",
+    domains: ["Care of Environment", "Coordination", "Concentration", "Independence"],
+    materials: ["Small pitcher", "Three different cups", "Tray"],
+    steps: ["Invite your child to try pouring, and name the materials together.", "Show how to hold the pitcher with both hands.", "Demonstrate pouring slowly into the first cup, then the next.", "Let your child try pouring into all three cups.", "Give your child space to repeat as many times as they like."],
+    keywords: "pouring cups water practical life coordination",
+    zh: {
+      title: "倒水到三个杯子",
+      age: "2–3岁",
+      materialsLabel: "4种材料",
+      description: "孩子们通过将水从小水壶倒入三个不同的杯子，培养协调能力和专注力。",
+      domains: ["照顾环境", "协调能力", "专注力", "独立性"],
+      materials: ["小水壶", "三个不同的杯子", "托盘"],
+      steps: ["邀请孩子一起试试倒水练习，并说出材料的名称。", "示范如何用双手握住水壶。", "展示缓慢地倒入第一个杯子，再倒入下一个。", "让孩子尝试倒入这三个杯子。", "给孩子空间，让他们按自己的节奏重复练习。"],
     },
   },
 ];
