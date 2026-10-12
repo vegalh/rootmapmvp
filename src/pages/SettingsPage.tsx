@@ -3,8 +3,9 @@ import { Icon } from "../components/Icon";
 import { PageHeader, NotificationToggle, Field } from "../components/ui";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
-import { readText, storeText } from "../lib/storage";
-import { resizePhoto } from "../lib/photos";
+import { saveSetting } from "../lib/data/hooks";
+import { readSetting } from "../lib/data/store";
+import { addPhoto, photoUrl } from "../lib/photos";
 
 export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, t }: {
   screen: Screen;
@@ -34,8 +35,8 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
         <PageHeader title={title} back={back} />
         <textarea
           className="notes-pad"
-          defaultValue={readText("rootmap-personal-notes")}
-          onChange={e => storeText("rootmap-personal-notes", e.target.value)}
+          defaultValue={readSetting("rootmap-personal-notes", "")}
+          onChange={e => void saveSetting("rootmap-personal-notes", e.target.value)}
           placeholder={t.notesPlaceholder}
         />
       </main>
@@ -70,16 +71,16 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
   }
 
   if (screen === "personal") {
-    // Downscaled like child photos: it's shown as a small avatar and must fit in local storage.
+    // Downscaled like child photos (it's shown as a small avatar) and stored on this device.
     const pickPhoto = (file: File | undefined) => {
       if (!file) return;
-      resizePhoto(file, 640, 0.85).then(setPhoto, () => window.alert(t.photoUnsupported));
+      addPhoto(file, 640, 0.85).then(setPhoto, (e: Error) => window.alert(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
     };
     return (
       <main className="simple-page">
         <PageHeader title={title} back={back} />
         <div className="info-card">
-          <img className="profile-edit-photo" src={photo} alt="" />
+          <img className="profile-edit-photo" src={photoUrl(photo)} alt="" />
           <p>{t.personalText}</p>
           <label className="wide-primary photo-upload-button">
             {t.uploadPhoto}

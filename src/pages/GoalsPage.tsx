@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { readText } from "../lib/storage";
+import { readSetting } from "../lib/data/store";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
 import type { Goal } from "../types";
@@ -18,7 +18,7 @@ export function GoalsPage({ goals, setGoals, back, openNotes, t }: {
   const [editing, setEditing] = useState<string | null>(null);
   const active = goals.filter(g => !g.completed);
   const completed = goals.filter(g => g.completed).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
-  const hasLegacyNotes = Boolean(readText("rootmap-personal-notes").trim());
+  const hasLegacyNotes = Boolean(readSetting("rootmap-personal-notes", "").trim());
 
   const toggle = (g: Goal) =>
     setGoals(goals.map(x => (x.id === g.id ? { ...x, completed: !x.completed, completedAt: x.completed ? undefined : new Date().toISOString() } : x)));

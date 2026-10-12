@@ -1,7 +1,26 @@
+// Sync metadata the data layer (src/lib/data) keeps on every stored record, ready for future cloud sync.
+// All timestamps are UTC ISO strings; dates are only converted to local time for display.
+export type SyncMeta = {
+  // When the record was first created. null = it predates timestamps (see docs/data-architecture.md); never invented.
+  createdAt?: string | null;
+  // Last local change. Set by the data layer on every write.
+  updatedAt?: string;
+  // Soft deletion: the record stays stored (and keeps its id) but is hidden. For children this is "Recently Deleted".
+  deletedAt?: string | null;
+  // Where the record came from: bundled demo data, the parent, or not reliably known (legacy data).
+  origin?: "demo" | "user" | "unknown";
+  // When it was copied out of localStorage by the IndexedDB migration.
+  migratedAt?: string;
+  // Display order within its collection (lists keep the order the parent saw before).
+  position?: number;
+  // Original id when a legacy record had to be re-keyed because two different records shared one id.
+  legacyId?: string;
+};
+
 export type Stage = "Introduced" | "Practicing" | "Independent";
 export type Area = "Practical Life" | "Sensorial" | "Language" | "Mathematics" | "Cultural Studies";
 
-export type Child = {
+export type Child = SyncMeta & {
   id: string;
   first: string;
   last: string;
@@ -10,6 +29,7 @@ export type Child = {
   enrolled: string;
   lessons: number;
   group: string;
+  // A stored photo id ("photo-…", see lib/data/photos.ts) or a bundled/remote image URL. Render with photoUrl().
   photo: string;
   notes?: string;
   // Chinese display variant; falls back to the English field above when absent.
@@ -18,20 +38,21 @@ export type Child = {
   interests?: string[];
 };
 
-// A profile removed from My Children (localStorage "rootmap-deleted-children"). Its records, entries and plans
-// stay keyed by `id`, so restoring the profile brings them back.
+// A profile removed from My Children: the same child record, soft-deleted (`deletedAt` set). Its records,
+// entries and plans stay keyed by `id`, so restoring the profile brings them back.
 export type DeletedChild = Child & { deletedAt: string };
 
 export type ProfileInfo = {
   name: string;
+  // Photo id or image URL, like Child.photo.
   photo: string;
   contact: string;
 };
 
-// One activity done with a child (localStorage "rootmap-records"), shown on the child's Activities tab.
+// One activity done with a child (collection "records"), shown on the child's Activities tab.
 // Records from the Record form carry a learning area and stage; "Mark as Tried" records (kind "tried") only
 // say the parent tried a Discover activity on a date, so area and stage are absent there.
-export type LessonRecord = {
+export type LessonRecord = SyncMeta & {
   id: string;
   childId: string;
   // Display name; for tried records the activity's English title, kept in case the activity is later removed.
@@ -42,14 +63,13 @@ export type LessonRecord = {
   kind?: "tried";
   // Discover activity id (src/data/activities.ts), set on tried records.
   activityId?: string;
-  createdAt?: string;
   notes?: string;
   nextSteps?: string;
   skills?: string[];
   notesZh?: string;
 };
 
-export type Observation = {
+export type Observation = SyncMeta & {
   id: string;
   childId: string;
   date: string;
@@ -90,7 +110,7 @@ export type Activity = {
   };
 };
 
-export type Plan = {
+export type Plan = SyncMeta & {
   id: string;
   activityId: string;
   date: string;
@@ -102,9 +122,9 @@ export type Plan = {
 };
 
 // One childhood memory: the single recording model behind both the Moments timeline and each
-// child's Journal (localStorage "rootmap-journal", see lib/entries.ts). Needs text (title or body)
+// child's Journal (collection "entries", see lib/entries.ts). Needs text (title or body)
 // and/or at least one photo.
-export type Entry = {
+export type Entry = SyncMeta & {
   id: string;
   childId: string;
   // ISO date the memory is about ("2026-10-11").
@@ -113,7 +133,7 @@ export type Entry = {
   text?: string;
   // Chinese text carried over from seed observations; dropped once the text is edited.
   textZh?: string;
-  // Downscaled JPEG data URLs.
+  // Stored photo ids ("photo-…"), in display order. Render with photoUrl().
   photos: string[];
   createdAt: string;
   updatedAt: string;
@@ -130,12 +150,13 @@ export type EntryDraft = {
   date: string;
   title: string;
   text: string;
+  // Photo ids, stored as soon as they're added so a draft never embeds image data.
   photos: string[];
   savedAt: string;
 };
 
 // A personal intention belonging to the parent/user — unrelated to any child.
-export type Goal = {
+export type Goal = SyncMeta & {
   id: string;
   title: string;
   description?: string;

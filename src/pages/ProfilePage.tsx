@@ -1,5 +1,6 @@
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
+import { photoUrl } from "../lib/photos";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -13,7 +14,7 @@ export function ProfilePage({ go, lang, appearance, profile, deletedCount, t }: 
     <main className="page-content profile-page">
       <PageHeader title={t.profile} subtitle={t.profileSubtitle} />
       <section className="user-summary">
-        <img src={profile.photo} alt="" />
+        <img src={photoUrl(profile.photo)} alt="" />
         <div><h2>{profile.name}</h2><p>{t.teacherRole}</p></div>
       </section>
       {groups.map(([title, items]) => (

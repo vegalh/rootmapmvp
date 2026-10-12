@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader, Field } from "../components/ui";
 import { areaLessons } from "../data/progress";
+import { photoUrl } from "../lib/photos";
 import type { Area, Child, LessonRecord, Stage } from "../types";
 import { childAge, lessonLabel, recordAreaLabel, skillLabel, stageLabel, type Copy } from "../lib/i18n";
 
@@ -23,7 +24,7 @@ export function RecordFormPage({ child, save, cancel, t }: {
     <main className="form-page">
       <PageHeader title={t.recordLesson} back={cancel} />
       <section className="form-child">
-        <img src={child.photo} alt="" />
+        <img src={photoUrl(child.photo)} alt="" />
         <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>
       </section>
       <div className="form-fields">

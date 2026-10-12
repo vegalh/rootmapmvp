@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
@@ -17,15 +17,18 @@ import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
-import { onStorageError, tryStore, useStored, type StorageFailure } from "./lib/storage";
-import { LAST_BACKUP_KEY, RESTORED_AT_KEY } from "./lib/backup";
-import { ENTRIES_KEY, MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
+import { onStorageError, type StorageFailure } from "./lib/storage";
+import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
+import { useCollection, useSetting } from "./lib/data/hooks";
+import { backupData, dataMode, restoreData } from "./lib/data/store";
+import { newRecordId } from "./lib/data/schema";
+import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { Child, DeletedChild, Entry, Goal, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
+import type { DeletedChild, Entry, LessonRecord, Lang, ModalKind, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -48,11 +51,6 @@ const seedIds = [
   ...initialObservations.map(x => `obs:${x.id}`),
 ];
 
-// Unique even when two records are created within the same millisecond.
-const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-// Profiles removed from My Children are kept here (with their photo) and can be restored from Profile.
-const DELETED_CHILDREN_KEY = "rootmap-deleted-children";
 // Development-only preview of the opening experience (`?opening`, `?opening=final`). Not part of navigation yet;
 // in production builds this is null and the component isn't bundled.
 const OpeningPreview = import.meta.env.DEV ? lazy(() => import("./dev/OpeningPreview")) : null;
@@ -80,25 +78,35 @@ export default function App() {
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState("");
 
-  const [childrenData, setChildrenData, commitChildren] = useStored<Child[]>("rootmap-children", initialChildren);
-  const [records, setRecords, commitRecords] = useStored<LessonRecord[]>("rootmap-records", initialRecords);
-  const [observations, setObservations] = useStored<Observation[]>("rootmap-observations", initialObservations);
-  const [seedVersion, setSeedVersion] = useStored<number>("rootmap-seed-version", 0);
+  // All persistent data comes from the data layer (src/lib/data): records are stored one by one with sync
+  // timestamps, and removing one from a list soft-deletes it. A removed child is a soft-deleted child record,
+  // which is what Recently Deleted lists.
+  const children = useCollection("children");
+  const { items: childrenData, set: setChildrenData, commit: commitChildren } = children;
+  const deletedChildren = children.deleted as DeletedChild[];
+  const { items: records, set: setRecords, commit: commitRecords } = useCollection("records");
+  const { items: observations, set: setObservations } = useCollection("observations");
+  const [seedVersion, setSeedVersion] = useSetting<number>("rootmap-seed-version", 0);
   // Every seed item this device has received ("child:emma", "record:r1", "obs:o1"); see mergeSeed.
-  const [seenSeeds, setSeenSeeds] = useStored<string[]>("rootmap-seed-ids", []);
-  const [profile, setProfile] = useStored<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
-  const [saved, setSaved] = useStored<string[]>("rootmap-saved", ["water-pouring", "dotting"]);
-  const [plans, setPlans, commitPlans] = useStored<Plan[]>("rootmap-plans", []);
+  const [seenSeeds, setSeenSeeds] = useSetting<string[]>("rootmap-seed-ids", []);
+  const [profile, setProfile] = useSetting<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
+  const savedActivities = useCollection("saved");
+  const saved = useMemo(() => savedActivities.items.map(s => s.id), [savedActivities.items]);
+  const setSavedRecords = savedActivities.set;
+  // Saved activities are records keyed by activity id; screens keep working with the list of ids.
+  const setSaved = useCallback((next: string[] | ((current: string[]) => string[])) => setSavedRecords(current => {
+    const ids = typeof next === "function" ? next(current.map(s => s.id)) : next;
+    return ids.map(id => current.find(s => s.id === id) || { id });
+  }), [setSavedRecords]);
+  const { items: plans, set: setPlans, commit: commitPlans } = useCollection("plans");
   // Moments/Journal entries (per child) and goals (per parent) are never part of the seed merge.
-  const [entries, setEntries] = useStored<Entry[]>(ENTRIES_KEY, []);
-  const [migrated, setMigrated] = useStored<string[]>(MIGRATED_KEY, []);
-  const [goals, setGoals] = useStored<Goal[]>("rootmap-goals", []);
-  const [deletedChildren, , commitDeleted] = useStored<DeletedChild[]>(DELETED_CHILDREN_KEY, []);
-  const [lastBackup, setLastBackup] = useStored<string>(LAST_BACKUP_KEY, "");
-  const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
-  const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
-  const [view, setView] = useStored<string>("rootmap-child-view", "grid");
-  const [filters, setFilters] = useStored<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
+  const { items: entries, commit: commitEntries } = useCollection("entries");
+  const [migrated, setMigrated] = useSetting<string[]>(MIGRATED_KEY, []);
+  const { items: goals, set: setGoals } = useCollection("goals");
+  const [lastBackup, setLastBackup] = useSetting<string>(LAST_BACKUP_KEY, "");
+  const [lang, setLang] = useSetting<Lang>("rootmap-language", "en");
+  const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
+  const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
 
   // When the bundled seed data changes (SEED_VERSION bumped), merge in new demo items without touching anything
@@ -152,21 +160,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Writes synchronously first so a full device (large photos) is reported instead of silently losing the entry.
-  const storeEntries = (next: Entry[]) => {
-    if (!tryStore(ENTRIES_KEY, next)) return false;
-    setEntries(next);
-    return true;
-  };
+  // Resolves to true only once the entries are stored, so a full device is reported instead of losing the entry.
+  // `draft` is cleared in the same write, so a saved entry can never be resumed (and saved again) from its draft.
+  const storeEntries = async (next: Entry[], draft?: string) =>
+    !(await commitEntries(next, draft ? { drafts: [[draft, null]] } : undefined));
 
   // Copies legacy observations into the entry collection once each (tracked in MIGRATED_KEY). Safe to run on
-  // every load; the observations themselves stay in "rootmap-observations". If storage is full it retries next load.
+  // every load; the observations themselves stay in their own collection. If storage is full it retries next load.
   useEffect(() => {
     const result = importObservations(entries, observations, migrated);
-    if (!result || !tryStore(ENTRIES_KEY, result.entries)) return;
-    setEntries(result.entries);
-    setMigrated(result.migrated);
-  }, [entries, observations, migrated, setEntries, setMigrated]);
+    if (!result) return;
+    void commitEntries(result.entries).then(failure => { if (!failure) setMigrated(result.migrated); });
+  }, [entries, observations, migrated, commitEntries, setMigrated]);
 
   useEffect(() => {
     if (!toast) return;
@@ -202,9 +207,9 @@ export default function App() {
   };
 
   // "Mark as Tried": one more record in the existing activity history. Repeat attempts are separate records.
-  const saveTried = (childId: string, date: string, notes: string) => {
-    const record: LessonRecord = { id: newId("t"), childId, kind: "tried", activityId: activity.id, lesson: activity.title, date, createdAt: new Date().toISOString(), ...(notes ? { notes } : {}) };
-    const failure = commitRecords([record, ...records]);
+  const saveTried = async (childId: string, date: string, notes: string) => {
+    const record: LessonRecord = { id: newRecordId("t"), childId, kind: "tried", activityId: activity.id, lesson: activity.title, date, createdAt: new Date().toISOString(), ...(notes ? { notes } : {}) };
+    const failure = await commitRecords([record, ...records]);
     return failure ? storageMessage(failure) : null;
   };
 
@@ -272,10 +277,10 @@ export default function App() {
           lang={lang}
           openEntry={id => openEntry(id, "child")}
           writeEntry={() => startEntry("child", child.id)}
-          importNotes={() => {
+          importNotes={async () => {
             // Copies the legacy note into the collection once; `child.notes` itself is left untouched.
             if (!hasPendingNotes(child, entries, migrated)) return;
-            if (!storeEntries([notesEntry(child), ...entries])) { setToast(t.journalStorageFull); return; }
+            if (!(await storeEntries([notesEntry(child), ...entries]))) { setToast(t.journalStorageFull); return; }
             setMigrated([...migrated, `notes:${child.id}`]);
             setToast(t.entrySaved);
           }}
@@ -285,7 +290,7 @@ export default function App() {
             const [first, ...last] = fullName.trim().split(" ");
             setChildrenData(childrenData.map(c => (c.id === child.id ? { ...c, first, last: last.join(" ") || c.last } : c)));
           }}
-          remove={() => {
+          remove={async () => {
             // The child's journal entries, activity records, plans and drafts are never deleted with the profile;
             // the warning says how much is attached so nothing disappears from view unexpectedly.
             const entryCount = entries.filter(e => e.childId === child.id).length;
@@ -294,15 +299,14 @@ export default function App() {
               ? t.confirmDeleteChildWithData.split("{name}").join(child.first).replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))
               : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`);
             if (!window.confirm(message)) return;
-            // The profile must be safely in the deleted list before it leaves My Children.
-            if (!savedOk(commitDeleted([...deletedChildren, { ...child, deletedAt: new Date().toISOString() }]))) return;
-            if (!savedOk(commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
+            // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
+            if (!savedOk(await commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
             go("children");
           }}
           back={() => go("children")}
           record={() => go("record")}
-          deleteRecord={id => {
-            if (!savedOk(commitRecords(records.filter(r => r.id !== id)))) return false;
+          deleteRecord={async id => {
+            if (!savedOk(await commitRecords(records.filter(r => r.id !== id)))) return false;
             setToast(t.recordDeleted);
             return true;
           }}
@@ -316,10 +320,10 @@ export default function App() {
           child={child}
           cancel={() => go("child")}
           t={t}
-          save={r => {
-            const item = { ...r, id: newId("r"), childId: child.id, createdAt: new Date().toISOString() };
+          save={async r => {
+            const item = { ...r, id: newRecordId("r"), childId: child.id, createdAt: new Date().toISOString() };
             // Activity notes stay on the activity record (Activities tab); memories are recorded through Moments.
-            if (!savedOk(commitRecords([item, ...records]))) return;
+            if (!savedOk(await commitRecords([item, ...records]))) return;
             go("child");
           }}
         />
@@ -334,8 +338,8 @@ export default function App() {
           lang={lang}
           back={() => go(originScreen)}
           edit={() => go("entryEdit")}
-          remove={() => {
-            if (!storeEntries(entries.filter(e => e.id !== entry.id))) { setToast(t.journalStorageFull); return; }
+          remove={async () => {
+            if (!(await storeEntries(entries.filter(e => e.id !== entry.id)))) { setToast(t.journalStorageFull); return; }
             setToast(t.entryDeleted);
             go(originScreen);
           }}
@@ -354,15 +358,15 @@ export default function App() {
           prefill={entry ? undefined : editorPrefill}
           lang={lang}
           back={() => go(entry ? "entry" : originScreen)}
-          save={f => {
+          save={async (f, draft) => {
             const now = new Date().toISOString();
             const fields = { childId: f.childId, date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
             if (entry) {
               // Same id and createdAt; a translated seed text no longer matches once the text is edited.
               const textZh = (entry.text || "") === (fields.text || "") ? entry.textZh : undefined;
-              if (!storeEntries(entries.map(e => (e.id === entry.id ? { ...e, ...fields, textZh, updatedAt: now } : e)))) return false;
+              if (!(await storeEntries(entries.map(e => (e.id === entry.id ? { ...e, ...fields, textZh, updatedAt: now } : e)), draft))) return false;
             } else {
-              if (!storeEntries([{ id: newId("m"), ...fields, createdAt: now, updatedAt: now }, ...entries])) return false;
+              if (!(await storeEntries([{ id: newRecordId("m"), ...fields, createdAt: now, updatedAt: now }, ...entries], draft))) return false;
             }
             setToast(t.entrySaved);
             go(originScreen);
@@ -410,10 +414,10 @@ export default function App() {
     if (screen === "backup") {
       return (
         <BackupPage
-          shown={{
-            "rootmap-children": childrenData, "rootmap-records": records, "rootmap-observations": observations, "rootmap-journal": entries,
-            "rootmap-saved": saved, "rootmap-plans": plans, "rootmap-goals": goals, "rootmap-profile": profile,
-            "rootmap-language": lang, "rootmap-appearance": appearance,
+          snapshot={backupData}
+          restore={async backup => {
+            if (dataMode() === "localStorage") return applyBackup(localStorage, backup);
+            return (await restoreData(backup.data)) ? { ok: true as const } : { ok: false as const, rolledBack: true };
           }}
           lastBackup={lastBackup}
           setLastBackup={setLastBackup}
@@ -435,13 +439,12 @@ export default function App() {
           childrenData={childrenData}
           entries={entries}
           records={records}
-          restore={d => {
+          restore={async d => {
             if (childrenData.some(c => c.id === d.id)) return;
             if (!window.confirm(t.confirmRestoreChild.replace("{name}", `${d.first} ${d.last}`))) return;
+            // Clearing deletedAt brings the same record (same id) back, with its entries and records.
             const { deletedAt: _deletedAt, ...profile } = d;
-            if (!savedOk(commitChildren([...childrenData, profile]))) return;
-            // If this second write fails the profile simply also stays listed here, marked as already restored.
-            commitDeleted(deletedChildren.filter(x => x !== d));
+            if (!savedOk(await commitChildren([...childrenData, profile]))) return;
             setToast(t.childRestored.replace("{name}", d.first));
           }}
           back={() => go("profile")}
@@ -469,12 +472,12 @@ export default function App() {
         modal={modal}
         close={closeModal}
         childrenData={childrenData}
-        setChildrenData={next => savedOk(commitChildren(next))}
+        setChildrenData={async next => savedOk(await commitChildren(next))}
         filters={filters}
         setFilters={setFilters}
         selectedActivity={activity}
         plans={plans}
-        setPlans={next => savedOk(commitPlans(next))}
+        setPlans={async next => savedOk(await commitPlans(next))}
         selectedChild={selectedChild}
         saveTried={saveTried}
         addMemory={(childId, date) => { setModal(null); startEntry("activity", childId, { title: localizeActivity(activity, t).title, date }); }}

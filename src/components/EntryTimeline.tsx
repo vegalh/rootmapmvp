@@ -1,6 +1,7 @@
 import { Icon } from "./Icon";
 import { entryText, groupByMonth } from "../lib/entries";
 import { fmtMonthDay, fmtMonthYear } from "../lib/dates";
+import { photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -46,7 +47,7 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
               <button className="journal-card" onClick={() => open(e.id)} key={e.id}>
                 {c ? (
                   <span className="entry-child">
-                    <img src={c.photo} alt="" />
+                    <img src={photoUrl(c.photo)} alt="" />
                     <span><strong>{c.first} {c.last}</strong><time>{fmtMonthDay(e.date, lang)}</time></span>
                   </span>
                 ) : (
@@ -54,7 +55,7 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
                 )}
                 {e.photos.length > 0 && (
                   <span className="journal-card-photo">
-                    <img src={e.photos[0]} alt="" loading="lazy" />
+                    <img src={photoUrl(e.photos[0])} alt="" loading="lazy" />
                     {e.photos.length > 1 && <em>+{e.photos.length - 1}</em>}
                   </span>
                 )}

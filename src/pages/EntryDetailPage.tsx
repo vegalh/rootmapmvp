@@ -1,5 +1,6 @@
 import { Icon } from "../components/Icon";
 import { fmtLong } from "../lib/dates";
+import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
@@ -26,7 +27,7 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
       </header>
       {child && (
         <div className="entry-child">
-          <img src={child.photo} alt="" />
+          <img src={photoUrl(child.photo)} alt="" />
           <span><strong>{child.first} {child.last}</strong><time>{fmtLong(entry.date, lang)}</time></span>
         </div>
       )}
@@ -34,7 +35,7 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
       {entry.title && <h1>{entry.title}</h1>}
       {entry.photos.length > 0 && (
         <div className="journal-entry-photos">
-          {entry.photos.map((p, i) => <img src={p} alt="" key={i} />)}
+          {entry.photos.map((p, i) => <img src={photoUrl(p)} alt="" key={i} />)}
         </div>
       )}
       {text && <p className="journal-entry-text">{text}</p>}

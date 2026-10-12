@@ -13,7 +13,7 @@ A Vite development server is **already running** on `$PORT` (default 8443). You 
 
 This is the canonical project structure. Start with task-relevant files below. Only follow imports or inspect other files when required, when a documented path is missing, or when the repository contradicts this guide.
 
-- `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
+- `src/main.tsx` - React entrypoint; imports `src/index.css`, loads saved data (`initData`), then mounts `src/App.tsx` into the `#root` element
 - `src/App.tsx` - Composition root: holds all top-level state and renders the active page based on `screen`
 - `src/types.ts` - Shared TypeScript types (`Child`, `Activity`, `LessonRecord`, `Observation`, `Screen`, etc.)
 - `src/data/` - Seed/mock content, edit these to change what shows up in the app:
@@ -22,10 +22,15 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `activities.ts` - Discover page activities/lessons and category list. **Add a new lesson/activity here.**
 - `src/lib/` - Small framework-agnostic helpers:
   - `i18n.ts` - English/Chinese translation strings (`copy`) and the `Copy` type.
-  - `storage.ts` - `useStored` hook (localStorage-backed `useState`).
+  - `data/` - The data access layer. All persistent data goes through it (never call localStorage/IndexedDB from screens). See [docs/data-architecture.md](docs/data-architecture.md).
+    - `hooks.ts` - `useCollection(name)` (record lists with soft delete) and `useSetting(key)`.
+    - `store.ts` - Start-up load, the single write path, photos, backup export/restore.
+    - `schema.ts` - IndexedDB stores, legacy key names, id helpers. `legacy.ts` / `migrate.ts` - One-time migration from localStorage. `records.ts` - Per-record diffing and timestamps.
+  - `storage.ts` - localStorage primitives and storage-error reporting (`onStorageError`).
+  - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
-  - `entries.ts` - The unified Moments/Journal entry collection (`rootmap-journal`): search, month grouping, and the idempotent import of legacy observations and child notes.
-  - `journalDrafts.ts` - Autosaved editor drafts (`rootmap-journal-drafts`).
+  - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
+  - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
   - `TreeLogo.tsx` - RootMap brand logo.
@@ -45,6 +50,8 @@ This is the canonical project structure. Start with task-relevant files below. O
 - **Add or edit a child / change a photo**: edit [src/data/children.ts](src/data/children.ts).
 - **Add a new page/screen**: create a file in `src/pages/`, add its name to the `Screen` union in [src/types.ts](src/types.ts), and wire it into the `content()` switch in [src/App.tsx](src/App.tsx).
 - **Change translation text**: edit `copy.en` / `copy.zh` in [src/lib/i18n.ts](src/lib/i18n.ts).
+- **Show a stored photo** (child, profile, entry): `<img src={photoUrl(ref)} />`; photo fields hold ids, not URLs.
+- **Add a persisted collection or setting**: add it to [src/lib/data/schema.ts](src/lib/data/schema.ts) (a new object store needs a `DB_VERSION` bump and an upgrade step in `idb.ts`) and read it with `useCollection` / `useSetting`.
 
 ## Dependencies
 

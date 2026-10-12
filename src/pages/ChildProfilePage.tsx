@@ -6,6 +6,7 @@ import { Modal } from "../components/ui";
 import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
+import { photoUrl } from "../lib/photos";
 import { activities } from "../data/activities";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
 import { childAge, childTabLabel, groupOptionLabel, lessonLabel, localizeActivity, noteText, recordAreaLabel, stageLabel, type Copy } from "../lib/i18n";
@@ -29,7 +30,7 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
   record: () => void;
   remove: () => void;
   // Deletes one activity record by id; false (with an error already shown) when the device couldn't save.
-  deleteRecord: (id: string) => boolean;
+  deleteRecord: (id: string) => Promise<boolean>;
   t: Copy;
 }) {
   // Several attempts on the same day keep the order they were recorded in (newest first).
@@ -45,7 +46,7 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
         </div>
       </header>
       <section className="profile-hero">
-        <img src={child.photo} alt="" />
+        <img src={photoUrl(child.photo)} alt="" />
         <h1>{child.first} {child.last}</h1>
         <p>{childAge(child, t)}</p>
         <small>{groupOptionLabel(child.group, t)}</small>
@@ -114,7 +115,7 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
   );
 }
 
-function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[]; lang: Lang; deleteRecord: (id: string) => boolean; t: Copy }) {
+function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[]; lang: Lang; deleteRecord: (id: string) => Promise<boolean>; t: Copy }) {
   // Tried record shown in the detail sheet, where a mistaken one can be deleted.
   const [open, setOpen] = useState<{ record: LessonRecord; title: string; when: string; notes?: string }>();
   return (
@@ -159,7 +160,7 @@ function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[
               onClick={() => {
                 // Removes only this record (by id): other attempts, the Discover activity and journal entries stay.
                 if (!window.confirm(t.confirmDeleteRecord)) return;
-                if (deleteRecord(open.record.id)) setOpen(undefined);
+                void deleteRecord(open.record.id).then(ok => ok && setOpen(undefined));
               }}
             ><Icon name="trash" size={17} />{t.deleteRecord}</button>
             <button onClick={() => setOpen(undefined)}>{t.done}</button>

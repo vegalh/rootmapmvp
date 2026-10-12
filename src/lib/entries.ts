@@ -1,10 +1,9 @@
 import type { Child, Entry, Lang, Observation } from "../types";
 import { localIsoToday } from "./dates";
 
-// The one canonical collection of childhood memories. The key predates Moments (it was the Journal's),
-// so existing journal entries are already in place. Seed-version resets never touch it.
-export const ENTRIES_KEY = "rootmap-journal";
-// Ids of legacy records already copied into ENTRIES_KEY ("obs:<id>", "notes:<childId>"). Lets the import
+// Entries are the one canonical collection of childhood memories (data layer collection "entries"; it was
+// localStorage "rootmap-journal" before IndexedDB). Seed-version resets never touch it.
+// Ids of legacy records already copied into the entries ("obs:<id>", "notes:<childId>"). Lets the import
 // run on every load without duplicating, and keeps a deleted imported entry from coming back.
 export const MIGRATED_KEY = "rootmap-migrated-legacy";
 
@@ -31,7 +30,7 @@ export function groupByMonth(entries: Entry[]): [string, Entry[]][] {
 }
 
 // Copies every legacy observation not yet imported into the entry collection. The observation itself is
-// left in "rootmap-observations" untouched. Returns null when there is nothing new to import.
+// left in its own collection untouched. Returns null when there is nothing new to import.
 export function importObservations(entries: Entry[], observations: Observation[], migrated: string[]) {
   const done = new Set(migrated);
   const ids = new Set(entries.map(e => e.id));

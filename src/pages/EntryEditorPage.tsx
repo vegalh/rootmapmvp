@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
-import { draftKey, readDraft, writeDraft } from "../lib/journalDrafts";
+import { draftKey, flushDraft, readDraft, writeDraft } from "../lib/journalDrafts";
 import { fmtLong, localIsoToday } from "../lib/dates";
-import { resizePhoto } from "../lib/photos";
+import { addPhoto, photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -25,8 +25,9 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   // Starting text for a new entry (e.g. the activity just marked as tried); freely editable, never saved on its own.
   prefill?: { title: string; date: string };
   lang: Lang;
-  // Returns false when the entry couldn't be stored (e.g. device out of space).
-  save: (fields: Fields) => boolean;
+  // Resolves to false when the entry couldn't be stored (e.g. device out of space). `draftKey` is the draft to
+  // clear in the same write, so the saved entry can't be resumed from it and saved twice.
+  save: (fields: Fields, draftKey: string) => Promise<boolean>;
   back: () => void;
   t: Copy;
 }) {
@@ -44,22 +45,27 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const latest = useRef(fields);
+  // Set while the entry is being saved and after it was: no draft may be written for it from then on.
   const done = useRef(false);
   const first = useRef(true);
+  // Only the newest autosave may update the status line.
+  const autosave = useRef(0);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
-  const persistDraft = (f: Fields): DraftStatus => {
-    if (!isDirty(f)) {
-      writeDraft(keyFor(f), null);
-      return "idle";
-    }
-    return writeDraft(keyFor(f), { ...f, savedAt: new Date().toISOString() }) ? "saved" : "failed";
+  const draftFor = (f: Fields) => (isDirty(f) ? { ...f, savedAt: new Date().toISOString() } : null);
+
+  // "saved" is only shown once the draft is actually stored.
+  const persistDraft = async (f: Fields): Promise<DraftStatus> => {
+    const draft = draftFor(f);
+    const ok = await writeDraft(keyFor(f), draft);
+    return !draft ? "idle" : ok ? "saved" : "failed";
   };
 
   // A new entry's draft follows the chosen child, so move it rather than leaving a copy behind.
   const chooseChild = (id: string) => {
-    if (!entry) writeDraft(draftKey(fields.childId), null);
+    if (!entry) void writeDraft(draftKey(fields.childId), null);
     set({ childId: id });
   };
 
@@ -68,7 +74,11 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
     latest.current = fields;
     if (first.current) { first.current = false; return; }
     setStatus("saving");
-    const id = window.setTimeout(() => setStatus(persistDraft(fields)), 600);
+    const run = ++autosave.current;
+    const id = window.setTimeout(() => {
+      if (done.current) return;
+      void persistDraft(fields).then(next => { if (run === autosave.current && !done.current) setStatus(next); });
+    }, 600);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields]);
@@ -76,7 +86,7 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   // Flush the latest edits if the parent leaves before the debounce fires: navigating away within the app,
   // or refreshing / closing / backgrounding the page (where unmount cleanup never runs).
   useEffect(() => {
-    const flush = () => { if (!done.current) persistDraft(latest.current); };
+    const flush = () => { if (!done.current) flushDraft(keyFor(latest.current), draftFor(latest.current)); };
     const onHidden = () => { if (document.visibilityState === "hidden") flush(); };
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", onHidden);
@@ -98,27 +108,36 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
 
   const set = (patch: Partial<Fields>) => setFields(f => ({ ...f, ...patch }));
 
+  // Each photo is stored on this device as soon as it's added; the draft and the entry keep only its id.
   const addPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
     setAdding(true);
     setError("");
-    const results = await Promise.allSettled(Array.from(files).map(f => resizePhoto(f)));
+    const results = await Promise.allSettled(Array.from(files).map(f => addPhoto(f)));
     const added = results.flatMap(r => (r.status === "fulfilled" ? [r.value] : []));
-    if (added.length < results.length) setError(t.photoUnsupported);
+    const reasons = results.flatMap(r => (r.status === "rejected" ? [String((r.reason as Error)?.message)] : []));
+    if (reasons.includes("full")) setError(t.storageFull);
+    else if (reasons.includes("failed")) setError(t.storageFailed);
+    else if (reasons.length) setError(t.photoUnsupported);
     setFields(f => ({ ...f, photos: [...f.photos, ...added] }));
     setAdding(false);
   };
 
-  const canSave = hasContent(fields) && !adding;
-  const submit = () => {
+  const canSave = hasContent(fields) && !adding && !saving;
+  const submit = async () => {
     if (!canSave) return;
-    if (!save(fields)) { setError(t.journalStorageFull); return; }
     done.current = true;
-    writeDraft(keyFor(fields), null);
+    setSaving(true);
+    const ok = await save(fields, keyFor(fields));
+    if (ok) return;
+    // Not stored: keep editing, and keep the draft.
+    done.current = false;
+    setSaving(false);
+    setError(t.journalStorageFull);
   };
 
   const discard = () => {
-    writeDraft(keyFor(fields), null);
+    void writeDraft(keyFor(fields), null);
     setRestored(false);
     setStatus("idle");
     // Skip the autosave pass for this reset.
@@ -137,12 +156,12 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
 
       {lockChild ? (
         <div className="entry-child-pick">
-          {child && <img src={child.photo} alt="" />}
+          {child && <img src={photoUrl(child.photo)} alt="" />}
           <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
         </div>
       ) : (
         <label className="entry-child-pick">
-          {child && <img src={child.photo} alt="" />}
+          {child && <img src={photoUrl(child.photo)} alt="" />}
           <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
           <Icon name="down" size={16} />
           <select value={fields.childId} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
@@ -170,7 +189,7 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
       <div className={`journal-photos ${fields.photos.length ? "has-photos" : ""}`}>
         {fields.photos.map((p, i) => (
           <figure key={`${i}-${p.slice(-24)}`}>
-            <img src={p} alt="" />
+            <img src={photoUrl(p)} alt="" />
             <button aria-label={t.removePhoto} onClick={() => set({ photos: fields.photos.filter((_, j) => j !== i) })}><Icon name="close" size={16} /></button>
           </figure>
         ))}

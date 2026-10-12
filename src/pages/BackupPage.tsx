@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { Modal, PageHeader } from "../components/ui";
-import { applyBackup, exportBackup, parseBackup, summarize, type BackupError, type BackupFile } from "../lib/backup";
+import { exportBackup, parseBackup, summarize, type BackupError, type BackupFile } from "../lib/backup";
 import { fmtLong } from "../lib/dates";
 import type { Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
-// Far larger than anything localStorage can hold; anything bigger is not a RootMap backup.
+// Far larger than a family's RootMap data; anything bigger is not a RootMap backup.
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 const errorText = (error: BackupError, t: Copy) => ({
@@ -22,9 +22,11 @@ const errorText = (error: BackupError, t: Copy) => ({
 // replace. Nothing is written until the last step, and the last step is all-or-nothing (see applyBackup).
 type Restore = { backup: BackupFile; step: "review" } | { backup: BackupFile; step: "safetySaved"; file: string };
 
-export function BackupPage({ shown, lastBackup, setLastBackup, restored, back, lang, t }: {
-  // What the app currently shows for each backed-up key, used for keys not yet written to storage.
-  shown: Record<string, unknown>;
+export function BackupPage({ snapshot, restore: applyRestore, lastBackup, setLastBackup, restored, back, lang, t }: {
+  // The current data in backup form (lib/data/store.ts backupData).
+  snapshot: () => Promise<Record<string, unknown>>;
+  // Replaces all data with the backup, all or nothing.
+  restore: (backup: BackupFile) => Promise<{ ok: true } | { ok: false; rolledBack: boolean }>;
   lastBackup: string;
   setLastBackup: (iso: string) => void;
   // Called after a successful restore; the app reloads so every screen reads the restored data.
@@ -38,9 +40,9 @@ export function BackupPage({ shown, lastBackup, setLastBackup, restored, back, l
   const input = useRef<HTMLInputElement>(null);
   const day = (iso: string) => fmtLong(iso.slice(0, 10), lang);
 
-  const doExport = () => {
+  const doExport = async () => {
     try {
-      const { backup } = exportBackup(localStorage, "rootmap-backup", shown);
+      const { backup } = exportBackup(await snapshot(), "rootmap-backup");
       setLastBackup(backup.exportedAt);
       setMessage({ text: t.backupDownloaded });
     } catch {
@@ -66,11 +68,11 @@ export function BackupPage({ shown, lastBackup, setLastBackup, restored, back, l
   };
 
   // Step 2: the current data must be exported (and pass its own validation) before anything is replaced.
-  const saveCurrent = () => {
+  const saveCurrent = async () => {
     if (!restore) return;
     let file: string;
     try {
-      const { backup, fileName } = exportBackup(localStorage, "rootmap-before-restore", shown);
+      const { backup, fileName } = exportBackup(await snapshot(), "rootmap-before-restore");
       file = fileName;
       setLastBackup(backup.exportedAt);
     } catch {
@@ -81,9 +83,9 @@ export function BackupPage({ shown, lastBackup, setLastBackup, restored, back, l
     setRestore({ backup: restore.backup, step: "safetySaved", file });
   };
 
-  const replace = () => {
+  const replace = async () => {
     if (restore?.step !== "safetySaved") return;
-    const result = applyBackup(localStorage, restore.backup);
+    const result = await applyRestore(restore.backup);
     if (result.ok) { restored(); return; }
     setRestore(undefined);
     setMessage({ text: result.rolledBack ? t.restoreFailed : t.restoreFailedPartial, error: true });

@@ -2,6 +2,7 @@ import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
 import { Empty } from "../components/ui";
 import { fmt } from "../lib/dates";
+import { photoUrl } from "../lib/photos";
 import { entryText, newestFirst } from "../lib/entries";
 import type { Child, Entry } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
@@ -33,7 +34,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openAddChild, ope
               const interests = c.interests?.length ? c.interests.join("、") : t.notAddedYet;
               return (
                 <button className="child-select-card" onClick={() => goChild(c.id)} key={c.id}>
-                  <div className="child-select-photo"><img src={c.photo} alt="" /></div>
+                  <div className="child-select-photo"><img src={photoUrl(c.photo)} alt="" /></div>
                   <div className="child-select-info">
                     <strong>{c.first}</strong>
                     <span className="child-select-age">{childAge(c, t)}</span>
@@ -60,7 +61,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openAddChild, ope
                 if (!c) return null;
                 return (
                   <button onClick={() => goChild(c.id)} key={o.id}>
-                    <img src={c.photo} alt="" />
+                    <img src={photoUrl(c.photo)} alt="" />
                     <span><strong>{c.first} {c.last}</strong><small>{o.title || t.independentObservation} · {fmt(o.date)}</small><p>{entryText(o, t.code === "zh" ? "zh" : "en")}</p></span>
                     <Icon name="chevron" size={16} />
                   </button>

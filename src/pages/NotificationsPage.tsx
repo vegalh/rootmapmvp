@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
-import { useStored } from "../lib/storage";
+import { useSetting } from "../lib/data/hooks";
+import { photoUrl } from "../lib/photos";
 import type { Child } from "../types";
 import { notificationTabLabel, type Copy } from "../lib/i18n";
 
@@ -14,7 +15,7 @@ const NOTES = [
 ];
 
 export function NotificationsPage({ childrenData, back, goChild, t }: { childrenData: Child[]; back: () => void; goChild: (id: string) => void; t: Copy }) {
-  const [read, setRead] = useStored<string[]>("rootmap-read-notifications", []);
+  const [read, setRead] = useSetting<string[]>("rootmap-read-notifications", []);
   const [filter, setFilter] = useState("All");
   const notes = NOTES.filter(n => filter === "All" || n.cat === filter);
   return (
@@ -29,7 +30,7 @@ export function NotificationsPage({ childrenData, back, goChild, t }: { children
           onClick={() => { setRead([...new Set([...read, n.id])]); if (n.childId) goChild(n.childId); }}
           key={n.id}
         >
-          {n.childId ? <img src={childrenData.find(c => c.id === n.childId)?.photo} alt="" /> : <i><Icon name="bell" /></i>}
+          {n.childId ? <img src={photoUrl(childrenData.find(c => c.id === n.childId)?.photo)} alt="" /> : <i><Icon name="bell" /></i>}
           <span><strong>{n.titleKey ? t[n.titleKey] : n.title}</strong><p>{t[n.textKey]}</p><small>{notificationTabLabel(n.cat, t)}</small></span>
           <Icon name="chevron" />
         </button>

@@ -1,5 +1,6 @@
-// Backup & Restore: a versioned JSON snapshot of the parent's RootMap data in localStorage.
-// Framework-agnostic and dependency-free (it takes the Storage to use), so it can be tested outside the browser.
+// Backup & Restore: a versioned JSON snapshot of the parent's RootMap data, keyed by the original localStorage
+// key names with photos inline, so files from before and after the IndexedDB move are interchangeable.
+// Framework-agnostic and dependency-free (it takes the data or Storage to use), so it can be tested outside the browser.
 
 export const BACKUP_FORMAT = "rootmap-backup";
 export const BACKUP_VERSION = 1;
@@ -96,25 +97,8 @@ function validData(data: Record<string, unknown>) {
   return true;
 }
 
-// Reads every backed-up key from storage. The app only writes a value once it changes, so a key never written
-// yet (e.g. untouched demo children) is taken from `shown`, what the app currently displays for it. Unreadable
-// (non-JSON) stored values are left out rather than exported broken.
-export function collectBackup(storage: Storage, now = new Date(), shown: Record<string, unknown> = {}): BackupFile {
-  const data: Record<string, unknown> = {};
-  for (const [key, shape] of Object.entries(BACKUP_KEYS)) {
-    const raw = storage.getItem(key);
-    if (raw === null) {
-      if (key in shown && hasShape(shown[key], shape)) data[key] = shown[key];
-      continue;
-    }
-    if (shape === "text") { data[key] = raw; continue; }
-    try {
-      const value = JSON.parse(raw);
-      if (hasShape(value, shape)) data[key] = value;
-    } catch {
-      // skipped: see storage.ts, which keeps a `.corrupt` copy of such values
-    }
-  }
+// Wraps already-collected data (see lib/data/store.ts backupData) as a backup file.
+export function buildBackup(data: Record<string, unknown>, now = new Date()): BackupFile {
   return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: now.toISOString(), data, checksum: checksum(JSON.stringify(data)) };
 }
 
@@ -222,11 +206,11 @@ export function downloadText(fileName: string, text: string) {
   }
 }
 
-// Builds a backup of the current data, checks it reads back as a valid backup, and downloads it.
+// Builds a backup of the given data, checks it reads back as a valid backup, and downloads it.
 // Throws (and downloads nothing) if any step fails.
-export function exportBackup(storage: Storage, prefix: string, shown: Record<string, unknown> = {}): { backup: BackupFile; fileName: string } {
+export function exportBackup(data: Record<string, unknown>, prefix: string): { backup: BackupFile; fileName: string } {
   const now = new Date();
-  const backup = collectBackup(storage, now, shown);
+  const backup = buildBackup(data, now);
   const text = serializeBackup(backup);
   const check = parseBackup(text);
   if (!check.ok) throw new Error(`backup self-check failed: ${check.error}`);

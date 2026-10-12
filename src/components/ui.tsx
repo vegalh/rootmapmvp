@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Icon } from "./Icon";
-import { useStored } from "../lib/storage";
+import { useSetting } from "../lib/data/hooks";
 import type { Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -170,6 +170,6 @@ export function Empty({ text }: { text: string }) {
 }
 
 export function NotificationToggle({ label }: { label: string }) {
-  const [on, setOn] = useStored<boolean>(`rootmap-pref-${label}`, true);
+  const [on, setOn] = useSetting<boolean>(`rootmap-pref-${label}`, true);
   return <button onClick={() => setOn(!on)}><span>{label}</span><i className={`switch ${on ? "on" : ""}`}><b /></i></button>;
 }
