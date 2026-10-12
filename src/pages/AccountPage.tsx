@@ -3,6 +3,7 @@ import { Icon } from "../components/Icon";
 import { Modal, PageHeader } from "../components/ui";
 import type { CloudState } from "../lib/cloud/session";
 import { useSyncStatus } from "../lib/cloud/hooks";
+import { retryPhotos } from "../lib/sync/runner";
 import type { SyncStatus } from "../lib/sync/status";
 import type { Copy } from "../lib/i18n";
 
@@ -48,6 +49,7 @@ export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; ba
 
 // Backup status in plain words. "All backed up" appears only when it is true (lib/sync/status.ts).
 function SyncSummary({ sync, t }: { sync: SyncStatus; t: Copy }) {
+  const [retrying, setRetrying] = useState(false);
   const lines: string[] = [];
   if (sync.allBackedUp) lines.push(t.syncAllBackedUp);
   else {
@@ -63,6 +65,12 @@ function SyncSummary({ sync, t }: { sync: SyncStatus; t: Copy }) {
   return (
     <div className="sync-summary" role="status" data-backed-up={sync.allBackedUp ? "yes" : "no"}>
       {lines.map(line => <p key={line}>{line}</p>)}
+      {sync.photosFailed > 0 && (
+        <button className="wide-secondary" data-testid="retry-photos" disabled={retrying || sync.phase === "syncing"}
+          onClick={async () => { setRetrying(true); try { await retryPhotos(); } finally { setRetrying(false); } }}>
+          {t.tryAgain}
+        </button>
+      )}
     </div>
   );
 }

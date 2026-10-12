@@ -5,7 +5,7 @@ import {
   syncMeta, syncRecordFor, syncRecordValue,
 } from "../data/store";
 import { SyncOffline, syncRound, type RoundResult, type SyncLocal } from "./engine";
-import { syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
+import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import type { SyncedCollection } from "./mapping";
 import { computeStatus, type SyncPhase, type SyncStatus } from "./status";
 
@@ -53,6 +53,18 @@ export const syncStatus = () => status;
 export function subscribeSync(listener: () => void) {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
+}
+
+// Set while sync runs: starts a round now (the Account page's "Try again").
+let runNow: (() => void) | null = null;
+
+// "Try again" for photos that failed: photos given up on after repeated rejected uploads are tried again, and a
+// round starts at once (without waiting for the back-off). False when sync isn't running.
+export async function retryPhotos(): Promise<boolean> {
+  if (!runNow) return false;
+  await resetPhotoRetries(photoLocal, Object.keys(photosFailed));
+  runNow?.();
+  return true;
 }
 
 const DEBOUNCE_MS = 1500;
@@ -134,10 +146,13 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   const visible = () => { if (document.visibilityState === "visible") schedule(0); };
   window.addEventListener("online", online);
   document.addEventListener("visibilitychange", visible);
+  const now = () => { failures = 0; if (running) again = true; else schedule(0); };
+  runNow = now;
   schedule(0);
 
   return () => {
     stopped = true;
+    if (runNow === now) runNow = null;
     window.clearTimeout(timer);
     unsubscribe();
     window.removeEventListener("online", online);

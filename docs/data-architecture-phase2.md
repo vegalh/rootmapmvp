@@ -24,10 +24,10 @@ As of 2026-10-12:
     off, no Supabase in its bundle). Staging email templates: approved, waiting to be changed in the dashboard.
   - **M3 (account spaces and outbox) is done**: commit `a18e414`, GitHub Actions passed, public website checked.
   - **M4 (record sync) is done**: commit `de5f8dc`, GitHub Actions passed, public website checked.
-  - **M5 (private photo sync) is implemented and awaiting review.** Photo files upload to the private bucket
-    (resumable above 6 MB), the `verify-photo` Edge Function checks each one before it counts as backed up, and
-    other devices download and check them. Tested on the local stack only; `verify-photo` is not deployed to
-    staging (needs approval).
+  - **M5 (private photo sync) is done.** Photo files upload to the private bucket (resumable above 6 MB), the
+    `verify-photo` Edge Function checks each one before it counts as backed up, and other devices download and
+    check them. A failed photo shows "Try Again" on the Account page. `verify-photo` is deployed to staging
+    (2026-10-12, after its security review).
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
@@ -752,7 +752,7 @@ Records already on the device are never uploaded before M6 has checked them.
 | M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | **Done** (`433a91b`) |
 | M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | **Done** (`a18e414`) |
 | M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | **Done** (`de5f8dc`) |
-| M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Implemented, awaiting review |
+| M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | **Done** (`0e454f4` + Try Again) |
 | M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
 | M7 Sign-out and reliability | Sign-out choices, account switching, full re-sync, sync status | Not started |
 
@@ -886,7 +886,9 @@ Records already on the device are never uploaded before M6 has checked them.
   missing (`upsert: false`; the bucket has no update policy, so nothing is ever overwritten), then verify again.
   Above 6 MB the upload is resumable (TUS, 6 MB chunks); its address is kept with the photo, so after an
   interruption or a reload it continues from what the server has. A local copy that no longer matches its own
-  SHA-256 is never sent. After 3 rejected uploads the photo is reported and left alone until the next start.
+  SHA-256 is never sent. After 3 rejected uploads the photo is reported and left alone until the parent taps
+  **Try Again** on the Account page (shown whenever a photo had a problem); that clears the count and starts a round
+  at once.
   The device's photo is never deleted or changed by any of this.
 - **SHA-256**: computed when a photo is saved (every space, new photos); for older photos, when sync first needs
   it. Guest photos are never uploaded (they are in the guest database) — the first-login migration (M6) decides.
@@ -898,9 +900,17 @@ Records already on the device are never uploaded before M6 has checked them.
   record to be verified.
 - **Local stack and CI**: the Edge runtime is now on (`supabase/config.toml`, and the CI workflow no longer
   excludes it).
-- **Staging (not done; needs approval)**: deploy the function with
-  `npx supabase functions deploy verify-photo --project-ref cbgkkeveprftddrobzao --no-verify-jwt`. The bucket and
-  its policies are already on staging (migration `000500`). Nothing else changes.
+- **Security review (2026-10-12)** before deploying with the gateway's JWT check off:
+  - the token is checked with Auth (`auth.getUser`) before anything else; no session, the public key, a forged or
+    garbage token all get 401 (tested locally and on staging);
+  - the row is read with the caller's token, so RLS decides; another family's photo is 404 and nothing is read or
+    changed (tested);
+  - the service role touches only `storage_path`, a **generated** column (`<family_id>/<id>.<ext>`, unique, not
+    writable by clients), so a member can't point it at another family's file;
+  - only `server_sha256`, `verified_at` and `uploaded_at` are written, and only for a row the caller can see.
+- **Staging**: deployed 2026-10-12 with
+  `npx supabase functions deploy verify-photo --project-ref cbgkkeveprftddrobzao --no-verify-jwt` (version 1,
+  `verify_jwt: false`). The bucket and its policies were already there (migration `000500`). Nothing else changed.
 
 **Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the
@@ -984,7 +994,7 @@ The test suite refuses to run against any non-local database, so it has never ru
 - The GitHub Actions workflow (`.github/workflows/db-tests.yml`) runs on every push to `main` and on pull requests.
   Its first run, on commit `002dc21` (2026-10-12), passed: database tests, unit tests, and typecheck, in about
   2 minutes, with no credentials.
-- Not yet built: `verify-photo`, the purge job, account deletion, `complete_migration()`, and the WeChat identity table.
+- Not yet built: the purge job, account deletion, `complete_migration()`, and the WeChat identity table.
 - Staging is on the Free plan: it pauses after 7 days of inactivity and has no backups. Test data only.
 
 ---

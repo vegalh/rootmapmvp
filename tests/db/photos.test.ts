@@ -3,10 +3,10 @@
 // Edge runtime (`npm run db:start`).
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { SyncOffline, sha256Hex } from "../../src/lib/sync/engine.ts";
-import { BUCKET, storagePath } from "../../src/lib/sync/photos.ts";
+import { BUCKET, resetPhotoRetries, storagePath } from "../../src/lib/sync/photos.ts";
 import { computeStatus } from "../../src/lib/sync/status.ts";
 import { localEnv, must, serviceClient } from "./helpers.ts";
 import { Device, addPhoto, parent } from "./syncDevice.ts";
@@ -134,6 +134,34 @@ describe("photo files: offline, interruptions, retries", () => {
     assert.equal(status(a, r.failed).allBackedUp, false);
   });
 
+  it("Try again: a photo given up on is sent again, verified, and then backed up", async () => {
+    const { p, a, photo, path, original } = await withPhoto("ph-retry");
+    const flip = (_id: string, blob: Blob) => new Blob([new Uint8Array(blob.size).fill(5)], { type: blob.type });
+    for (let i = 0; i < 3; i++) await a.syncFiles({ tamperUpload: flip });
+    const stuck = await a.syncFiles();
+    assert.match(stuck.failed[photo], /several times/, "without Try again it stays given up, even with a good connection");
+    assert.equal(await resetPhotoRetries(a, Object.keys(stuck.failed)), 1);
+    assert.equal(await resetPhotoRetries(a, ["photo-not-failed"]), 0, "only the photos that failed are touched");
+    const retry = await a.syncFiles();
+    assert.deepEqual(retry.verified, [photo]);
+    assert.deepEqual(retry.failed, {});
+    assert.ok(same(await objectBytes(path), original), "the right file is stored");
+    assert.ok((await photoRow(p.familyId, photo)).verified_at);
+    assert.equal(status(a, retry.failed).allBackedUp, true);
+    assert.deepEqual((await a.syncFiles()).verified, [], "a second Try again changes nothing");
+  });
+
+  it("Try again while the server still rejects the file: counted again, the local copy is kept", async () => {
+    const { a, photo, original } = await withPhoto("ph-retry-bad");
+    const flip = (_id: string, blob: Blob) => new Blob([new Uint8Array(blob.size).fill(4)], { type: blob.type });
+    for (let i = 0; i < 3; i++) await a.syncFiles({ tamperUpload: flip });
+    await resetPhotoRetries(a, [photo]);
+    const r = await a.syncFiles({ tamperUpload: flip });
+    assert.match(r.failed[photo], /didn't match/);
+    assert.equal((a.get("photos", photo) as { mismatches?: number }).mismatches, 1);
+    assert.ok(same(a.blobs.get(photo), original));
+  });
+
   it("a corrupted download is discarded and reported; the next download stores the right file", async () => {
     const { p, a, photo, original } = await withPhoto("ph-corrupt-down");
     await a.syncFiles();
@@ -207,6 +235,15 @@ describe("photo files: privacy between families", () => {
     assert.ok((await anon.storage.from(BUCKET).download(path)).error, "no download without a session");
     const fn = await fetch(`${localEnv().url}/functions/v1/verify-photo`, { method: "POST", headers: { apikey: localEnv().anonKey, "Content-Type": "application/json" }, body: JSON.stringify({ familyId: p.familyId, photoId: photo }) });
     assert.equal(fn.status, 401);
+    // A key or a forged token in place of a session is refused before anything is read
+    const call = (bearer: string) => fetch(`${localEnv().url}/functions/v1/verify-photo`, { method: "POST", headers: { apikey: localEnv().anonKey, Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" }, body: JSON.stringify({ familyId: p.familyId, photoId: photo }) });
+    assert.equal((await call(localEnv().anonKey)).status, 401, "the public key is not a session");
+    const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const body = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: p.user.id, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 600 })}`;
+    const forged = `${body}.${createHmac("sha256", "not-the-server-secret-not-the-server-secret").update(body).digest("base64url")}`;
+    assert.equal((await call(forged)).status, 401, "a token not issued by Auth (even naming the family's own parent) is refused");
+    assert.equal((await call("garbage")).status, 401);
+    assert.equal((await photoRow(p.familyId, photo)).verified_at !== null, true, "the photo itself is unaffected");
     // The bucket is private: its "public" URL serves nothing
     const publicUrl = anon.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
     assert.notEqual((await fetch(publicUrl)).status, 200);

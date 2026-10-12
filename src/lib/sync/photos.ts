@@ -16,7 +16,7 @@ export const BUCKET = "family-photos";
 const RESUMABLE_FROM = 6 * 1024 * 1024;
 const CHUNK = 6 * 1024 * 1024; // the size Supabase Storage expects for every chunk but the last
 // After this many uploads the server rejected as not matching, the photo is reported and left alone until the
-// next start (the local copy is kept).
+// parent taps "Try again" (resetPhotoRetries). The local copy is kept.
 const MAX_MISMATCHES = 3;
 
 // Photo metadata as this device keeps it, plus the transfer state M5 adds.
@@ -73,6 +73,16 @@ export async function syncPhotos(client: SupabaseClient, local: PhotoLocal, opts
     }
   }
   return result;
+}
+
+// The parent's "Try again" (Account page): photos that were given up on after repeated rejected uploads are tried
+// again in the next round. Only the counter is cleared; a resumable upload still continues where it stopped.
+export async function resetPhotoRetries(local: PhotoLocal, ids: string[]): Promise<number> {
+  const wanted = new Set(ids);
+  const reset = local.photos().filter(p => wanted.has(p.id) && (p.mismatches ?? 0) > 0);
+  if (!reset.length) return 0;
+  const done = await local.commit({ records: reset.map(p => ({ collection: "photos" as const, record: { ...p, mismatches: 0 } as unknown as Record<string, unknown> })) });
+  return done === "ok" ? reset.length : 0;
 }
 
 // ---- Upload --------------------------------------------------------------------------------------------------

@@ -168,6 +168,38 @@ try {
   await two.close();
   two = undefined;
 
+  await step("A photo given up on after repeated rejected uploads: the Account page shows the problem and Try Again; tapping it backs the photo up", async () => {
+    page = one;
+    await one.send("Network.setBlockedURLs", { urls: [`${API}/*`] });
+    let photo;
+    try {
+      photo = (await savePhoto(one)).ref;
+      const now = new Date().toISOString();
+      await store(one, `return S.write({ collections: { entries: [{ id: "m-retry", childId: "c-ada", date: "2026-10-12", title: "Clay", text: "", photos: [${JSON.stringify(photo)}], createdAt: "${now}", updatedAt: "${now}", deletedAt: null, origin: "user", position: 0 }] } }, { rollback: true });`);
+      // As left by three uploads the server rejected (lib/sync/photos.ts MAX_MISMATCHES).
+      assert.equal(await store(one, `return S.commitSync({ records: [{ collection: "photos", record: { ...S.photoMeta(${JSON.stringify(photo)}), mismatches: 3 } }] });`), "ok");
+    } finally {
+      await one.send("Network.setBlockedURLs", { urls: [] });
+    }
+    await syncNow(one);
+    await waitStatus(one, `s.photosFailed === 1 && s.phase === "idle"`, "photo reported as failed");
+    assert.ok(!(await objects(familyA)).some(o => o.name.startsWith(photo)), "not uploaded while given up");
+    await u1.openProfile();
+    await u1.click("RootMap Account");
+    await one.waitFor(`document.querySelector("[data-testid=retry-photos]")?.innerText === "Try Again"`, 5000, "Try Again shown");
+    assert.ok(await u1.has("1 photos had a problem uploading"));
+    await syncNow(one);
+    await sleep(1500);
+    assert.equal((await status(one)).photosFailed, 1, "an ordinary round still leaves it alone");
+    await one.eval(`document.querySelector("[data-testid=retry-photos]").click()`);
+    await waitStatus(one, `s.allBackedUp`, "backed up after Try Again");
+    const row = (await admin(`/rest/v1/photos?family_id=eq.${familyA}&id=eq.${photo}&select=sha256,server_sha256,verified_at`))[0];
+    assert.ok(row.verified_at);
+    assert.equal(row.server_sha256, row.sha256);
+    assert.ok((await objects(familyA)).some(o => o.name === `${photo}.png`));
+    await one.waitFor(`!document.querySelector("[data-testid=retry-photos]") && document.querySelector(".sync-summary")?.innerText.includes("All backed up")`, 5000, "button gone, All backed up");
+  }, /ERR_BLOCKED_BY_CLIENT|Failed to fetch/);
+
   await step("Signing out returns to the guest space unchanged; signing in as B shows and sends nothing of A's or the guest's", async () => {
     page = one;
     await u1.signOut();
