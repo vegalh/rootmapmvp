@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { Modal, PageHeader } from "../components/ui";
 import type { CloudState } from "../lib/cloud/session";
+import { useSyncStatus } from "../lib/cloud/hooks";
+import type { SyncStatus } from "../lib/sync/status";
 import type { Copy } from "../lib/i18n";
 
 // The parent's RootMap account (Phase 2B-2 M2): who is signed in, and Sign out. Signing in and out never changes
@@ -10,6 +12,7 @@ export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; ba
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const signedIn = cloud.status === "signed-in" ? cloud : null;
+  const sync = useSyncStatus();
 
   const confirm = async () => {
     setBusy(true);
@@ -26,6 +29,7 @@ export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; ba
         <h2>{t.accountSignedIn}</h2>
         {signedIn?.user.email && <p style={{ overflowWrap: "anywhere" }}><strong>{signedIn.user.email}</strong></p>}
         {signedIn?.offline && <p>{t.accountOffline}</p>}
+        <SyncSummary sync={sync} t={t} />
         <p>{t.accountLocalNote}</p>
         <button className="wide-secondary" onClick={() => setConfirming(true)} disabled={!signedIn}>{t.signOut}</button>
       </div>
@@ -39,5 +43,25 @@ export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; ba
         </Modal>
       )}
     </main>
+  );
+}
+
+// Backup status in plain words. "All backed up" appears only when it is true (lib/sync/status.ts).
+function SyncSummary({ sync, t }: { sync: SyncStatus; t: Copy }) {
+  const lines: string[] = [];
+  if (sync.allBackedUp) lines.push(t.syncAllBackedUp);
+  else {
+    if (sync.phase === "offline") lines.push(t.syncOffline);
+    else if (sync.phase === "syncing" || (sync.phase === "idle" && !sync.lastSyncedAt)) lines.push(t.syncWorking);
+    else if (sync.phase === "error") lines.push(t.syncError);
+    if (sync.pending) lines.push(t.syncPending.replace("{n}", String(sync.pending)));
+    if (sync.photosWaiting) lines.push(t.syncPhotosWaiting.replace("{n}", String(sync.photosWaiting)));
+    if (sync.held) lines.push(t.syncHeld.replace("{n}", String(sync.held)));
+    if (sync.failed) lines.push(t.syncFailed.replace("{n}", String(sync.failed)));
+  }
+  return (
+    <div className="sync-summary" role="status" data-backed-up={sync.allBackedUp ? "yes" : "no"}>
+      {lines.map(line => <p key={line}>{line}</p>)}
+    </div>
   );
 }

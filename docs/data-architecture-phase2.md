@@ -22,9 +22,11 @@ As of 2026-10-12:
     restore and refresh, sign-out, and the family and profile on first sign-in (`src/lib/cloud/`).
   - **M2 (sign-in screens) is done**: commit `433a91b`, GitHub Actions passed, the public website checked (cloud
     off, no Supabase in its bundle). Staging email templates: approved, waiting to be changed in the dashboard.
-  - **M3 (account spaces and outbox) is implemented and awaiting review.** A separate local database per account;
-    the guest database is never written while signed in; an outbox written in the same transaction as every
-    account change; device id and sync state stores; a guest migration plan (not run). Nothing is uploaded.
+  - **M3 (account spaces and outbox) is done**: commit `a18e414`, GitHub Actions passed, public website checked.
+  - **M4 (record sync) is implemented and awaiting review.** The signed-in account's records sync both ways with
+    the local stack: conditional writes, paged pull by change number, the section 6 resolver with losing versions
+    kept, offline queueing and retry, honest backup status. Photo details sync, photo files do not (M5). Guest
+    data, demo and unknown-origin records are never sent.
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
@@ -747,8 +749,8 @@ Records already on the device are never uploaded before M6 has checked them.
 | M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | **Done** (`cdda37c`) |
 | M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | **Done** (`ae9f0f6`) |
 | M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | **Done** (`433a91b`) |
-| M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Implemented, awaiting review |
-| M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Not started |
+| M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | **Done** (`a18e414`) |
+| M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Implemented, awaiting review |
 | M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Not started |
 | M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
 | M7 Sign-out and reliability | Sign-out choices, account switching, full re-sync, sync status | Not started |
@@ -834,6 +836,41 @@ Records already on the device are never uploaded before M6 has checked them.
   it yet; M6 uses it, with the parent's confirmation.
 - **What the parent sees.** After sign-in, a new account's space is empty (guest children are not shown or
   copied). After sign-out, the guest space reappears exactly as it was. The Account page explains this.
+
+**M4 implementation notes** (`src/lib/sync/`).
+
+- **Mapping** (`mapping.ts`): local records ↔ the client-owned columns of each table (`records` → `activity_records`,
+  `saved` → `saved_activities`; legacy `observations` stay local, already folded into entries). Server columns are
+  never sent; `id`, `goals.owner_user_id` and the photo identity columns are never updated. A download is merged onto
+  the local record, so local-only fields survive. A child's default picture travels as `bundled:default-child`; other
+  local pictures the server can't hold (e.g. demo assets) stay on the device.
+- **Push** (`engine.ts`): outbox entries in dependency order (photos, children, then what refers to them). Insert
+  with "on conflict do nothing"; update only `where rev = <last seen>`. No row back means conflict: the server's row
+  is fetched and resolved, losing versions are written to `record_versions` **before** the merged result, and the
+  result is written at the server's revision (at most 3 attempts per round). Version ids are derived from their
+  content, so a repeat adds nothing.
+- **Pull**: per table, `change_seq > cursor` in pages of 500; each page and its cursor are applied in one local
+  transaction. A downloaded row for a record with an unsent local edit is resolved immediately (the merge is kept
+  locally and sent next; losing local versions are queued as outbox `versions` entries), so the next upload can never
+  overwrite the other device's change.
+- **Local commits** (`store.ts` `commitSync`): all-or-nothing, and refused if any record involved has changed since
+  sync looked at it (checked on disk inside the transaction, so another tab's edit counts too). A refused commit is
+  recomputed; nothing sync writes is queued for upload again.
+- **Never sent**: anything outside the open account space (guest data is in another database); records of `demo` or
+  `unknown` origin ("held" until M6 decides); records that need one of those, or a photo that couldn't be sent
+  ("waiting"); records the server refuses ("failed", retried each round). Photo **files** are not uploaded (M5); the
+  photo's details (`photos` row with its SHA-256) are, because entries and children can only refer to photos the
+  server knows.
+- **Interruptions**: an upload the server applied but the device didn't record is recognised on retry by content
+  (no second row, no extra revision, no version kept); an interrupted download repeats at most one page.
+- **When it runs** (`runner.ts`): at start, 1.5 s after local changes, on reconnect and when the app returns to the
+  screen, and every 30 s; one round at a time per account across tabs (Web Locks); back-off up to 5 minutes. A tab
+  that sees another tab's changes on disk reloads its data first.
+- **Status** (`status.ts`, Account page): "All backed up" only after a completed round with nothing pending, held or
+  failed and every photo shown by a live record verified on the server. Until M5 that means a record with a photo is
+  never "all backed up"; the page says how many photos are waiting.
+- **Not in M4**: settings and the parent's profile (`user_settings`, `profiles` content), photo files, the
+  first-login migration, purge / full re-sync after a watermark, a record_versions screen ("Another version saved").
 
 **Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the

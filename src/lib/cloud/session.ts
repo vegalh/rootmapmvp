@@ -41,6 +41,10 @@ export function startCloud(): Promise<void> {
     // supabase-js holds its session lock while calling this listener, so work is deferred out of it.
     client.auth.onAuthStateChange((event, session) => { setTimeout(() => onAuthChange(event, session), 0); });
     if (restored.status === "signed-in" && !restored.offline) await completeAccount();
+    // Started offline: confirm the account (and so start sync) once the device is back online.
+    window.addEventListener("online", () => {
+      if (state.status === "signed-in" && !state.account) void completeAccount();
+    });
   })();
   return started;
 }

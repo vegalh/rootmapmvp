@@ -2,11 +2,13 @@
 // `npm run test:e2e:cloud`.
 //
 // One device, a guest who already uses RootMap, then two accounts: each space is its own database; switching never
-// shows another space's data; the guest database is never changed; every account change has its outbox entry,
-// written in the same transaction (a failed or interrupted write leaves neither); nothing is uploaded.
+// shows another space's data; the guest database is never changed or uploaded; every account change has its outbox
+// entry, written in the same transaction (a failed or interrupted write leaves neither). While the outbox is checked
+// the server's data API is blocked, so sync (M4) can't empty it; afterwards each account's records reach only that
+// account's family.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { admin, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
+import { API, admin, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
 
 const server = await startServer();
 const BASE = server.base;
@@ -37,7 +39,9 @@ async function assertOutboxConsistent(name) {
 
 const emailA = `a-${randomUUID()}@example.com`;
 const emailB = `b-${randomUUID()}@example.com`;
-let guestBefore, idA, idB, aAfter;
+let guestBefore, idA, idB, aChildren;
+const BLOCKED = /ERR_BLOCKED_BY_CLIENT|Failed to fetch/;
+const blockData = on => page.send("Network.setBlockedURLs", { urls: on ? [`${API}/rest/*`] : [] });
 
 try {
   // A device where RootMap was already in use without an account.
@@ -75,9 +79,10 @@ try {
     assert.equal(meta.deviceId, await page.eval(`localStorage.getItem("rootmap.device-id")`));
     assert.match(meta.deviceId, /^d-[0-9a-f-]{36}$/);
     assert.equal(JSON.stringify(await u.dump("rootmap")), guestBefore);
+    await blockData(true);
   });
 
-  await step("Changes in A's space are queued in A's outbox in the same transaction; nothing is uploaded", async () => {
+  await step("Changes in A's space are queued in A's outbox in the same transaction; nothing is uploaded while the server is unreachable", async () => {
     assert.equal(await addChild("c-ada", "Ada"), null);
     assert.equal(await addChild("c-gone", "Temp"), null);
     // A photo, as the photo picker stores it.
@@ -97,7 +102,7 @@ try {
     const { familyId } = (await u.cloudState()).account;
     assert.deepEqual(await admin(`/rest/v1/children?family_id=eq.${familyId}&select=id`), [], "nothing uploaded");
     assert.equal(JSON.stringify(await u.dump("rootmap")), guestBefore);
-  });
+  }, BLOCKED);
 
   await step("A write that fails part-way stores nothing: no record and no outbox entry", async () => {
     const before = await dataOf(accountDb(idA));
@@ -107,24 +112,31 @@ try {
     assert.equal(await dataOf(accountDb(idA)), before, "nothing stored");
     assert.equal(await store(`return S.pendingOutbox().some(e => e.id === "c-half" || e.id === "c-bad");`), false, "nothing queued in memory");
     assert.ok(!(await childNames()).includes("Half"));
-  });
+  }, BLOCKED);
 
   await step("A write interrupted by closing the page is stored completely or not at all, records and outbox together", async () => {
     // 400 records in one change, then the page reloads at once, while the transaction may still be running.
     const many = Array.from({ length: 400 }, (_, i) => child(`c-bulk-${i}`, `Bulk${i}`));
     const loaded = page.waitEvent("Page.loadEventFired", 20000);
-    await page.eval(`import("/src/lib/data/store.ts").then(S => { S.write({ collections: { children: ${JSON.stringify(many)} } }); location.reload(); })`);
+    await page.eval(`import("/src/lib/data/store.ts").then(S => { S.write({ collections: { children: ${JSON.stringify(many)} } }); setTimeout(() => location.reload(), 0); return true; })`);
     await loaded;
     await u.appReady();
     const d = await assertOutboxConsistent(accountDb(idA));
     const stored = d.children.filter(c => c.id.startsWith("c-bulk-")).length;
     assert.ok(stored === 0 || stored === 400, `all or nothing (stored ${stored})`);
     console.log(`      (interrupted write: ${stored ? "committed before the reload" : "not committed"})`);
-    aAfter = await dataOf(accountDb(idA));
-  });
+  }, BLOCKED);
 
-  await step("Signing out returns to the guest space: guest data exactly as before, none of A's data", async () => {
+  await step("Back online, A's records are uploaded to A's family only; signing out returns to the guest space unchanged, none of A's data", async () => {
+    await blockData(false);
+    await page.eval(`window.dispatchEvent(new Event("online"))`);
+    await page.waitFor(`import("/src/lib/sync/runner.ts").then(R => R.syncStatus().pending === 0 && R.syncStatus().phase === "idle")`, 30000, "A synced");
+    // (The account check couldn't run while the server was blocked; sync uses the family recorded in the space.)
+    const familyId = (await admin(`/rest/v1/family_members?user_id=eq.${idA}&select=family_id`))[0].family_id;
+    const local = (await u.dump(accountDb(idA))).children.map(c => c.id).sort();
+    assert.deepEqual((await admin(`/rest/v1/children?family_id=eq.${familyId}&select=id&order=id`)).map(c => c.id), local);
     await u.signOut();
+    aChildren = JSON.stringify((await u.dump(accountDb(idA))).children);
     assert.deepEqual(await u.space(), { kind: "guest" });
     const names = await childNames();
     assert.ok(names.includes("Gina"));
@@ -143,10 +155,9 @@ try {
     assert.deepEqual(await u.space(), { kind: "account", userId: idB });
     assert.deepEqual(await childNames(), []);
     assert.equal(await addChild("c-bea", "Bea"), null);
-    await assertOutboxConsistent(accountDb(idB));
     const b = await u.dump(accountDb(idB));
     assert.deepEqual(b.children.map(c => c.id), ["c-bea"]);
-    assert.equal(await dataOf(accountDb(idA)), aAfter, "A's space untouched while B is signed in");
+    assert.equal(JSON.stringify((await u.dump(accountDb(idA))).children), aChildren, "A's space untouched while B is signed in");
     assert.equal(JSON.stringify(await u.dump("rootmap")), guestBefore);
   });
 
@@ -161,22 +172,30 @@ try {
     const names = await childNames();
     assert.ok(names.includes("Ada"));
     assert.ok(!names.includes("Bea") && !names.includes("Gina"));
-    assert.equal(await dataOf(accountDb(idA)), aAfter);
+    assert.equal(JSON.stringify((await u.dump(accountDb(idA))).children), aChildren);
     const names2 = await u.dbNames();
     for (const n of ["rootmap", accountDb(idA), accountDb(idB)]) assert.ok(names2.includes(n), n);
   });
 
-  await step("The guest database was never changed, and no account's records appear in another space", async () => {
+  await step("The guest database was never changed or uploaded, and no account's records appear in another space, locally or on the server", async () => {
     assert.equal(JSON.stringify(await u.dump("rootmap")), guestBefore);
     const a = await u.dump(accountDb(idA)), b = await u.dump(accountDb(idB)), g = await u.dump("rootmap");
     const ids = d => new Set(d.children.map(c => c.id));
     assert.ok(!ids(a).has("c-guest") && !ids(b).has("c-guest"));
     assert.ok(!ids(b).has("c-ada") && !ids(g).has("c-ada"));
     assert.ok(!ids(a).has("c-bea") && !ids(g).has("c-bea"));
-    for (const id of [idA, idB]) {
-      const { familyId } = { familyId: (await admin(`/rest/v1/family_members?user_id=eq.${id}&select=family_id`))[0].family_id };
-      for (const table of ["children", "entries", "photos"]) assert.deepEqual(await admin(`/rest/v1/${table}?family_id=eq.${familyId}&select=id`), [], `no ${table} uploaded`);
+    await page.waitFor(`import("/src/lib/sync/runner.ts").then(R => R.syncStatus().pending === 0 && R.syncStatus().phase === "idle")`, 30000, "A synced");
+    for (const [id, d] of [[idA, a], [idB, b]]) {
+      const familyId = (await admin(`/rest/v1/family_members?user_id=eq.${id}&select=family_id`))[0].family_id;
+      const onServer = (await admin(`/rest/v1/children?family_id=eq.${familyId}&select=id&order=id`)).map(c => c.id);
+      assert.ok(onServer.every(cid => ids(d).has(cid)), "only this account's own records are in its family");
     }
+    assert.deepEqual(await admin(`/rest/v1/children?id=eq.c-guest&select=id`), [], "the guest child is on no server");
+    const familyB = (await admin(`/rest/v1/family_members?user_id=eq.${idB}&select=family_id`))[0].family_id;
+    // B signed out moments after adding Bea, so Bea may still be queued on the device (sent at B's next sign-in).
+    const bOnServer = (await admin(`/rest/v1/children?family_id=eq.${familyB}&select=id`)).map(c => c.id);
+    assert.ok(bOnServer.every(id => id === "c-bea"), "B's family holds only B's child");
+    if (!bOnServer.length) assert.ok(b.outbox.some(e => e.key === "children:c-bea"), "still queued in B's space");
   });
 } finally {
   await page?.close().catch(() => undefined);

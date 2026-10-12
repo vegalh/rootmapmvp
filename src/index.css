@@ -322,3 +322,4 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 /* Welcome and sign-in (OpeningExperience), full screen above the app; same frame as the development preview. */
 .opening-screen { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; background: #efe7d6; }
 .opening-screen > div { width: min(100%, 430px); height: 100dvh; }
+.sync-summary { margin: 4px 0 8px; padding: 10px 14px; border-radius: 13px; background: var(--lavender); }.sync-summary p { margin: 2px 0; color: var(--primary); font-size: 14px; font-weight: 600; }.sync-summary:empty { display: none; }

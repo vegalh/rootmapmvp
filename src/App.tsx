@@ -22,7 +22,7 @@ import OpeningExperience from "./components/OpeningExperience";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { activeSpace, backupData, dataMode, restoreData } from "./lib/data/store";
+import { activeSpace, backupData, dataMode, restoreData, syncMeta } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
@@ -30,6 +30,7 @@ import { cloudConfig } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
 import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
 import { spaceMatches } from "./lib/cloud/space";
+import { startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
@@ -165,6 +166,15 @@ export default function App() {
       try { sessionStorage.removeItem(SWITCH_COUNT_KEY); } catch { /* nothing to reset */ }
     }
   }, [cloud]);
+  // Record sync for the signed-in account's own space (lib/sync). Uses the family recorded in the space while the
+  // account can't be confirmed (offline start), so changes made offline are sent as soon as the device is online.
+  const syncUser = cloud.status === "signed-in" && spaceMatches(activeSpace(), cloud) ? cloud.user.userId : null;
+  const syncFamily = cloud.status === "signed-in" ? cloud.account?.familyId ?? syncMeta().familyId : null;
+  useEffect(() => {
+    if (!syncUser || !syncFamily) return;
+    return startSync({ userId: syncUser, familyId: syncFamily });
+  }, [syncUser, syncFamily]);
+
   const afterSwitchTo = (next: AfterSwitch) => {
     try { sessionStorage.setItem(AFTER_SWITCH_KEY, JSON.stringify(next)); } catch { /* the reload still happens */ }
   };

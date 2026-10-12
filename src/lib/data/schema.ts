@@ -105,6 +105,10 @@ export type PhotoMeta = {
   source: "upload" | "migrated" | "restored";
   storagePath: string | null;
   uploadedAt: string | null;
+  // Sync (M4, M5): the SHA-256 of the bytes once computed, and when the server confirmed it holds them. A photo is
+  // backed up only when `verifiedAt` is set.
+  sha256?: string;
+  verifiedAt?: string | null;
 };
 export type PhotoBlob = { id: string; blob: Blob };
 
@@ -134,7 +138,8 @@ export type StoreName = (typeof STORE_NAMES)[number] | (typeof ACCOUNT_STORES)[n
 // What sync uploads (Phase 2B-2 M4) is decided from the outbox, never from what the screens show. One entry per
 // record with local changes not yet confirmed by the server, written in the same transaction as the record itself,
 // so a record change and its outbox entry are stored together or not at all. Nothing is uploaded in M3.
-export type OutboxCollection = CollectionName | "photos";
+// "versions": a version that lost a conflict found while downloading, waiting to be kept in record_versions.
+export type OutboxCollection = CollectionName | "photos" | "versions";
 export type OutboxEntry = {
   key: string; // "<collection>:<id>"
   collection: OutboxCollection;
@@ -147,14 +152,17 @@ export type OutboxEntry = {
   queuedAt: string;
   changedAt: string;
   deviceId: string;
+  // "versions" entries only: what to keep (see lib/sync).
+  payload?: { table: string; recordId: string; version: Record<string, unknown>; baseRev: number | null; reason: string };
 };
 export const outboxKey = (collection: OutboxCollection, id: string) => `${collection}:${id}`;
 
 // Per-record sync state, filled by sync (M4): the server revision and the last version both sides agreed on.
-export type SyncRecord = { key: string; collection: OutboxCollection; id: string; rev: number | null; syncedAt: string | null; syncBase: unknown };
+export type SyncRecord = { key: string; collection: OutboxCollection; id: string; rev: number; syncedAt: string; syncBase: Record<string, unknown> };
 
 // The account space's own description, in "meta".
-export type SpaceMeta = { key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number };
+// `cursors`: per server table, the highest change number applied on this device (sync, M4).
+export type SpaceMeta = { key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number; cursors?: Record<string, number> };
 
 // Photo ids look like "photo-<uuid>"; anything else in a photo field is an image URL (bundled asset, remote
 // image, or a legacy data URL that could not be converted) and is used as-is.

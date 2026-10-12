@@ -11,7 +11,7 @@ import { applyChanges, byPosition, outboxEntries } from "./records";
 import {
   COLLECTIONS, DB_NAME, GUEST, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
   type CollectionName, type Collections, type OutboxCollection, type OutboxEntry, type PhotoBlob, type PhotoMeta, type Space, type SpaceMeta,
-  type StoreName, type StoredDraft, type StoredSetting,
+  type StoreName, type StoredDraft, type StoredSetting, type SyncRecord,
 } from "./schema";
 
 // The single place RootMap data is read from and written to. Screens never touch a storage API directly.
@@ -49,6 +49,9 @@ let spaceMeta: SpaceMeta | null = null;
 // Account spaces: the stored outbox (see OutboxEntry), kept in memory like everything else.
 const outbox = new Map<string, OutboxEntry>();
 let outboxSeq = 0;
+// Account spaces: per-record sync state, and photo metadata (light; the bytes stay in IndexedDB).
+const syncRecords = new Map<string, SyncRecord>();
+const photoMetas = new Map<string, PhotoMeta>();
 
 const cache = {
   collections: Object.fromEntries(COLLECTIONS.map(n => [n, []])) as unknown as { [K in CollectionName]: Collections[K][] },
@@ -201,9 +204,13 @@ async function hydrate(source: IDBDatabase) {
   cache.settings = new Map((await getAll<StoredSetting>(source, "settings")).map(s => [s.key, s.value]));
   cache.drafts = new Map((await getAll<StoredDraft>(source, "drafts")).map(({ key, ...draft }) => [key, draft]));
   outbox.clear();
+  syncRecords.clear();
+  photoMetas.clear();
   if (source.objectStoreNames.contains("outbox")) {
     for (const entry of await getAll<OutboxEntry>(source, "outbox")) outbox.set(entry.key, entry);
-    outboxSeq = Math.max(0, ...[...outbox.values()].map(e => e.seq));
+    outboxSeq = Math.max(outboxSeq, 0, ...[...outbox.values()].map(e => e.seq));
+    for (const r of await getAll<SyncRecord>(source, "syncRecords")) syncRecords.set(r.key, r);
+    for (const p of await getAll<PhotoMeta>(source, "photos")) photoMetas.set(p.id, p);
   }
   for (const url of photoUrls.values()) URL.revokeObjectURL(url);
   photoUrls.clear();
@@ -537,6 +544,8 @@ export async function savePhoto(blob: Blob, size?: { width: number; height: numb
     return { ok: false, failure: failureOf(e) };
   }
   photoUrls.set(id, URL.createObjectURL(blob));
+  if (space.kind === "account") photoMetas.set(id, meta);
+  publish();
   return { ok: true, ref: id };
 }
 
@@ -615,6 +624,114 @@ export async function restoreData(data: Record<string, unknown>): Promise<boolea
     queued.undo();
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Sync (account spaces only; lib/sync/engine.ts). Records written here are not queued for upload: they are what
+// the server already holds.
+
+export const syncRecordFor = (key: string) => syncRecords.get(key);
+export const photoMeta = (id: string) => photoMetas.get(id);
+export const allPhotoMetas = () => [...photoMetas.values()];
+
+export async function syncRecordValue(collection: string, id: string): Promise<Record<string, unknown> | undefined> {
+  if (collection === "photos") {
+    const meta = photoMetas.get(id);
+    return meta && { ...meta };
+  }
+  const rec = (cache.collections as Record<string, { id: string }[]>)[collection]?.find(r => r.id === id);
+  return rec && { ...rec };
+}
+
+export async function photoChecksum(id: string): Promise<string | null> {
+  if (!db) return null;
+  const stored = await request<PhotoBlob | undefined>(db.transaction("photoBlobs").objectStore("photoBlobs").get(id));
+  if (!stored) return null;
+  const digest = await crypto.subtle.digest("SHA-256", await stored.blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export const syncMeta = () => ({ familyId: spaceMeta?.familyId ?? null, cursors: spaceMeta?.cursors ?? {}, deviceId: spaceMeta?.deviceId ?? "" });
+
+export type SyncCommit = {
+  records?: { collection: string; record: Record<string, unknown> }[];
+  syncRecords?: SyncRecord[];
+  outboxRemove?: { key: string; seq: number }[];
+  outboxAdd?: OutboxEntry[];
+  expect?: { key: string; seq: number | null }[];
+  meta?: { familyId?: string; cursors?: Record<string, number> };
+};
+
+// Applies a sync result in one transaction, only if every outbox expectation still holds on disk (the parent, or
+// another tab, may have changed a record since sync looked at it). "stale": nothing was applied.
+export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
+  if (space.kind !== "account" || !db || !spaceMeta) return Promise.reject(new Error("sync needs an open account space"));
+  const expectations = new Map<string, number | null>();
+  for (const e of batch.expect ?? []) expectations.set(e.key, e.seq);
+  for (const r of batch.outboxRemove ?? []) expectations.set(r.key, r.seq);
+  // Quick check against memory first.
+  for (const [key, seq] of expectations) if ((outbox.get(key)?.seq ?? null) !== seq) return Promise.resolve("stale");
+
+  const collections = new Set((batch.records ?? []).map(r => r.collection));
+  const stores = new Set<string>(["outbox", "syncRecords", "meta", ...collections]);
+  const nextMeta: SpaceMeta = { ...spaceMeta, ...(batch.meta?.familyId ? { familyId: batch.meta.familyId } : {}), ...(batch.meta?.cursors ? { cursors: batch.meta.cursors } : {}) };
+  const tx = db.transaction([...stores], "readwrite");
+  const result = new Promise<"ok" | "stale">(resolveResult => {
+    let stale = false;
+    const keys = [...expectations.keys()];
+    let left = keys.length;
+    const apply = () => {
+      try {
+        for (const { collection, record } of batch.records ?? []) tx.objectStore(collection).put(record);
+        for (const r of batch.syncRecords ?? []) tx.objectStore("syncRecords").put(r);
+        for (const r of batch.outboxRemove ?? []) tx.objectStore("outbox").delete(r.key);
+        for (const e of batch.outboxAdd ?? []) tx.objectStore("outbox").put(e);
+        if (batch.meta) tx.objectStore("meta").put(nextMeta);
+      } catch {
+        try { tx.abort(); } catch { /* finished */ }
+      }
+    };
+    if (!left) apply();
+    for (const key of keys) {
+      const req = tx.objectStore("outbox").get(key);
+      req.onsuccess = () => {
+        if (((req.result as OutboxEntry | undefined)?.seq ?? null) !== expectations.get(key)) stale = true;
+        if (--left === 0) {
+          if (stale) { try { tx.abort(); } catch { /* finished */ } }
+          else apply();
+        }
+      };
+    }
+    done(tx).then(() => resolveResult("ok"), () => resolveResult("stale"));
+  });
+  return result.then(outcome => {
+    if (outcome !== "ok") return outcome;
+    // Stored: now memory and screens.
+    const byCollection = new Map<string, { id: string }[]>();
+    for (const { collection, record } of batch.records ?? []) {
+      if (collection === "photos") photoMetas.set(String(record.id), record as unknown as PhotoMeta);
+      else byCollection.set(collection, [...(byCollection.get(collection) ?? []), record as { id: string }]);
+    }
+    for (const [name, recs] of byCollection) (cache.collections as Record<string, unknown[]>)[name] = applyChanges((cache.collections as Record<string, { id: string }[]>)[name], recs);
+    for (const r of batch.syncRecords ?? []) syncRecords.set(r.key, r);
+    for (const r of batch.outboxRemove ?? []) if (outbox.get(r.key)?.seq === r.seq) outbox.delete(r.key);
+    for (const e of batch.outboxAdd ?? []) { outbox.set(e.key, e); outboxSeq = Math.max(outboxSeq, e.seq); }
+    if (batch.meta) spaceMeta = nextMeta;
+    publish();
+    return outcome;
+  });
+}
+
+// Another tab of this space may have written since this one loaded: if the stored outbox differs from memory,
+// reload everything from disk (screens update).
+export async function refreshFromDisk(): Promise<void> {
+  if (space.kind !== "account" || !db) return;
+  const stored = await getAll<OutboxEntry>(db, "outbox");
+  const same = stored.length === outbox.size && stored.every(e => outbox.get(e.key)?.seq === e.seq);
+  const storedMeta = await request<SpaceMeta | undefined>(db.transaction("meta").objectStore("meta").get("space"));
+  const syncedElsewhere = JSON.stringify(storedMeta?.cursors ?? {}) !== JSON.stringify(spaceMeta?.cursors ?? {});
+  if (storedMeta) spaceMeta = storedMeta;
+  if (!same || syncedElsewhere) await hydrate(db);
 }
 
 // Development only: a hot update would reset the loaded data above while screens keep running; reload instead.

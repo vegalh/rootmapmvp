@@ -3,6 +3,7 @@ import { Icon } from "./Icon";
 import { Modal, Field } from "./ui";
 import { fmtLong, isoToday, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
+import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
 import { saveSetting } from "../lib/data/hooks";
 import { readSetting } from "../lib/data/store";
 import { newRecordId } from "../lib/data/schema";
@@ -61,7 +62,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
       lessons: 0,
       group,
       notes,
-      photo: photo || "https://images.unsplash.com/photo-1606386666595-d135abc1e3b2?auto=format&fit=crop&w=300&q=85",
+      photo: photo || DEFAULT_CHILD_PHOTO,
     }]);
     if (added) close();
   };

@@ -21,7 +21,8 @@ const guestDump = async () => {
   return JSON.stringify(d);
 };
 const welcomeSetting = async () => (await u.dump("rootmap"))?.settings.find(s => s.key === "rootmap-welcome")?.value ?? null;
-const AUTH_ONLY = /^(GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))$/;
+// Sign-in, account set-up, and sync reading this (empty) account's family. No data is written to the server.
+const AUTH_ONLY = /^((GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))|(GET|OPTIONS) \/rest\/v1\/(children|entries|activity_records|plans|goals|saved_activities|photos))$/;
 
 const email = `parent-${randomUUID()}@example.com`;
 let guestBefore, userId, familyId;

@@ -2,6 +2,7 @@
 // a dev server with cloud on, one browser profile per simulated device, sign-in through the app's own screens,
 // and reading any of the app's local databases.
 import { execFileSync, spawn } from "node:child_process";
+import net from "node:net";
 import path from "node:path";
 import pg from "pg";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
@@ -48,7 +49,8 @@ window.__s = {
 
 // A simulated device: its own browser profile. `requests` collects every request to the stack, across reloads.
 export async function newDevice(name, devtoolsPort, setup) {
-  const page = await launch(tempProfile(name), devtoolsPort);
+  // A free DevTools port, so a browser left over from an interrupted run is never mistaken for this one.
+  const page = await launch(tempProfile(name), await freePort(devtoolsPort));
   await page.send("Page.addScriptToEvaluateOnNewDocument", { source: HELPERS });
   await page.send("Page.addScriptToEvaluateOnNewDocument", { source: DB_HELPERS });
   if (setup) await page.send("Page.addScriptToEvaluateOnNewDocument", { source: setup });
@@ -58,6 +60,14 @@ export async function newDevice(name, devtoolsPort, setup) {
     if (m.method === "Network.requestWillBeSent" && m.params.request.url.startsWith(API)) page.requests.push(`${m.params.request.method} ${m.params.request.url.replace(API, "").split("?")[0]}`);
   });
   return page;
+}
+
+async function freePort(preferred) {
+  const tryPort = port => new Promise(resolve => {
+    const srv = net.createServer().once("error", () => resolve(false)).once("listening", () => srv.close(() => resolve(true))).listen(port, "127.0.0.1");
+  });
+  for (let port = preferred; port < preferred + 200; port++) if (await tryPort(port)) return port;
+  throw new Error("no free DevTools port");
 }
 
 // Runs named steps; a step fails on any console error it didn't expect.
@@ -97,7 +107,12 @@ export function ui(page) {
     space: () => page.eval(`import("/src/lib/data/store.ts").then(S => S.activeSpace())`),
     appReady: () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, .page-content, main")`, 15000, "app rendered"),
     welcomeShown: () => page.waitFor(`document.querySelector(".opening") && document.body.innerText.includes("Welcome to RootMap")`, 15000, "Welcome shown"),
-    openProfile: async () => { await page.eval(`[...document.querySelectorAll(".bottom-nav button")].at(-1).click()`); await page.waitFor(`document.querySelector(".profile-page")`, 5000, "Profile"); },
+    // From any screen: back out of a sub-page (they have no bottom bar), then the Profile tab.
+    openProfile: async () => {
+      await page.waitFor(`document.querySelector(".bottom-nav") || document.querySelector(".page-header.with-back .icon-button")?.click()`, 5000, "a screen with the bottom bar");
+      await page.eval(`[...document.querySelectorAll(".bottom-nav button")].at(-1).click()`);
+      await page.waitFor(`document.querySelector(".profile-page")`, 5000, "Profile");
+    },
     errorShown: () => page.eval(`document.querySelector("[role=alert]")?.innerText ?? ""`),
     dbNames: () => page.eval(`__s.names()`),
     dump: name => page.eval(`__s.dump(${JSON.stringify(name)})`),
