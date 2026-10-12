@@ -157,6 +157,9 @@ and two default saved activities. `origin` records only what is reliably known:
 
 ## Phase 2: what Supabase needs
 
+> Superseded by the finalized design in [data-architecture-phase2.md](data-architecture-phase2.md). The notes
+> below are the original Phase 1 sketch.
+
 - **Auth:** Supabase Auth with Sign in with Apple and Google (OAuth); **WeChat** needs a custom OIDC/OAuth bridge
   (e.g. an Edge Function issuing Supabase sessions), since it isn't a built-in provider. Google must not be the only
   option: Google services are unavailable in mainland China. Check Supabase reachability and latency from China

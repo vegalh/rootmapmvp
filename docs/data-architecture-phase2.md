@@ -1,10 +1,44 @@
 # RootMap data architecture — Phase 2 (cloud)
 
-Finalized Phase 2A architecture, approved on 2026-10-11. This document is the reference for every Phase 2B step.
+This is the finalized Phase 2A architecture, approved on 2026-10-11. It is the reference for every Phase 2B step.
 It extends [data-architecture.md](data-architecture.md), which describes the Phase 1 local data layer and remains
 accurate for everything on the device.
 
-Nothing in this document is implemented yet, and no Supabase resources exist.
+## Current status (start here)
+
+As of 2026-10-12:
+
+- **Phase 2B-1 (cloud foundation) is complete and approved.**
+  - The schema, RLS, storage policies, and revision / `change_seq` triggers are in `supabase/migrations/`.
+  - They are tested locally (`npm run test:db`, 48 tests).
+  - They are deployed to the **staging** project `rootmap-staging` (`cbgkkeveprftddrobzao`). See section 19.
+- **The app does not use Supabase yet.**
+  - Nothing in `src/` talks to the cloud.
+  - Local data (IndexedDB, Phase 1) works exactly as before.
+- **Next phase: 2B-2 (sync client)**, which has not started. Scope is in section 18. Start it only after explicit
+  approval.
+- **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
+  started.
+
+**Working with the database locally**
+
+- Docker Desktop must be running.
+- If the `docker` command is missing, add `export PATH="$HOME/.docker/bin:$PATH"` to your shell profile.
+- Commands:
+  - `npm run db:start` starts the local stack and applies the migrations.
+  - `npm run test:db` runs the database tests.
+  - `npm run db:reset` re-applies all migrations from an empty database.
+- The tests refuse to run against anything except the local stack.
+
+**Changing the database**
+
+1. Add a new file in `supabase/migrations/`. Never edit a migration that has already been applied.
+2. Add or extend tests in `tests/db/`.
+3. Run `npm run db:reset && npm run test:db`.
+4. Only with the owner's approval, apply the change to staging with `npx supabase db push --linked`.
+
+The CLI login is stored in the macOS Keychain. The project link lives in `supabase/.temp/`, which is git-ignored,
+so a fresh clone must run `npx supabase link --project-ref cbgkkeveprftddrobzao` again.
 
 ---
 
@@ -347,7 +381,8 @@ Deleted records keep the same select policy, so they stay exactly as protected a
 - `execute` is revoked from `public` and `anon`. Each function is granted to `authenticated` only where needed.
 - No function takes a `user_id` argument. Every function uses `auth.uid()`.
 - `create_family()` creates the family and the caller's `owner` membership in one transaction. It refuses if the
-  caller already belongs to a family.
+  caller already belongs to a family. It is the one privileged function in `public`, because the app calls it
+  as an RPC. Its execute grant goes to `authenticated` only.
 - No client path can create, change, or delete a membership. Future invitations will use single-use, expiring
   tokens.
 - **RLS never reads `user_metadata`**, because users can edit it. Membership comes from `family_members`. Provider
@@ -684,12 +719,76 @@ The region cannot be changed after the project is created.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **2B-1 Cloud foundation** | Schema, family ownership, RLS, storage policies, revision and `change_seq` triggers, two-account and sync-cursor tests, CI | Awaiting approval |
+| **2B-1 Cloud foundation** | Schema, family ownership, RLS, storage policies, revision and `change_seq` triggers, two-account and sync-cursor tests, CI | **Done.** Deployed to staging on 2026-10-12 (section 19). Awaiting review. |
 | 2B-2 Sync client | Outbox, conditional push, pull, resolver with `record_versions`, photo queue, `verify-photo`, sign-in screens (Apple, Google, email), sign-out | Later |
 | 2B-3 First-login migration | Planner, automatic upload, verification, `complete_migration` | Later |
 | iOS PoC | Separate proof of concept (section 12) | Before any iOS backend work |
 | iOS app | Capacitor build, native backend, Keychain, native sign-in, account deletion, TestFlight | After the PoC |
 | WeChat | Only after the entity and the session method are verified | Research |
+
+---
+
+## 19. Deployment status
+
+### Environments
+
+| Environment | Project | Region | Plan | Schema | Data |
+|---|---|---|---|---|---|
+| Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000600` | Test data only, recreated on every reset |
+| Staging | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 (does not bind production) | Free | Migrations `20261012000100`–`000600`, applied 2026-10-12 with `supabase db push --linked` | None: 0 users, 0 objects, 0 app rows |
+| Production | **Not created** | Decided by the region test (section 15) | Pro | — | — |
+
+### Phase 2B-1 implementation
+
+| Migration | Contents |
+|---|---|
+| `20261012000100_ownership.sql` | `private` schema; `families`, `family_members`, `profiles`, `user_settings`; `private.my_family_ids()`, `private.is_family_member()`; `public.create_family()` |
+| `20261012000200_family_tables.sql` | The 9 family-data tables, keys, foreign keys, checks, pull and per-child indexes |
+| `20261012000300_revision_triggers.sql` | `t00_member` (membership checked first), `t10_*` reference checks and guards, `t90_stamp` (`rev`, `change_seq`, `server_updated_at`, `updated_by`) |
+| `20261012000400_rls.sql` | RLS on all 13 tables; 35 policies; no delete policies |
+| `20261012000500_storage.sql` | Private `family-photos` bucket (15 MB; JPEG, PNG, WebP, HEIC); `private.photo_object_allowed()`; storage select and insert policies |
+| `20261012000600_grants.sql` | Nothing for `anon`; column-level insert/update for `authenticated`; no automatic grants on future objects |
+
+Every database change is a new migration file. An applied migration is never edited.
+
+### Verified on staging after deployment (2026-10-12)
+
+- All 6 migrations are recorded remotely.
+- All 13 tables exist, and all 13 have RLS enabled.
+- 35 table policies:
+  - none name `anon` or `public`;
+  - none allow delete.
+- 2 storage policies (select, insert).
+- The bucket is private, with the 15 MB limit and the 4 image types.
+- `anon` has 0 table grants. `authenticated` has only table-level `SELECT`, plus column-level insert and update; no server-controlled column is writable.
+- 13 functions:
+  - every security definer function has a fixed `search_path`;
+  - none can be executed by `PUBLIC` or `anon`;
+  - `authenticated` can execute only `private.is_family_member`, `private.my_family_ids`, `private.photo_object_allowed`, and `public.create_family`.
+- 25 triggers.
+- No user data: 0 auth users, 0 storage objects, 0 application rows.
+
+### Tests (local stack)
+
+| Suite | Result |
+|---|---|
+| `npm run test:db` | **48/48 pass**: security 15, storage 8, revisions 13, sync cursor 12 |
+| `npm test` | 14/14 |
+| `npm run typecheck`, `npm run build` | Clean |
+| `npm run test:e2e` | 31/31 (app 25, resilience 3, tabs 3) |
+
+To confirm the tests detect regressions, the local database was sabotaged twice on purpose:
+
+- RLS turned off on `children`, and clients allowed to write `rev`: 9 security tests failed.
+- The family-locked change number replaced with a plain sequence: 6 cursor tests failed, including the concurrent commit-order test.
+
+The test suite refuses to run against any non-local database, so it has never run against staging.
+
+### Known limitations
+
+- The GitHub Actions workflow (`.github/workflows/db-tests.yml`) has been reproduced locally but has not yet run on GitHub.
+- Not yet built: `verify-photo`, the purge job, account deletion, `complete_migration()`, and the WeChat identity table.
+- Staging is on the Free plan: it pauses after 7 days of inactivity and has no backups. Test data only.
 
 ---
 

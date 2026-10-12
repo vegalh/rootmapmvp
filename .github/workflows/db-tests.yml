@@ -1,0 +1,34 @@
+name: Database tests
+
+# Applies every migration in supabase/migrations to a fresh local Supabase stack and runs the database test
+# suite (tests/db) plus the existing unit tests and typecheck. Uses only the stack's built-in development
+# keys: no secrets, and nothing remote is touched.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  db-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Start local Supabase
+        run: npx supabase start -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+      - run: npm run test:db
+      - run: npm test
+      - run: npm run typecheck
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup

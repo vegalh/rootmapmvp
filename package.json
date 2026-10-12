@@ -11,20 +11,28 @@
     "format": "oxfmt",
     "typecheck": "tsc --noEmit -p .",
     "test": "node --import ./tests/loader.mjs --test \"tests/unit/*.test.ts\"",
-    "test:e2e": "node tests/e2e/run.mjs"
+    "test:e2e": "node tests/e2e/run.mjs",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "test:db": "node --import ./tests/loader.mjs --test --test-concurrency=1 \"tests/db/*.test.ts\""
   },
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
-    "tailwindcss": "^4.0.0",
-    "@tailwindcss/vite": "^4.0.0",
     "oxfmt": "^0.2.0",
+    "pg": "^8.23.1",
+    "supabase": "^2.120.0",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
     "vite": "^8.0.5"
   }
