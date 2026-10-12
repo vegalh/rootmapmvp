@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import ./tests/loader.mjs --test \"tests/unit/*.test.ts\"",
+    "test:e2e": "node tests/e2e/run.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
