@@ -786,7 +786,9 @@ The test suite refuses to run against any non-local database, so it has never ru
 
 ### Known limitations
 
-- The GitHub Actions workflow (`.github/workflows/db-tests.yml`) has been reproduced locally but has not yet run on GitHub.
+- The GitHub Actions workflow (`.github/workflows/db-tests.yml`) runs on every push to `main` and on pull requests.
+  Its first run, on commit `002dc21` (2026-10-12), passed: database tests, unit tests, and typecheck, in about
+  2 minutes, with no credentials.
 - Not yet built: `verify-photo`, the purge job, account deletion, `complete_migration()`, and the WeChat identity table.
 - Staging is on the Free plan: it pauses after 7 days of inactivity and has no backups. Test data only.
 
