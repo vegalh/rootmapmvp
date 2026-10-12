@@ -28,10 +28,13 @@ As of 2026-10-12:
     `verify-photo` Edge Function checks each one before it counts as backed up, and other devices download and
     check them. A failed photo shows "Try Again" on the Account page. `verify-photo` is deployed to staging
     (2026-10-12, after its security review).
-  - **M6 (first-login migration) is implemented and awaiting review** (not committed). A parent's guest data is
-    brought into their account after one question, uploaded by the M4/M5 sync and completed only after the server
-    re-checks it (`complete_migration()`, migration `000700`). Tested on the local stack only; migration `000700` is
-    **not applied to staging** (needs approval).
+  - **M6 (first-login migration) is done**: commit `6f3dab3`, GitHub Actions passed, public website checked. A
+    parent's guest data is brought into their account after one question, uploaded by the M4/M5 sync and completed
+    only after the server re-checks it (`complete_migration()`). Migration `000700` applied to staging 2026-10-12.
+  - **The full M7 is not planned.** Only two safety fixes were made (2026-10-12): the sign-out dialog says how many
+    items aren't backed up yet (they stay on the device and upload at the next sign-in), and sync asks Auth every
+    5 minutes (and before its first round) whether the session is still valid, so a session revoked elsewhere stops
+    uploading at once instead of when its access token expires; the app then signs out and opens the guest space.
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor and WeChat are not started.
 
@@ -994,7 +997,7 @@ with M6 / M7.)
 | Environment | Project | Region | Plan | Schema | Data |
 |---|---|---|---|---|---|
 | Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000700` | Test data only, recreated on every reset |
-| Staging | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 (does not bind production) | Free | Migrations `20261012000100`–`000600`, applied 2026-10-12 with `supabase db push --linked` | None: 0 users, 0 objects, 0 app rows |
+| Staging | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 (does not bind production) | Free | Migrations `20261012000100`–`000700`, applied 2026-10-12 with `supabase db push --linked` (`000700` after a dry run showed it was the only one pending) | None: 0 users, 0 objects, 0 app rows |
 | Production | **Not created** | Decided by the region test (section 15) | Pro | — | — |
 
 ### Phase 2B-1 implementation
@@ -1007,7 +1010,7 @@ with M6 / M7.)
 | `20261012000400_rls.sql` | RLS on all 13 tables; 35 policies; no delete policies |
 | `20261012000500_storage.sql` | Private `family-photos` bucket (15 MB; JPEG, PNG, WebP, HEIC); `private.photo_object_allowed()`; storage select and insert policies |
 | `20261012000600_grants.sql` | Nothing for `anon`; column-level insert/update for `authenticated`; no automatic grants on future objects |
-| `20261012000700_complete_migration.sql` (M6; **local only, not on staging**) | `public.complete_migration()`; the `cloud_migrations` status guard lets only that function complete an attempt |
+| `20261012000700_complete_migration.sql` (M6) | `public.complete_migration()`; the `cloud_migrations` status guard lets only that function complete an attempt |
 
 Every database change is a new migration file. An applied migration is never edited.
 

@@ -15,6 +15,8 @@ export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: Cl
   const signedIn = cloud.status === "signed-in" ? cloud : null;
   const sync = useSyncStatus();
   const imported = useGuestImport();
+  // Not yet on the server: changes and photos. They stay in this account's space and upload at the next sign-in.
+  const notBackedUp = sync.pending + sync.held + sync.failed + sync.photosWaiting;
 
   const confirm = async () => {
     setBusy(true);
@@ -39,6 +41,11 @@ export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: Cl
       {confirming && (
         <Modal title={t.signOutTitle} close={() => !busy && setConfirming(false)}>
           <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 15, lineHeight: 1.6 }}>{t.signOutBody}</p>
+          {notBackedUp > 0 && (
+            <p data-testid="signout-pending" style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.6, fontWeight: 600 }}>
+              {t.signOutPending.replace("{n}", String(notBackedUp))}
+            </p>
+          )}
           <div className="sheet-buttons even">
             <button onClick={() => setConfirming(false)} disabled={busy}>{t.cancel}</button>
             <button onClick={() => void confirm()} disabled={busy}>{t.signOut}</button>

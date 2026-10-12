@@ -8,7 +8,7 @@
 // account's family.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { API, admin, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
+import { API, KEY, admin, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
 
 const server = await startServer();
 const BASE = server.base;
@@ -199,6 +199,19 @@ try {
     assert.ok(bOnServer.every(id => id === "c-bea"), "B's family holds only B's child");
     if (!bOnServer.length) assert.ok(b.outbox.some(e => e.key === "children:c-bea"), "still queued in B's space");
   });
+
+  await step("A session revoked elsewhere (signed out everywhere) stops sync at once: the app signs out and opens the guest space; A's data stays on the device", async () => {
+    const aBefore = await dataOf(accountDb(idA));
+    const token = await page.eval(`import("/src/lib/cloud/client.ts").then(C => C.getCloudClient()).then(c => c.auth.getSession()).then(r => r.data.session.access_token)`);
+    const res = await fetch(`${API}/auth/v1/logout?scope=global`, { method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${token}` } });
+    assert.ok(res.ok, `revoked (${res.status})`);
+    // The access token itself has not expired; the next start's first sync round asks Auth and finds the session gone.
+    await u.reloaded(() => page.eval(`location.reload(); true`));
+    await u.waitCloud("signed-out");
+    await page.waitFor(`import("/src/lib/data/store.ts").then(S => S.activeSpace().kind === "guest")`, 20000, "guest space");
+    assert.equal(JSON.stringify(await u.dump("rootmap")), guestBefore);
+    assert.equal(await dataOf(accountDb(idA)), aBefore, "A's space kept as it was");
+  }, /auth\/v1\/(user|logout)/);
 } finally {
   await page?.close().catch(() => undefined);
   server.stop();

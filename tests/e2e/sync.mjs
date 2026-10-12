@@ -106,6 +106,12 @@ try {
       await waitStatus(one, `s.phase === "offline" && s.pending === 1`, "offline, one waiting");
       assert.equal((await status(one)).allBackedUp, false);
       await one.waitFor(`document.querySelector(".sync-summary")?.innerText.includes("Offline")`, 5000, "offline shown");
+      // Signing out now would leave the change on this device only: the dialog says so before anything happens.
+      await u1.click("Sign out");
+      await one.waitFor(`document.querySelector("[data-testid=signout-pending]")?.innerText.includes("Not backed up yet: 1.")`, 5000, "sign-out warning");
+      await u1.click("Cancel");
+      await one.waitFor(`!document.querySelector("[data-testid=signout-pending]")`, 5000, "dialog closed");
+      assert.equal((await u1.cloudState()).status, "signed-in");
     } finally {
       await one.send("Network.emulateNetworkConditions", { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
     }

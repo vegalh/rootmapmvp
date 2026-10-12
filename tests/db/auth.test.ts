@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ensureAccount, ensureFamily, ensureProfile } from "../../src/lib/cloud/account.ts";
-import { SESSION_KEY, authOptions, requestEmailCode, restoreSession, signOut, verifyEmailCode } from "../../src/lib/cloud/auth.ts";
+import { SESSION_KEY, authOptions, requestEmailCode, restoreSession, sessionValid, signOut, verifyEmailCode } from "../../src/lib/cloud/auth.ts";
 import type { KeyValueStore } from "../../src/lib/platform/index.ts";
 import { anonClient, dbConnection, localEnv, localMailUrl, must, serviceClient } from "./helpers.ts";
 
@@ -273,6 +273,25 @@ describe("sign-out", () => {
 
     // The other device is unaffected.
     assert.equal((await ensureAccount(b.client)).familyId, familyId);
+  });
+
+  it("a session revoked elsewhere is known at once, while its access token would still work (sync checks this)", async () => {
+    const email = newEmail("revoked");
+    const a = await signedIn("revoked", email);
+    await sleep(1100);
+    const b = await signedIn("revoked", email);
+    const { familyId } = await ensureAccount(a.client);
+    assert.equal(await sessionValid(a.client), true);
+
+    // Signing out everywhere (from the other device) revokes a's session on the server.
+    must(await b.client.auth.signOut({ scope: "global" }));
+    const read = await a.client.from("families").select("id").eq("id", familyId);
+    assert.equal(read.data?.length, 1, "the access token alone is still accepted until it expires");
+    assert.equal(await sessionValid(a.client), false, "Auth knows the session is gone");
+
+    // Unreachable server: unknown, never "signed out".
+    const away = device(OFFLINE_URL, (await signedIn("revoked-offline")).store);
+    assert.equal(await sessionValid(away.client), "unknown");
   });
 
   it("offline: the session is still removed from the device", async () => {

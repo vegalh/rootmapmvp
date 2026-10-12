@@ -118,6 +118,20 @@ export async function storedUser(storage: KeyValueStore): Promise<StoredUser | n
   }
 }
 
+// Whether the server still accepts this device's session. An access token keeps working until it expires (up to an
+// hour) even after its session was revoked (signed out everywhere) or its account removed; Auth itself knows at
+// once. "unknown" when the server can't be reached or has a problem of its own: that never signs anyone out.
+export async function sessionValid(client: SupabaseClient): Promise<boolean | "unknown"> {
+  try {
+    const { error } = await client.auth.getUser();
+    if (!error) return true;
+    if (error.name === "AuthSessionMissingError" || error.status === 401 || error.status === 403 || error.status === 404) return false;
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 // Signs out of this device: the server revokes this session's refresh token, and the stored session is removed.
 // Other devices stay signed in. If the server can't be reached the stored session is still removed (supabase-js
 // does this in every case; checked below), so nothing on this device can use it again; `serverRevoked` is false.

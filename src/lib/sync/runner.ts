@@ -1,4 +1,6 @@
+import { sessionValid } from "../cloud/auth";
 import { getCloudClient } from "../cloud/client";
+import { signOutHere } from "../cloud/session";
 import { cloudConfig } from "../cloud/config";
 import { initialChildren } from "../../data/children";
 import { initialObservations, initialRecords } from "../../data/progress";
@@ -126,6 +128,8 @@ export async function retryPhotos(): Promise<boolean> {
 const DEBOUNCE_MS = 1500;
 const INTERVAL_MS = 30_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
+// How often sync asks Auth whether the session is still valid (also before the first round).
+const SESSION_CHECK_MS = 5 * 60_000;
 
 // Starts syncing; returns the function that stops it. Only for the open account space of `userId`.
 export function startSync({ userId, familyId }: { userId: string; familyId: string }): () => void {
@@ -136,6 +140,7 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   let again = false;
   let timer: number | undefined;
   let failures = 0;
+  let sessionCheckedAt = 0;
   let seenOutbox = outboxSignature();
 
   const schedule = (ms: number) => {
@@ -147,6 +152,13 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   async function round() {
     const client = await getCloudClient();
     if (!client) return;
+    // A session the server no longer accepts uploads nothing more: sign out here, and the app reopens the guest
+    // space (App.tsx). Everything stays on this device for when the parent signs in again.
+    if (Date.now() - sessionCheckedAt >= SESSION_CHECK_MS) {
+      const valid = await sessionValid(client);
+      if (valid === false) { stopped = true; await signOutHere(); return; }
+      if (valid === true) sessionCheckedAt = Date.now();
+    }
     const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
     const go = async () => {
       phase = "syncing"; update();
