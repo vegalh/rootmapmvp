@@ -1,0 +1,10 @@
+<!-- RootMap sign-in code (Phase 2B-2). Used for both new and returning parents. The app asks for the
+     6-digit code; there is deliberately no sign-in link, so the iOS app never has to hand off to Safari. -->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #3b2a1a; max-width: 480px;">
+  <p>Your RootMap sign-in code:</p>
+  <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 16px 0;">{{ .Token }}</p>
+  <p>Enter it in RootMap to continue. If you did not ask for this code, you can ignore this email.</p>
+  <hr style="border: 0; border-top: 1px solid #eee1d0; margin: 24px 0;" />
+  <p>你的 RootMap 登录验证码：<strong>{{ .Token }}</strong></p>
+  <p>请在 RootMap 中输入此验证码。如果这不是你本人的操作，请忽略这封邮件。</p>
+</div>

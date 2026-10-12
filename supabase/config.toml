@@ -244,6 +244,17 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# RootMap signs in with a typed 6-digit code, never a link (docs/data-architecture-phase2.md, section 9).
+# New parents get the "confirmation" email, returning parents the "magic_link" one; both show only the code.
+# Local stack only: staging gets the same templates in Phase 2B-2 M2, with approval.
+[auth.email.template.confirmation]
+subject = "Your RootMap code / RootMap 验证码"
+content_path = "./supabase/templates/email-code.html"
+
+[auth.email.template.magic_link]
+subject = "Your RootMap code / RootMap 验证码"
+content_path = "./supabase/templates/email-code.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

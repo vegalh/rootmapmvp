@@ -25,7 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Start local Supabase
-        run: npx supabase start -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+        # Mailpit stays on: the sign-in tests (tests/db/auth.test.ts) read the emailed codes from it.
+        run: npx supabase start -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
       - run: npm run test:db
       - run: npm test
       - run: npm run typecheck

@@ -16,9 +16,11 @@ As of 2026-10-12:
   - Nothing in `src/` talks to the cloud.
   - Local data (IndexedDB, Phase 1) works exactly as before.
 - **Phase 2B-2 (accounts and sync) is in progress**, in milestones M0–M7 (section 18).
-  - **M0 (groundwork) is implemented and awaiting review.** Cloud settings (off by default, locked off for the
-    public website), platform adapters, screens that follow store changes, and uuid ids for goals and repeated
-    plans. Still no Supabase calls from the app.
+  - **M0 (groundwork) is done**: commit `cdda37c`, GitHub Actions passed. Cloud settings (off by default, locked
+    off for the public website), platform adapters, screens that follow store changes, uuid ids.
+  - **M1 (account foundation) is implemented and awaiting review.** Email-code sign-in, session restore and
+    refresh, sign-out, and the family and profile on first sign-in (`src/lib/cloud/`), tested against the local
+    stack. No screen uses it yet, and the public website does not contain it.
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
@@ -738,14 +740,42 @@ Records already on the device are never uploaded before M6 has checked them.
 
 | Milestone | Scope | Status |
 |---|---|---|
-| M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | Implemented, awaiting review |
-| M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | Not started |
+| M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | **Done** (`cdda37c`) |
+| M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | Implemented, awaiting review |
 | M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | Not started |
 | M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Not started |
 | M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Not started |
 | M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Not started |
 | M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
 | M7 Sign-out and reliability | Sign-out choices, account switching, full re-sync, sync status | Not started |
+
+**M1 implementation notes.**
+
+- `src/lib/cloud/auth.ts`: `requestEmailCode` / `verifyEmailCode` (account created on first use, so "create" and
+  "log in" are one flow), `restoreSession`, `signOut`, and `authFailure`, which turns server errors into a few
+  explainable failures (`code-rejected`, `rate-limited`, `offline`, …). `account.ts`: `ensureFamily`,
+  `ensureProfile`, `ensureAccount`. Both take the Supabase client, so the tests run the app's own code.
+  `session.ts`: the app-wide sign-in state and the actions M2's screens will call. `client.ts`: the lazily loaded
+  client.
+- **Supabase is not in the public bundle.** It is imported lazily, behind a condition Vite decides at build time.
+- **Family and profile setup are idempotent without a new migration.** The client looks for its membership first.
+  It calls `create_family()` only if there is none, and looks again if a parallel device won the race. The profile is
+  inserted with `on conflict do nothing`, so an existing profile is never changed. Nothing local is uploaded: the
+  family has no name and the profile only its owner.
+- **Restore is offline-first.** An unreachable server keeps the parent signed in, using the user stored with the
+  session (M3 needs that id to open the account's local space). A session the server rejects means signed out.
+- **Sign-out** uses scope `local`. The server revokes this device's refresh token and other devices stay signed in.
+  The stored session is removed even when the server cannot be reached.
+- The client uses the implicit flow: with PKCE, every code request would leave an unused verifier in storage. The
+  Apple / Google redirect sign-in (M2) switches to PKCE.
+- The local stack's emails show only the code (`supabase/templates/email-code.html`, English and Chinese).
+  **Staging still sends links:** its templates are changed in M2, with approval.
+- **Known limitations.**
+  - An access token already issued stays valid until it expires (`jwt_expiry`, 1 hour), even after sign-out; the
+    device no longer holds it.
+  - Code expiry is the server's `otp_expiry` (1 hour locally). It is not covered by a test; M2 sets the expiry
+    for staging.
+  - Sign-in state is per tab until M7.
 
 **Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the

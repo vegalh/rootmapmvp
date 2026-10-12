@@ -10,6 +10,7 @@ import pg from "pg";
 type Env = { url: string; anonKey: string; serviceKey: string; dbUrl: string };
 
 let env: Env | undefined;
+let mail: string | undefined;
 
 export function localEnv(): Env {
   if (env) return env;
@@ -29,7 +30,16 @@ export function localEnv(): Env {
   const local = (u: string) => ["127.0.0.1", "localhost", "[::1]"].includes(new URL(u).hostname);
   if (!local(next.url) || !local(next.dbUrl)) throw new Error(`Refusing to run database tests against a non-local stack (${next.url})`);
   env = next;
+  mail = status.MAILPIT_URL ?? status.INBUCKET_URL;
+  if (mail && !local(mail)) mail = undefined;
   return env;
+}
+
+// The local stack's test inbox (Mailpit), where sign-in codes arrive. Refused unless it is on this machine.
+export function localMailUrl(): string {
+  localEnv();
+  if (!mail) throw new Error("The local stack's mail service (Mailpit) is not running. Start the stack without excluding mailpit.");
+  return mail;
 }
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
