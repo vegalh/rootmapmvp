@@ -17,6 +17,8 @@ import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
+import { AccountPage } from "./pages/AccountPage";
+import OpeningExperience from "./components/OpeningExperience";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { useCollection, useSetting } from "./lib/data/hooks";
@@ -24,6 +26,10 @@ import { backupData, dataMode, restoreData } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
+import { cloudConfig } from "./lib/cloud/config";
+import { useCloudState } from "./lib/cloud/hooks";
+import { confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
+import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
@@ -55,6 +61,10 @@ const seedIds = [
 // in production builds this is null and the component isn't bundled.
 const OpeningPreview = import.meta.env.DEV ? lazy(() => import("./dev/OpeningPreview")) : null;
 const previewOpening = import.meta.env.DEV && new URLSearchParams(window.location.search).has("opening");
+
+// The sign-in actions the opening screens use (Phase 2B-2 M2). Signing in only creates the session and the empty
+// family and profile on the server; nothing on this device is uploaded, moved or changed.
+const openingAuth = { sendCode: sendSignInCode, confirmCode: confirmSignInCode };
 
 // Set just before the reload that follows a restore, so the reloaded app can confirm it.
 const JUST_RESTORED_KEY = "rootmap-just-restored";
@@ -108,6 +118,17 @@ export default function App() {
   const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
   const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
+
+  // Sign-in state (always "off" on the public website). New devices see the Welcome screen until the parent signs in
+  // or continues without an account; devices that already have RootMap data open straight into the app. Decided
+  // before the app records its first run (see lib/welcome.ts).
+  const cloud = useCloudState();
+  const [welcome, setWelcome] = useSetting<WelcomeState>(WELCOME_KEY, "");
+  const [welcomeStart] = useState(() => (cloudConfig.enabled ? welcomeAtStart() : "skip"));
+  useEffect(() => {
+    if (welcomeStart === "show" && welcome === "") setWelcome("pending");
+  }, [welcomeStart, welcome, setWelcome]);
+  const showWelcome = welcomeStart === "show" && welcome !== "done" && cloud.status !== "signed-in";
 
   // When the bundled seed data changes (SEED_VERSION bumped), merge in new demo items without touching anything
   // already on the device (see mergeSeed). The parent's profile and all their own data are never reset.
@@ -221,6 +242,18 @@ export default function App() {
     else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
   };
 
+  const signedIn = (email: string) => {
+    if (welcomeStart === "show") setWelcome("done");
+    if (screen === "signIn") go("profile");
+    setToast(t.signedInAs.replace("{email}", email));
+  };
+  // Signs out of this device only. Everything stored on the device stays as it is.
+  const signOut = async () => {
+    await signOutHere();
+    go("profile");
+    setToast(t.signedOut);
+  };
+
   const content = () => {
     if (screen === "children") {
       return (
@@ -264,7 +297,8 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} cloud={cloud} t={t} />;
+    if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} t={t} />;
     if (screen === "child") {
       return (
         <ChildProfilePage
@@ -458,6 +492,24 @@ export default function App() {
     }
     return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
+
+  if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {
+    const fromProfile = !showWelcome;
+    return (
+      <div className="opening-screen">
+        <div>
+          <OpeningExperience
+            lang={lang}
+            setLang={setLang}
+            startAt={fromProfile ? "final" : "animation"}
+            auth={openingAuth}
+            onSignedIn={signedIn}
+            onContinueAsGuest={() => (fromProfile ? go("profile") : setWelcome("done"))}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (OpeningPreview && previewOpening) {
     return <Suspense fallback={null}><OpeningPreview lang={lang} setLang={setLang} /></Suspense>;

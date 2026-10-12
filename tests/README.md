@@ -25,7 +25,7 @@ drive headless Chrome over the DevTools protocol with Node's built-in WebSocket.
   - IndexedDB that won't open after migration (the app shows the bilingual Try Again message).
   - Restoring from a backup.
 - `tabs.mjs`: two tabs starting the app for the first time at the same moment.
-- `cloud.mjs` (separate: `npm run test:e2e:cloud`, needs the local Supabase stack): the app with cloud features on. No request without a session; email-code sign-in creates the family and profile; a reload restores the session; sign-out removes it; local data identical throughout.
+- `cloud.mjs` (separate: `npm run test:e2e:cloud`, needs the local Supabase stack): the app with cloud features on, through its screens. Welcome on a new device (English and Chinese; no password, phone or social buttons); invalid email; offline; wrong and expired codes; new-account sign-in creates the family and profile and uploads nothing; a reload restores the session; Sign out from Profile; returning sign-in reaches the same family; "Continue without an account"; a device with RootMap data skips Welcome. Local data identical throughout.
 - `reactive.mjs`: changes written to the store outside any screen (children, a soft delete, the language setting, a plan) appear without a reload; a confirmed save is shown only once stored; new goals and repeated plans get `<prefix>-<uuid>` ids.
 
 Every step also fails on any console error, uncaught exception or failed network request.

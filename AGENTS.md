@@ -28,19 +28,21 @@ This is the canonical project structure. Start with task-relevant files below. O
     - `schema.ts` - IndexedDB stores, legacy key names, id helpers. `legacy.ts` / `migrate.ts` - One-time migration from localStorage. `records.ts` - Per-record diffing and timestamps.
   - `storage.ts` - localStorage primitives and storage-error reporting (`onStorageError`).
   - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
+  - `welcome.ts` - Whether this device still shows the Welcome screen (new devices only, cloud builds only).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
-  - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state (not shown in any screen yet).
+  - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state; `hooks.ts` `useCloudState()` for screens.
   - `platform/` - The only code that differs between the website and the future iOS app (session storage, saving a file). Web adapters only so far.
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
   - `TreeLogo.tsx` - RootMap brand logo.
   - `ui.tsx` - Shared UI atoms: `PageHeader`, `BottomNav`, `Shell`, `FilterSelect`, `Field`, `Modal`, `Empty`, `NotificationToggle`.
+  - `OpeningExperience.tsx` - Opening animation, Welcome and the email + 6-digit code sign-in screens.
   - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
   - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
-  - `ChildrenPage.tsx`, `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
+  - `ChildrenPage.tsx`, `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, Sign out), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts

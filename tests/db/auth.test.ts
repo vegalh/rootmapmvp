@@ -9,7 +9,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ensureAccount, ensureFamily, ensureProfile } from "../../src/lib/cloud/account.ts";
 import { SESSION_KEY, authOptions, requestEmailCode, restoreSession, signOut, verifyEmailCode } from "../../src/lib/cloud/auth.ts";
 import type { KeyValueStore } from "../../src/lib/platform/index.ts";
-import { anonClient, localEnv, localMailUrl, must, serviceClient } from "./helpers.ts";
+import { anonClient, dbConnection, localEnv, localMailUrl, must, serviceClient } from "./helpers.ts";
 
 // The platform session store, in memory: one per simulated device.
 class MemStore implements KeyValueStore {
@@ -107,6 +107,28 @@ describe("email code sign-in", () => {
     assert.deepEqual(await verifyEmailCode(d.client, email, wrong), { ok: false, failure: "code-rejected" });
     assert.equal(d.store.m.size, 0);
     assert.equal((await d.client.auth.getSession()).data.session, null);
+  });
+
+  it("a code older than the expiry (otp_expiry, 1 hour) is rejected, even though it is otherwise right", async () => {
+    for (const returning of [false, true]) {
+      const email = newEmail(returning ? "expired-returning" : "expired-new");
+      // Codes for one address can be requested at most once a second.
+      if (returning) { await signedIn("expired-first", email); await sleep(1100); }
+      const d = device();
+      const code = await emailedCode(d, email);
+      // Waiting an hour is not practical: move the code's send time back 61 minutes instead (local stack only).
+      const db = await dbConnection();
+      try {
+        const { rowCount } = await db.query(
+          "update auth.users set confirmation_sent_at = confirmation_sent_at - interval '61 minutes', recovery_sent_at = recovery_sent_at - interval '61 minutes' where email = $1",
+          [email]);
+        assert.equal(rowCount, 1);
+      } finally {
+        await db.end();
+      }
+      assert.deepEqual(await verifyEmailCode(d.client, email, code), { ok: false, failure: "code-rejected" });
+      assert.equal(d.store.m.size, 0);
+    }
   });
 
   it("a code works only once", async () => {

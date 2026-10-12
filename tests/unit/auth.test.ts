@@ -38,3 +38,13 @@ test("the session lives in the platform store, refreshes itself, and is never re
   assert.equal(o.autoRefreshToken, true);
   assert.equal(o.detectSessionInUrl, false);
 });
+
+test("Welcome: new devices see it until the parent chooses; devices with RootMap data never do", async () => {
+  const { welcomeDecision } = await import("../../src/lib/welcome.ts");
+  const fresh = () => false, used = () => true;
+  assert.equal(welcomeDecision("", fresh), "show");
+  assert.equal(welcomeDecision("", used), "skip");
+  // A reload in the middle of Welcome still shows it, even though the app has recorded its first run by then.
+  assert.equal(welcomeDecision("pending", used), "show");
+  assert.equal(welcomeDecision("done", fresh), "skip");
+});

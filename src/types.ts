@@ -189,6 +189,8 @@ export type Screen =
   | "privacy"
   | "help"
   | "backup"
-  | "deletedChildren";
+  | "deletedChildren"
+  | "account"
+  | "signIn";
 
 export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | "tried" | null;

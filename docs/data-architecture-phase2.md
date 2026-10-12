@@ -18,9 +18,11 @@ As of 2026-10-12:
 - **Phase 2B-2 (accounts and sync) is in progress**, in milestones M0–M7 (section 18).
   - **M0 (groundwork) is done**: commit `cdda37c`, GitHub Actions passed. Cloud settings (off by default, locked
     off for the public website), platform adapters, screens that follow store changes, uuid ids.
-  - **M1 (account foundation) is implemented and awaiting review.** Email-code sign-in, session restore and
-    refresh, sign-out, and the family and profile on first sign-in (`src/lib/cloud/`), tested against the local
-    stack. No screen uses it yet, and the public website does not contain it.
+  - **M1 (account foundation) is done**: commit `ae9f0f6`, GitHub Actions passed. Email-code sign-in, session
+    restore and refresh, sign-out, and the family and profile on first sign-in (`src/lib/cloud/`).
+  - **M2 (sign-in screens) is implemented and awaiting review.** Welcome on new devices, email + 6-digit code,
+    "Continue without an account", account and Sign out in Profile, English and Chinese. Only in builds with cloud
+    features; the public website is unchanged. Staging email settings are proposed, not applied (see M2 notes).
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
@@ -741,8 +743,8 @@ Records already on the device are never uploaded before M6 has checked them.
 | Milestone | Scope | Status |
 |---|---|---|
 | M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | **Done** (`cdda37c`) |
-| M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | Implemented, awaiting review |
-| M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | Not started |
+| M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | **Done** (`ae9f0f6`) |
+| M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | Implemented, awaiting review |
 | M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Not started |
 | M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Not started |
 | M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Not started |
@@ -767,7 +769,7 @@ Records already on the device are never uploaded before M6 has checked them.
 - **Sign-out** uses scope `local`. The server revokes this device's refresh token and other devices stay signed in.
   The stored session is removed even when the server cannot be reached.
 - The client uses the implicit flow: with PKCE, every code request would leave an unused verifier in storage. The
-  Apple / Google redirect sign-in (M2) switches to PKCE.
+  Apple / Google redirect sign-in (a later phase) will use PKCE.
 - The local stack's emails show only the code (`supabase/templates/email-code.html`, English and Chinese).
   **Staging still sends links:** its templates are changed in M2, with approval.
 - **Known limitations.**
@@ -777,7 +779,35 @@ Records already on the device are never uploaded before M6 has checked them.
     for staging.
   - Sign-in state is per tab until M7.
 
-**Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
+**M2 implementation notes.**
+
+- **Screens.** `OpeningExperience` (unchanged animation and look) now has Welcome → email → code. "Create an
+  account" and "I already have an account" are the same flow with different words. The code is checked as soon as
+  six digits are typed or pasted; "Send a new code" waits 60 seconds. WeChat and Apple buttons are hidden
+  (`SOCIAL_PROVIDERS` is empty); Google is not built. No password or phone fields remain.
+- **Who sees Welcome** (`src/lib/welcome.ts`), only in builds with cloud features:
+  - a new device (no seed version recorded, nothing of the parent's own) sees it until the parent signs in or taps
+    "Continue without an account"; a reload in between shows it again;
+  - a device that already has RootMap data opens straight into the app, and nothing is written for it;
+  - the device setting `rootmap-welcome` (`pending` / `done`) is not part of backups.
+- **Profile.** The Account group gets "RootMap Account" (email; Sign out with a confirmation) or "Sign in or
+  create an account", which opens the same sign-in screens. The row does not exist on the public website.
+- **Data.** Signing in or out changes nothing stored locally (the browser test compares IndexedDB before and after
+  each step). Only auth, the membership check, `create_family` and the empty profile are sent; no records, no
+  photos. After sign-out the same local data stays visible: separating guest and account data is M3.
+- **Errors** are shown in plain words: invalid email, wrong or expired code (Supabase reports both the same way),
+  too many tries, no connection ("Everything on this device is safe"), sign-in unavailable.
+- **Not changed:** PKCE / OAuth (with Google and Apple, later), the database, the OTP expiry.
+- **Staging (proposed, not applied; needs the owner's approval).** Staging emails still contain a link. To send
+  the same 6-digit code as the local stack:
+  1. Email templates "Confirm signup" (new parents) and "Magic Link" (returning parents): subject
+     `Your RootMap code / RootMap 验证码`, body `supabase/templates/email-code.html` (shows `{{ .Token }}`, no link).
+  2. Email OTP length: 6 (check the current value; change only if different).
+  3. OTP expiry: **unchanged** (3600 seconds).
+  Done in the dashboard (Authentication → Emails / Sign In / Providers → Email). `supabase config push` is not
+  used, because it would also push the local stack's other settings (site URL, rate limits).
+
+ uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the
 app. The public website keeps cloud features off. After sign-out, "continue without an account" starts a fresh guest
 space and never shows another account's data.

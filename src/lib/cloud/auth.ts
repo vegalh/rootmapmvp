@@ -11,7 +11,7 @@ export const SESSION_KEY = "auth";
 // Auth options for every RootMap client. The session is kept in the platform's store and refreshed automatically.
 // Sign-in never comes back through a URL (codes are typed), so URL detection is off, and so is PKCE: with PKCE,
 // every code request leaves a verifier in the store that a typed code never uses. The Apple / Google redirect
-// sign-in on the website (M2) switches to PKCE for that flow.
+// sign-in on the website (a later phase) will use PKCE for that flow.
 export const authOptions = (storage: KeyValueStore) => ({
   storage,
   storageKey: SESSION_KEY,
