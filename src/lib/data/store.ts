@@ -44,6 +44,14 @@ const cache = {
   drafts: new Map<string, EntryDraft>(),
 };
 const photoUrls = new Map<string, string>();
+
+// What screens show. `cache` is the working copy every write updates at once; `published` is the state screens
+// render, and listeners are told whenever it changes. An ordinary write is published immediately; a write with
+// `rollback` (a save that shows a confirmation) is published only once it is stored, so a failed save never
+// appears on screen. Any write is published this way, whoever makes it (a screen, a restore, a future sync).
+type Published = { collections: { [K in CollectionName]: Collections[K][] }; settings: Map<string, unknown> };
+let published: Published = { collections: { ...cache.collections }, settings: new Map() };
+const listeners = new Set<() => void>();
 // localStorage mode only: items that could not become records (see legacy.ts), written back unchanged with
 // their key so the fallback backend never drops anything it could not understand.
 let legacyExtras = new Map<string, unknown[]>();
@@ -114,6 +122,7 @@ async function hydrate(source: IDBDatabase) {
   for (const url of photoUrls.values()) URL.revokeObjectURL(url);
   photoUrls.clear();
   for (const p of await getAll<PhotoBlob>(source, "photoBlobs")) photoUrls.set(p.id, URL.createObjectURL(p.blob));
+  publish();
 }
 
 // Runs on the original localStorage data, interpreted exactly as before (same defaults for missing values).
@@ -139,6 +148,7 @@ function startLegacy(reason: string): DataStatus {
     if (item.reason === "unreadable" || item.reason === "earlier-unreadable-copy" || item.reason === "unrecognized-key") continue;
     legacyExtras.set(item.source, [...(legacyExtras.get(item.source) || []), item.value]);
   }
+  publish();
   return { mode };
 }
 
@@ -165,11 +175,28 @@ export const listByChild = <K extends "records" | "observations" | "entries">(na
   getCollection(name).filter(r => r.childId === childId && !r.deletedAt);
 
 // The stored value, or `fallback` when absent or of another shape (array vs. object vs. primitive).
-export function readSetting<T>(key: string, fallback: T): T {
-  if (!cache.settings.has(key)) return fallback;
-  const value = cache.settings.get(key);
+export const readSetting = <T>(key: string, fallback: T): T => settingFrom(cache.settings, key, fallback);
+
+function settingFrom<T>(settings: Map<string, unknown>, key: string, fallback: T): T {
+  if (!settings.has(key)) return fallback;
+  const value = settings.get(key);
   const sameShape = value !== null && Array.isArray(value) === Array.isArray(fallback) && typeof value === typeof fallback;
   return sameShape ? (value as T) : fallback;
+}
+
+// The published state (see `published`), for React's useSyncExternalStore. Each value keeps its identity until
+// it changes, so a screen re-renders only when its own data did.
+export const publishedCollection = <K extends CollectionName>(name: K): Collections[K][] => published.collections[name];
+export const publishedSetting = <T>(key: string, fallback: T): T => settingFrom(published.settings, key, fallback);
+
+export function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
+function publish() {
+  published = { collections: { ...cache.collections }, settings: new Map(cache.settings) };
+  for (const listener of [...listeners]) listener();
 }
 
 export const readDraftValue = (key: string) => cache.drafts.get(key);
@@ -212,32 +239,34 @@ function applyToCache(change: Change) {
 }
 
 // Persists a change. Resolves to null only once the data is stored; otherwise to the reason it was not.
-// Memory is updated immediately (so every screen agrees); with `rollback` a failed change is taken back out.
-// The IndexedDB transaction is started synchronously, before this function first yields, so a write begun
-// while the page is closing is already queued.
+// Memory is updated immediately. Without `rollback` the change is also shown at once, and stays shown if saving
+// fails (the failure is reported instead). With `rollback` it is shown only once stored, and a failed change is
+// taken back out. The IndexedDB transaction is started synchronously, before this function first yields, so a
+// write begun while the page is closing is already queued.
 export function write(change: Change, { rollback = false } = {}): Promise<StorageFailure | null> {
   const undo = applyToCache(change);
-  const fail = (failure: StorageFailure) => {
-    if (rollback) undo();
+  if (!rollback) publish();
+  const settle = (failure: StorageFailure | null) => {
+    if (rollback) {
+      if (failure) undo();
+      publish();
+    }
     return failure;
   };
-  if (mode === "localStorage") {
-    const failure = writeLegacy(change);
-    return Promise.resolve(failure ? fail(failure) : null);
-  }
-  if (!Object.keys(change.collections || {}).length && !change.settings?.length && !change.drafts?.length) return Promise.resolve(null);
+  if (mode === "localStorage") return Promise.resolve(settle(writeLegacy(change)));
+  if (!Object.keys(change.collections || {}).length && !change.settings?.length && !change.drafts?.length) return Promise.resolve(settle(null));
   let tx: IDBTransaction;
   try {
     tx = transactionFor(change);
   } catch (e) {
-    return Promise.resolve(fail(failureOf(e)));
+    return Promise.resolve(settle(failureOf(e)));
   }
   return done(tx).then(
     () => {
       if (change.drafts) clearRescue(change.drafts.map(([key]) => key));
-      return null;
+      return settle(null);
     },
-    e => fail(failureOf(e)),
+    e => settle(failureOf(e)),
   );
 }
 

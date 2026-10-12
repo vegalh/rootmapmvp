@@ -6,3 +6,4 @@ dist/
 # Local secrets (Supabase keys, database passwords) never go in the repo
 .env
 .env.*
+!.env.example

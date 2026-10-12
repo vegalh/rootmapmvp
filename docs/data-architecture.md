@@ -21,7 +21,9 @@ Store           src/lib/data/store.ts     loads everything once at start (initDa
    └── localStorage backend (only until the one-time migration has succeeded on this device)
 ```
 
-Screens never call a storage API. `set` updates at once and saves in the background (a failure shows a toast).
+Screens never call a storage API. Hooks read the store's *published* state (`useSyncExternalStore`), so any
+`write`, including one not made by a screen (a restore, the future cloud sync), appears on every mounted screen
+without a reload. `set` updates at once and saves in the background (a failure shows a toast).
 `commit` resolves only after the write has really been stored, so "Saved" is never shown for data that wasn't kept.
 
 ## IndexedDB layout (`rootmap`, version 1)
@@ -152,6 +154,10 @@ and two default saved activities. `origin` records only what is reliably known:
 - Photos removed from an entry or draft (and avatars picked but not saved) stay in storage as orphans until a
   cleanup is added together with sync.
 - All photo object URLs are created at start-up. Fine for hundreds of photos; for thousands, load them on demand.
+- A confirmed save (`commit`) is shown only once stored, but a background `set` that lands during those few
+  milliseconds publishes the whole collection, including the pending save, slightly early. If that save then
+  fails, it can stay on screen (not stored) until the next reload. Rare and accepted in 2B-2 M0; the sync engine
+  must not treat what is on screen as stored (it reads the outbox).
 - Two open tabs each keep their own in-memory copy; a change in one tab appears in the other after a reload.
   Writes are per record, so one tab no longer overwrites the other's whole list.
 

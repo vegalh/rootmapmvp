@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:staging": "vite --mode staging",
     "build": "vite build",
+    "build:staging": "vite build --mode staging",
     "preview": "vite preview",
     "format": "oxfmt",
     "typecheck": "tsc --noEmit -p .",

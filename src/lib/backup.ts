@@ -1,6 +1,8 @@
 // Backup & Restore: a versioned JSON snapshot of the parent's RootMap data, keyed by the original localStorage
 // key names with photos inline, so files from before and after the IndexedDB move are interchangeable.
-// Framework-agnostic and dependency-free (it takes the data or Storage to use), so it can be tested outside the browser.
+// Framework-agnostic (it takes the data or Storage to use), so it can be tested outside the browser.
+
+import { platform } from "./platform";
 
 export const BACKUP_FORMAT = "rootmap-backup";
 export const BACKUP_VERSION = 1;
@@ -188,22 +190,10 @@ export function applyBackup(storage: Storage, backup: BackupFile): { ok: true } 
 export const backupFileName = (prefix: string, now = new Date()) =>
   `${prefix}-${now.toISOString().slice(0, 19).replace(/[T:]/g, "-")}.json`;
 
-// Hands a file to the browser's download manager. Throws if the browser refuses; browsers do not report
-// whether the file was actually saved, so callers ask the parent to confirm when that matters.
+// Hands a file to the parent (a download on the website; see lib/platform). Throws if the browser refuses;
+// browsers do not report whether the file was actually saved, so callers ask the parent to confirm when that matters.
 export function downloadText(fileName: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } finally {
-    // Revoking immediately can cancel the download in some browsers.
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }
+  void platform.saveFile(fileName, new Blob([text], { type: "application/json" }));
 }
 
 // Builds a backup of the given data, checks it reads back as a valid backup, and downloads it.

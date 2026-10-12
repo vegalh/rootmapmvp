@@ -31,6 +31,8 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
+  - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`. Nothing in the app calls Supabase yet.
+  - `platform/` - The only code that differs between the website and the future iOS app (session storage, saving a file). Web adapters only so far.
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
   - `TreeLogo.tsx` - RootMap brand logo.
@@ -55,6 +57,7 @@ This is the canonical project structure. Start with task-relevant files below. O
 - **Add a new page/screen**: create a file in `src/pages/`, add its name to the `Screen` union in [src/types.ts](src/types.ts), and wire it into the `content()` switch in [src/App.tsx](src/App.tsx).
 - **Change translation text**: edit `copy.en` / `copy.zh` in [src/lib/i18n.ts](src/lib/i18n.ts).
 - **Show a stored photo** (child, profile, entry): `<img src={photoUrl(ref)} />`; photo fields hold ids, not URLs.
+- **Cloud settings for development or staging**: copy the relevant block of [.env.example](.env.example) into `.env.development.local` or `.env.staging.local` (git-ignored). Never put a secret key in a `VITE_` variable; the dev server and build refuse it.
 - **Add a persisted collection or setting**: add it to [src/lib/data/schema.ts](src/lib/data/schema.ts) (a new object store needs a `DB_VERSION` bump and an upgrade step in `idb.ts`) and read it with `useCollection` / `useSetting`.
 
 ## Dependencies

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { newRecordId } from "../lib/data/schema";
 import { readSetting } from "../lib/data/store";
 import { Icon } from "../components/Icon";
 import { PageHeader } from "../components/ui";
@@ -54,7 +55,7 @@ export function GoalsPage({ goals, setGoals, back, openNotes, t }: {
         <GoalForm
           submitLabel={t.addGoal}
           onSubmit={(title, description) => {
-            setGoals([{ id: `g-${Date.now()}`, title, description: description || undefined, completed: false, createdAt: new Date().toISOString() }, ...goals]);
+            setGoals([{ id: newRecordId("g"), title, description: description || undefined, completed: false, createdAt: new Date().toISOString() }, ...goals]);
             setAdding(false);
           }}
           onCancel={() => setAdding(false)}

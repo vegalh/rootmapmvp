@@ -1,7 +1,8 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import { assertSafeClientEnv } from './src/lib/cloud/environment'
 
 const siteConfiguration = {
   title: 'RootMap',
@@ -13,6 +14,11 @@ const siteConfiguration = {
 export default defineConfig(({ mode }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  // Refuses secret keys in client variables, and cloud features in the public website (src/lib/cloud/environment.ts).
+  assertSafeClientEnv(loadEnv(mode, process.cwd(), 'VITE_'), {
+    mode,
+    publicSite: Boolean(process.env.GITHUB_PAGES || process.env.FIGMA_PUBLIC_URL),
+  })
 
   return {
     base: process.env.FIGMA_PUBLIC_URL

@@ -1,12 +1,15 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { reportStorageError, type StorageFailure } from "../storage";
-import { applyChanges, diffCollection } from "./records";
-import { defaults, getCollection, readSetting, write, type Change } from "./store";
+import { diffCollection } from "./records";
+import { defaults, publishedCollection, publishedSetting, subscribe, write, type Change } from "./store";
 import type { CollectionName, Collections } from "./schema";
 
 // React bindings for the data layer. They mirror the old localStorage hook: screens get plain arrays and
 // values, `set` updates at once and saves in the background (a failure is reported, see onStorageError), and
 // `commit` resolves to null only after the change is stored, for saves that show a confirmation.
+//
+// Screens read the store's published state, so a change made anywhere (another screen, a restore, a future
+// cloud sync calling `write`) appears on every mounted screen without a reload.
 
 const seedIds: Partial<Record<CollectionName, Set<string>>> = {
   children: new Set(defaults.children.map(x => x.id)),
@@ -18,47 +21,42 @@ const originFor = (name: CollectionName) => (r: { id: string }) => (seedIds[name
 
 export function useCollection<K extends CollectionName>(name: K) {
   type T = Collections[K];
-  const [all, setAll] = useState<T[]>(() => getCollection(name));
-  // Latest records, including changes not rendered yet, so quick successive updates build on each other.
-  const latest = useRef(all);
+  const getSnapshot = useCallback(() => publishedCollection(name), [name]);
+  const all = useSyncExternalStore(subscribe, getSnapshot);
   const items = useMemo(() => all.filter(r => !r.deletedAt), [all]);
   // Soft-deleted records (for children: the Recently Deleted list).
   const deleted = useMemo(() => all.filter(r => r.deletedAt), [all]);
 
-  const apply = useCallback((changed: T[]) => {
-    latest.current = applyChanges(latest.current, changed);
-    setAll(latest.current);
-  }, []);
-
+  // Changes are worked out against the published records, which already include earlier `set` calls that have
+  // not rendered yet, so quick successive updates build on each other.
   const set = useCallback((next: T[] | ((current: T[]) => T[])) => {
-    const visible = latest.current.filter(r => !r.deletedAt);
+    const current = publishedCollection(name);
+    const visible = current.filter(r => !r.deletedAt);
     const target = typeof next === "function" ? next(visible) : next;
-    const changed = diffCollection(latest.current, target, new Date().toISOString(), originFor(name));
+    const changed = diffCollection(current, target, new Date().toISOString(), originFor(name));
     if (!changed.length) return;
-    apply(changed);
     void write({ collections: { [name]: changed } }).then(failure => { if (failure) reportStorageError(failure); });
-  }, [name, apply]);
+  }, [name]);
 
   // `also` is written in the same transaction (e.g. clearing the draft a new entry was written from).
   const commit = useCallback(async (next: T[], also?: Omit<Change, "collections">): Promise<StorageFailure | null> => {
-    const changed = diffCollection(latest.current, next, new Date().toISOString(), originFor(name));
+    const changed = diffCollection(publishedCollection(name), next, new Date().toISOString(), originFor(name));
     if (!changed.length && !also) return null;
-    const failure = await write({ ...also, collections: { [name]: changed } }, { rollback: true });
-    if (!failure) apply(changed);
-    return failure;
-  }, [name, apply]);
+    return write({ ...also, collections: { [name]: changed } }, { rollback: true });
+  }, [name]);
 
   return { items, deleted, set, commit };
 }
 
 export function useSetting<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => readSetting(key, fallback));
-  const latest = useRef(value);
+  // The first fallback is kept, so a literal passed on every render (e.g. `[]`) doesn't count as a change.
+  const fallbackRef = useRef(fallback);
+  const getSnapshot = useCallback(() => publishedSetting(key, fallbackRef.current), [key]);
+  const value = useSyncExternalStore(subscribe, getSnapshot);
   const set = useCallback((next: T | ((current: T) => T)) => {
-    const v = typeof next === "function" ? (next as (current: T) => T)(latest.current) : next;
-    if (JSON.stringify(v) === JSON.stringify(latest.current)) return;
-    latest.current = v;
-    setValue(v);
+    const current = publishedSetting(key, fallbackRef.current);
+    const v = typeof next === "function" ? (next as (current: T) => T)(current) : next;
+    if (JSON.stringify(v) === JSON.stringify(current)) return;
     void write({ settings: [[key, v]] }).then(failure => { if (failure) reportStorageError(failure); });
   }, [key]);
   return [value, set] as const;

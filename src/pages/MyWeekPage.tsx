@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, Empty } from "../components/ui";
 import { activities } from "../data/activities";
+import { newRecordId } from "../lib/data/schema";
 import { fmt, isoToday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
@@ -76,7 +77,7 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
                   a={a}
                   t={t}
                   subtitle={`${p.childIds.map(id => childrenData.find(c => c.id === id)?.first).join(", ") || t.unassigned} · ${fmt(p.completedDate || p.date)}`}
-                  action={<button onClick={() => setPlans(x => [...x, { ...p, id: `p-${Date.now()}`, date: isoToday(), completed: false }])}>{t.repeat}</button>}
+                  action={<button onClick={() => setPlans(x => [...x, { ...p, id: newRecordId("p"), date: isoToday(), completed: false }])}>{t.repeat}</button>}
                   key={p.id}
                 />
               );

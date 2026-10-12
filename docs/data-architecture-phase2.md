@@ -15,8 +15,11 @@ As of 2026-10-12:
 - **The app does not use Supabase yet.**
   - Nothing in `src/` talks to the cloud.
   - Local data (IndexedDB, Phase 1) works exactly as before.
-- **Next phase: 2B-2 (sync client)**, which has not started. Scope is in section 18. Start it only after explicit
-  approval.
+- **Phase 2B-2 (accounts and sync) is in progress**, in milestones M0–M7 (section 18).
+  - **M0 (groundwork) is implemented and awaiting review.** Cloud settings (off by default, locked off for the
+    public website), platform adapters, screens that follow store changes, and uuid ids for goals and repeated
+    plans. Still no Supabase calls from the app.
+  - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
 
@@ -89,7 +92,7 @@ so a fresh clone must run `npx supabase link --project-ref cbgkkeveprftddrobzao`
 Screens never talk to Supabase. The data layer remains the only write path. Sync reads the local outbox and writes
 to the local store through that same path.
 
-**Platform adapters.** A new folder, `src/lib/platform/` (Phase 2B-2 and later), holds the only code that differs
+**Platform adapters.** `src/lib/platform/` (created in 2B-2 M0, web adapters only so far) holds the only code that differs
 by platform:
 
 | Adapter | Website | iOS |
@@ -706,7 +709,8 @@ The region cannot be changed after the project is created.
 | A future feature breaks a section 5.4 invariant (per-row sharing, hard deletes) | The invariants are tested in CI. Breaking one requires introducing a change_log first. |
 | Purging a child tombstone while entries still reference it | The purge (a later phase) must handle dependants. Foreign keys block an unsafe purge. |
 | Legacy values that do not fit cloud columns (data URLs, bundled asset paths, unusual ids) | The migration planner converts them, or keeps them local with a reason. The id check accepts every Phase 1 id form. |
-| `p-${Date.now()}` ids created by "Repeat" in My Week (`src/pages/MyWeekPage.tsx`) | Composite keys keep families apart. Change the "Repeat" button to `newRecordId("p")` when the sync client is built, to avoid collisions between devices in one family. |
+| Clock-based ids (`p-${Date.now()}` from "Repeat" in My Week, `g-${Date.now()}` for goals) could collide between devices of one family | **Fixed in 2B-2 M0**: both use `newRecordId()`. A unit test fails if a screen builds an id from `Date.now()` again. Ids already stored keep their form. |
+| A background change during an in-flight confirmed save publishes that save a few milliseconds early; if the save then fails it can stay visible until reload (known limitation, accepted in M0; see data-architecture.md, Remaining risks) | Sync must decide what to upload from the outbox written in the same transaction as the record (M3), never from the published screen state |
 | The local Supabase stack differs slightly from hosted Supabase | Apply the same migrations to staging and run the test suite against it before each phase ends |
 | iOS storage eviction | Native backend after the PoC; the cloud copy covers anything already synced |
 | WeChat entity and session method unverified | No bridge until verified; Apple, Google, and email are not blocked |
@@ -720,11 +724,45 @@ The region cannot be changed after the project is created.
 | Phase | Scope | Status |
 |---|---|---|
 | **2B-1 Cloud foundation** | Schema, family ownership, RLS, storage policies, revision and `change_seq` triggers, two-account and sync-cursor tests, CI | **Done.** Deployed to staging on 2026-10-12 (section 19). Awaiting review. |
-| 2B-2 Sync client | Outbox, conditional push, pull, resolver with `record_versions`, photo queue, `verify-photo`, sign-in screens (Apple, Google, email), sign-out | Later |
+| 2B-2 Sync client | Outbox, conditional push, pull, resolver with `record_versions`, photo queue, `verify-photo`, sign-in screens (Apple, Google, email), sign-out | **In progress** (M0 awaiting review; see below) |
 | 2B-3 First-login migration | Planner, automatic upload, verification, `complete_migration` | Later |
 | iOS PoC | Separate proof of concept (section 12) | Before any iOS backend work |
 | iOS app | Capacitor build, native backend, Keychain, native sign-in, account deletion, TestFlight | After the PoC |
 | WeChat | Only after the entity and the session method are verified | Research |
+
+
+### Phase 2B-2 milestones (approved 2026-10-12)
+
+Order chosen for technical dependencies: the first-login upload (M6) reuses the record and photo sync (M4, M5).
+Records already on the device are never uploaded before M6 has checked them.
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | Implemented, awaiting review |
+| M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | Not started |
+| M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | Not started |
+| M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Not started |
+| M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Not started |
+| M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Not started |
+| M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
+| M7 Sign-out and reliability | Sign-out choices, account switching, full re-sync, sync status | Not started |
+
+**Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
+WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the
+app. The public website keeps cloud features off. After sign-out, "continue without an account" starts a fresh guest
+space and never shows another account's data.
+
+**Architecture requirements.**
+
+- **Environments.** `local` (`npm run dev`, a loopback Supabase only), `staging` (`--mode staging`, HTTPS), and
+  `production` (the public website, cloud locked off). See `src/lib/cloud/environment.ts` and `.env.example`. No
+  staging preview is deployed yet.
+- **Guest data ownership.** Signing in does not by itself claim the guest data. Before guest records are copied
+  into an account's space, the migration checks ownership and possible duplicates. Ambiguous records need the
+  parent's confirmation. The original guest database is never changed.
+- **Backup status.** Sync status is tracked per record and per photo from the start. "All backed up" is shown only
+  when every relevant record and photo has been confirmed by the server (photos: `verified_at`). Pending, failed and
+  held items never count as backed up.
 
 ---
 
