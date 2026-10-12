@@ -146,6 +146,10 @@ and two default saved activities. `origin` records only what is reliably known:
    provide its own onboarding examples.
 4. Archived items (`archive`) are never uploaded; they stay on the device as a safety net.
 
+Found while building M6: the memories the app makes from the demo observations (`obs-o1`, `obs-o2`) are stored with
+origin `user`, and older versions stored the demo pictures as photos (SVG data). Neither means the parent changed
+anything, so the planner recognises untouched demo content by its content (see the Phase 2 doc, M6 notes).
+
 ## Remaining risks
 
 - **Not a backup.** Clearing site data, uninstalling the browser, or losing the device loses everything. Safari can

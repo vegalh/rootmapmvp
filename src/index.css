@@ -323,3 +323,4 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .opening-screen { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; background: #efe7d6; }
 .opening-screen > div { width: min(100%, 430px); height: 100dvh; }
 .sync-summary { margin: 4px 0 8px; padding: 10px 14px; border-radius: 13px; background: var(--lavender); }.sync-summary p { margin: 2px 0; color: var(--primary); font-size: 14px; font-weight: 600; }.sync-summary:empty { display: none; }
+.stage-choices.two { grid-template-columns: 1fr 1fr; }.import-summary { margin: 10px 0; padding: 10px 14px; border-radius: 13px; background: var(--lavender); }.import-summary p { margin: 2px 0; color: var(--primary); font-size: 15px; }.import-question { margin: 16px 0 4px; text-align: left; }.import-question legend { font-weight: 700; font-size: 16px; margin-bottom: 4px; }.import-question p { margin: 0 0 10px; }

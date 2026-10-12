@@ -2,18 +2,19 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { Modal, PageHeader } from "../components/ui";
 import type { CloudState } from "../lib/cloud/session";
-import { useSyncStatus } from "../lib/cloud/hooks";
+import { useGuestImport, useSyncStatus, type GuestImportSummary } from "../lib/cloud/hooks";
 import { retryPhotos } from "../lib/sync/runner";
 import type { SyncStatus } from "../lib/sync/status";
 import type { Copy } from "../lib/i18n";
 
 // The parent's RootMap account (Phase 2B-2 M2): who is signed in, and Sign out. Signing in and out never changes
 // what is stored on this device.
-export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; back: () => void; signOut: () => Promise<void>; t: Copy }) {
+export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: CloudState; back: () => void; signOut: () => Promise<void>; openImport?: () => void; t: Copy }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const signedIn = cloud.status === "signed-in" ? cloud : null;
   const sync = useSyncStatus();
+  const imported = useGuestImport();
 
   const confirm = async () => {
     setBusy(true);
@@ -31,6 +32,7 @@ export function AccountPage({ cloud, back, signOut, t }: { cloud: CloudState; ba
         {signedIn?.user.email && <p style={{ overflowWrap: "anywhere" }}><strong>{signedIn.user.email}</strong></p>}
         {signedIn?.offline && <p>{t.accountOffline}</p>}
         <SyncSummary sync={sync} t={t} />
+        <ImportSummary imported={imported} openImport={openImport} disabled={!signedIn} t={t} />
         <p>{t.accountLocalNote}</p>
         <button className="wide-secondary" onClick={() => setConfirming(true)} disabled={!signedIn}>{t.signOut}</button>
       </div>
@@ -71,6 +73,24 @@ function SyncSummary({ sync, t }: { sync: SyncStatus; t: Copy }) {
           {t.tryAgain}
         </button>
       )}
+    </div>
+  );
+}
+
+// Memories from before signing in (lib/sync/guestImport.ts): offered until brought in, then progress, then done.
+function ImportSummary({ imported, openImport, disabled, t }: { imported: GuestImportSummary; openImport?: () => void; disabled: boolean; t: Copy }) {
+  if (imported.status === null || imported.status === "dismissed") {
+    if (!openImport) return null;
+    return <button className="wide-secondary" data-testid="open-import" onClick={openImport} disabled={disabled}>{t.importOffer}</button>;
+  }
+  const lines = imported.status === "complete"
+    ? [t.importDone]
+    : [t.importProgress.replace("{done}", String(imported.done)).replace("{total}", String(imported.total))];
+  if (imported.likelyDuplicates) lines.push(t.importDuplicates.replace("{n}", String(imported.likelyDuplicates)));
+  if (imported.missingPhotos) lines.push(t.importMissingPhotos.replace("{n}", String(imported.missingPhotos)));
+  return (
+    <div className="sync-summary" role="status" data-testid="import-status" data-import={imported.status}>
+      {lines.map(line => <p key={line}>{line}</p>)}
     </div>
   );
 }

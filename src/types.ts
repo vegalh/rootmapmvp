@@ -191,6 +191,7 @@ export type Screen =
   | "backup"
   | "deletedChildren"
   | "account"
+  | "guestImport"
   | "signIn";
 
 export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | "tried" | null;

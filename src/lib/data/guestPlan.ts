@@ -1,4 +1,4 @@
-import type { Child } from "../../types";
+import type { Child, LessonRecord, Observation } from "../../types";
 import { getAll, openExisting } from "./idb";
 import { COLLECTIONS, DB_NAME, isPhotoId, type CollectionName, type Collections, type PhotoMeta } from "./schema";
 
@@ -36,6 +36,40 @@ export type GuestPlan = {
 const sameChild = (a: Pick<Child, "first" | "last" | "dob">, b: Pick<Child, "first" | "last" | "dob">) =>
   a.first.trim().toLowerCase() === b.first.trim().toLowerCase() && a.last.trim().toLowerCase() === b.last.trim().toLowerCase() && a.dob === b.dob;
 
+// The bundled demo content besides the children (src/data/progress.ts and the default saved activities), to tell
+// untouched demo records from ones the parent changed.
+// `photoSha`: SHA-256 of the bundled demo pictures (a demo child's picture may be stored as a photo of its own).
+export type DemoSeed = { records?: LessonRecord[]; observations?: Observation[]; saved?: string[]; photoSha?: string[] };
+
+const sameText = (a: unknown, b: unknown) => String(a ?? "").trim() === String(b ?? "").trim();
+const sameList = (a: unknown, b: unknown) => JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+
+// A demo child the parent hasn't made their own: same name and birth date as bundled, no photo or notes of theirs.
+// A bundled picture's address changes between builds, and older versions stored it as a photo of its own, so a
+// stored photo counts as the parent's only if its bytes aren't a bundled picture's (`photoSha`: guest photo id →
+// SHA-256 of its bytes).
+const untouchedChild = (child: Child, demo: Child | undefined, seed: DemoSeed, photoSha: Map<string, string>) =>
+  !!demo && sameChild(child, demo) && !child.notes?.trim() && (!isPhotoId(child.photo) || !!seed.photoSha?.includes(photoSha.get(child.photo) ?? "-"));
+
+// Bundled demo content exactly as shipped: a demo record, observation, the memory the app made from a demo
+// observation ("obs-<id>"; it is stored with origin "user" because the app wrote it), or a default saved activity.
+function untouchedDemo(name: CollectionName, r: Record<string, unknown>, seed: DemoSeed): boolean {
+  if (name === "records") {
+    const s = seed.records?.find(x => x.id === r.id);
+    return !!s && r.childId === s.childId && r.lesson === s.lesson && r.area === s.area && r.stage === s.stage && r.date === s.date && sameText(r.notes, s.notes) && sameText(r.notesZh, s.notesZh) && sameText(r.nextSteps, s.nextSteps) && sameList(r.skills, s.skills);
+  }
+  if (name === "observations") {
+    const s = seed.observations?.find(x => x.id === r.id);
+    return !!s && r.childId === s.childId && r.date === s.date && sameText(r.notes, s.notes);
+  }
+  if (name === "entries") {
+    const s = typeof r.id === "string" && r.id.startsWith("obs-") ? seed.observations?.find(x => `obs-${x.id}` === r.id) : undefined;
+    return !!s && r.childId === s.childId && r.date === s.date && sameText(r.text, s.notes) && !String(r.title ?? "").trim() && !((r.photos as unknown[] | undefined) ?? []).length;
+  }
+  if (name === "saved") return !!seed.saved?.includes(String(r.id)) && r.origin !== "user";
+  return false;
+}
+
 // Photo ids a record refers to.
 function photoRefs(collection: CollectionName, r: Record<string, unknown>): string[] {
   const refs = collection === "children" ? [r.photo] : collection === "entries" ? (r.photos as unknown[] | undefined) ?? [] : [];
@@ -43,19 +77,22 @@ function photoRefs(collection: CollectionName, r: Record<string, unknown>): stri
 }
 
 // `demoChildren`: the bundled demo children, to tell an untouched demo child from one the parent changed.
-// `cloudChildren`: children already in the account (empty before sync exists).
-export function planGuestMigration(snapshot: GuestSnapshot, demoChildren: Child[], cloudChildren: Child[] = []): GuestPlan {
+// `cloudChildren`: children already in the account. `seed`: the rest of the bundled demo content.
+export function planGuestMigration(snapshot: GuestSnapshot, demoChildren: Child[], cloudChildren: Child[] = [], seed: DemoSeed = {}, photoSha = new Map<string, string>()): GuestPlan {
   const plan: GuestPlan = { upload: [], keepDemo: [], ask: [], possibleDuplicates: [], photos: [], never: { drafts: snapshot.drafts, archive: snapshot.archive, orphanPhotos: [] }, needsConfirmation: false };
   const c = snapshot.collections;
   const childOf = (r: { childId?: string; childIds?: string[] }) => (r.childId ? [r.childId] : r.childIds ?? []);
+  // The parent's own work on a child: a record they created, or a demo record they changed.
+  const parentsWork = (name: CollectionName, r: Record<string, unknown>) =>
+    !untouchedDemo(name, r, seed) && (r.origin === "user" || (r.origin === "demo" && (name === "records" ? !!seed.records?.some(x => x.id === r.id) : name === "observations" && !!seed.observations?.some(x => x.id === r.id))));
   const hasUserRecords = (childId: string) =>
-    (["records", "observations", "entries", "plans"] as const).some(name => (c[name] as { origin?: string; childId?: string; childIds?: string[] }[]).some(r => r.origin === "user" && childOf(r).includes(childId)));
+    (["records", "observations", "entries", "plans"] as const).some(name => (c[name] as unknown as Record<string, unknown>[]).some(r => !r.deletedAt && parentsWork(name, r) && childOf(r).includes(childId)));
 
   // Children first: which ones the parent owns.
   const ownChildren = new Set<string>();
   for (const child of c.children) {
     const demo = demoChildren.find(d => d.id === child.id);
-    const madeOwn = child.origin === "demo" && (!demo || !sameChild(child, demo) || hasUserRecords(child.id));
+    const madeOwn = child.origin === "demo" && (!untouchedChild(child, demo, seed, photoSha) || hasUserRecords(child.id));
     if (child.origin === "user" || madeOwn) ownChildren.add(child.id);
   }
 
@@ -65,7 +102,7 @@ export function planGuestMigration(snapshot: GuestSnapshot, demoChildren: Child[
       const item = { collection: name, id: r.id, deleted: !!r.deletedAt };
       const children = name === "children" ? [r.id] : childOf(r as { childId?: string; childIds?: string[] });
       const attached = children.some(id => ownChildren.has(id));
-      const group = r.origin === "user" || attached ? plan.upload : r.origin === "demo" ? plan.keepDemo : plan.ask;
+      const group = attached ? plan.upload : untouchedDemo(name, r, seed) ? plan.keepDemo : r.origin === "user" ? plan.upload : r.origin === "demo" ? plan.keepDemo : plan.ask;
       group.push(item);
       for (const ref of photoRefs(name, r)) {
         referenced.add(ref);

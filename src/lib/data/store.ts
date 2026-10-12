@@ -3,6 +3,7 @@ import { initialChildren } from "../../data/children";
 import { initialObservations, initialRecords } from "../../data/progress";
 import { BACKUP_KEYS } from "../backup";
 import { backupCorrupt, isQuotaError, writeRaw, type StorageFailure } from "../storage";
+import type { GuestImportState, ImportBuild } from "../sync/guestImport";
 import { deviceId } from "./device";
 import { done, getAll, openDatabase, openExisting, request } from "./idb";
 import { buildFromLegacy, readLegacyStorage, type Built, type Defaults } from "./legacy";
@@ -52,6 +53,8 @@ let outboxSeq = 0;
 // Account spaces: per-record sync state, and photo metadata (light; the bytes stay in IndexedDB).
 const syncRecords = new Map<string, SyncRecord>();
 const photoMetas = new Map<string, PhotoMeta>();
+// Account spaces: bringing the guest data into the account (lib/sync/guestImport.ts), "meta" record "guestImport".
+let importState: GuestImportState | null = null;
 
 const cache = {
   collections: Object.fromEntries(COLLECTIONS.map(n => [n, []])) as unknown as { [K in CollectionName]: Collections[K][] },
@@ -211,6 +214,7 @@ async function hydrate(source: IDBDatabase) {
     outboxSeq = Math.max(outboxSeq, 0, ...[...outbox.values()].map(e => e.seq));
     for (const r of await getAll<SyncRecord>(source, "syncRecords")) syncRecords.set(r.key, r);
     for (const p of await getAll<PhotoMeta>(source, "photos")) photoMetas.set(p.id, p);
+    importState = (await request<GuestImportState | undefined>(source.transaction("meta").objectStore("meta").get("guestImport"))) ?? null;
   }
   for (const url of photoUrls.values()) URL.revokeObjectURL(url);
   photoUrls.clear();
@@ -754,6 +758,72 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
     publish();
     return outcome;
   });
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Bringing the guest data into the account (account spaces only; lib/sync/guestImport.ts)
+
+export const guestImportState = () => importState;
+
+export async function saveGuestImportState(state: GuestImportState): Promise<void> {
+  if (space.kind !== "account" || !db) throw new Error("needs an open account space");
+  const tx = db.transaction("meta", "readwrite");
+  tx.objectStore("meta").put(state);
+  await done(tx);
+  importState = state;
+  publish();
+}
+
+// The copy of the chosen guest records and photos, their outbox entries and the attempt's state, in one
+// transaction. Records and photos are added, never replaced: if an id is already used in this space, nothing is
+// stored ("exists"). If the stored state is no longer the one the caller saw (another tab acted), nothing is
+// stored ("decided").
+export async function importGuestCopy(batch: { records: ImportBuild["records"]; photos: { meta: PhotoMeta; blob: Blob }[]; state: GuestImportState; expectStateId: string | null }): Promise<"ok" | "exists" | "decided"> {
+  if (space.kind !== "account" || !db) throw new Error("needs an open account space");
+  const byCollection = new Map<CollectionName, { id: string; deletedAt?: string | null }[]>();
+  for (const { collection, record } of batch.records) byCollection.set(collection, [...(byCollection.get(collection) ?? []), record as { id: string }]);
+  const queued = queueOutbox([...byCollection.entries(), ["photos", batch.photos.map(p => p.meta)]]);
+  const tx = db.transaction([...byCollection.keys(), "photos", "photoBlobs", "outbox", "meta"], "readwrite");
+  let outcome: "ok" | "exists" | "decided" = "ok";
+  const stop = (why: "exists" | "decided") => { outcome = why; try { tx.abort(); } catch { /* finished */ } };
+  const stateReq = tx.objectStore("meta").get("guestImport");
+  stateReq.onsuccess = () => {
+    if (((stateReq.result as GuestImportState | undefined)?.id ?? null) !== batch.expectStateId) { stop("decided"); return; }
+    const add = (store: string, value: unknown) => { const r = tx.objectStore(store).add(value); r.onerror = e => { e.preventDefault(); stop("exists"); }; };
+    try {
+      for (const { collection, record } of batch.records) add(collection, record);
+      for (const { meta, blob } of batch.photos) { add("photos", meta); add("photoBlobs", { id: meta.id, blob } satisfies PhotoBlob); }
+      for (const entry of queued.entries) tx.objectStore("outbox").put(entry);
+      tx.objectStore("meta").put(batch.state);
+    } catch {
+      stop("exists");
+    }
+  };
+  try {
+    await done(tx);
+  } catch (e) {
+    queued.undo();
+    if (outcome !== "ok") return outcome;
+    throw e;
+  }
+  for (const [name, recs] of byCollection) (cache.collections as Record<string, unknown[]>)[name] = applyChanges((cache.collections as Record<string, { id: string }[]>)[name], recs);
+  for (const { meta, blob } of batch.photos) { photoMetas.set(meta.id, meta); photoUrls.set(meta.id, URL.createObjectURL(blob)); }
+  importState = batch.state;
+  publish();
+  return "ok";
+}
+
+// A guest photo's bytes, read without changing the guest database.
+export async function guestPhotoBytes(id: string): Promise<Blob | null> {
+  const guest = await openExisting(DB_NAME);
+  if (!guest) return null;
+  try {
+    if (!guest.objectStoreNames.contains("photoBlobs")) return null;
+    const stored = await request<PhotoBlob | undefined>(guest.transaction("photoBlobs").objectStore("photoBlobs").get(id));
+    return stored?.blob ?? null;
+  } finally {
+    guest.close();
+  }
 }
 
 // Another tab of this space may have written since this one loaded: if the stored outbox differs from memory,

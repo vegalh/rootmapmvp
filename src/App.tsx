@@ -18,11 +18,12 @@ import { GoalsPage } from "./pages/GoalsPage";
 import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
+import { GuestImportPage } from "./pages/GuestImportPage";
 import OpeningExperience from "./components/OpeningExperience";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { activeSpace, backupData, dataMode, restoreData, syncMeta } from "./lib/data/store";
+import { activeSpace, backupData, dataMode, guestImportState, restoreData, syncMeta } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
@@ -30,7 +31,7 @@ import { cloudConfig } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
 import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
 import { spaceMatches } from "./lib/cloud/space";
-import { startSync } from "./lib/sync/runner";
+import { prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
@@ -173,6 +174,22 @@ export default function App() {
   useEffect(() => {
     if (!syncUser || !syncFamily) return;
     return startSync({ userId: syncUser, familyId: syncFamily });
+  }, [syncUser, syncFamily]);
+  // Memories saved on this device before signing in (lib/sync/guestImport.ts): checked once per page load. If there
+  // are some and the parent hasn't decided yet, the question opens once; the Account page offers it again.
+  const [importAvailable, setImportAvailable] = useState(false);
+  const importChecked = useRef(false);
+  useEffect(() => {
+    if (!syncUser || !syncFamily || importChecked.current) return;
+    importChecked.current = true;
+    const decided = guestImportState()?.status;
+    if (decided === "copied" || decided === "complete") return;
+    void prepareImport().then(p => {
+      const available = !!p && !p.offer.nothingToImport;
+      setImportAvailable(available);
+      if (available && guestImportState() === null) go("guestImport");
+    }, () => undefined); // offline: offered again at the next start
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncUser, syncFamily]);
 
   const afterSwitchTo = (next: AfterSwitch) => {
@@ -361,7 +378,10 @@ export default function App() {
       );
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} cloud={cloud} t={t} />;
-    if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} t={t} />;
+    if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
+    if (screen === "guestImport" && syncUser) {
+      return <GuestImportPage userId={syncUser} back={() => go(previous === "account" ? "account" : "children")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
+    }
     if (screen === "child") {
       return (
         <ChildProfilePage

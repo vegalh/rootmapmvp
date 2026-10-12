@@ -135,6 +135,12 @@ export function ui(page) {
       await self.reloaded(() => self.type("input[name=code]", code));
       await page.waitFor(`import("/src/lib/cloud/session.ts").then(C => C.cloudState().status === "signed-in" && C.cloudState().account)`, 15000, "signed in, account ready");
     },
+    // After signing in on a device with guest data, the question about bringing it in (M6) opens; "Not now".
+    skipImport: async () => {
+      await page.waitFor(`document.querySelector(".guest-import .sheet-buttons button") || (document.querySelector(".guest-import") && document.body.innerText.includes("nothing on this device"))`, 15000, "the guest import question");
+      await page.eval(`[...document.querySelectorAll(".guest-import .sheet-buttons button")].find(b => b.textContent === "Not now")?.click(); true`);
+      await page.waitFor(`!document.querySelector(".guest-import")`, 5000, "question closed");
+    },
     // Profile → RootMap Account → Sign out → confirm; waits for the guest space.
     signOut: async () => {
       await self.openProfile();

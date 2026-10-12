@@ -1,10 +1,17 @@
 import { getCloudClient } from "../cloud/client";
 import { cloudConfig } from "../cloud/config";
+import { initialChildren } from "../../data/children";
+import { initialObservations, initialRecords } from "../../data/progress";
+import { readGuestSnapshot } from "../data/guestPlan";
 import {
-  activeSpace, allPhotoMetas, commitSync, getCollection, hasPhotoBytes, pendingOutbox, photoBytes, photoChecksum, photoMeta, refreshFromDisk, storePhotoBytes, subscribe,
-  syncMeta, syncRecordFor, syncRecordValue,
+  DEFAULT_SAVED, activeSpace, allPhotoMetas, commitSync, getCollection, guestImportState, guestPhotoBytes, hasPhotoBytes, importGuestCopy, pendingOutbox, photoBytes,
+  photoChecksum, photoMeta, refreshFromDisk, saveGuestImportState, storePhotoBytes, subscribe, syncMeta, syncRecordFor, syncRecordValue,
 } from "../data/store";
-import { SyncOffline, syncRound, type RoundResult, type SyncLocal } from "./engine";
+import {
+  acceptGuestImport, advanceGuestImport, dismissGuestImport, importProgress, prepareGuestImport, type AcceptResult, type GuestImportLocal, type ImportAnswers,
+  type ImportContext, type ImportProgress, type Prepared,
+} from "./guestImport";
+import { SyncOffline, sha256Hex, syncRound, type RoundResult, type SyncLocal } from "./engine";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import type { SyncedCollection } from "./mapping";
 import { computeStatus, type SyncPhase, type SyncStatus } from "./status";
@@ -33,6 +40,20 @@ const photoLocal: PhotoLocal = {
   commit: batch => commitSync(batch),
 };
 
+// Bringing the guest data into the account (guestImport.ts), on this device's stores.
+const importLocal: GuestImportLocal = {
+  guest: readGuestSnapshot,
+  guestPhotoBytes,
+  records: collection => getCollection(collection) as unknown as Record<string, unknown>[],
+  photos: allPhotoMetas,
+  state: guestImportState,
+  saveState: saveGuestImportState,
+  copy: importGuestCopy,
+  syncRecord: syncRecordFor,
+  outbox: pendingOutbox,
+  deviceId: () => syncMeta().deviceId,
+};
+
 let phase: SyncPhase = "off";
 let lastSyncedAt: string | null = null;
 let notSent: RoundResult["notSent"] = {};
@@ -57,6 +78,41 @@ export function subscribeSync(listener: () => void) {
 
 // Set while sync runs: starts a round now (the Account page's "Try again").
 let runNow: (() => void) | null = null;
+// The account sync runs for.
+let syncAccount: { userId: string; familyId: string } | null = null;
+
+// ---- Earlier memories (guest data) → this account. Screens call these; see guestImport.ts. ----
+
+// SHA-256 of the bundled demo pictures, so a demo child still showing one isn't taken for the parent's own.
+let demoPhotoSha: Promise<string[]> | null = null;
+const bundledPhotoSha = () => (demoPhotoSha ??= Promise.all(initialChildren.map(async c => {
+  try { return await sha256Hex(await (await fetch(c.photo)).arrayBuffer()); } catch { return ""; }
+})).then(list => list.filter(Boolean)));
+async function importContext(): Promise<ImportContext | null> {
+  const account = syncAccount;
+  if (!account) return null;
+  return { ...account, demo: initialChildren, seed: { records: initialRecords, observations: initialObservations, saved: DEFAULT_SAVED, photoSha: await bundledPhotoSha() } };
+}
+
+// What could be brought in. null: not signed in here, or nothing on this device. Throws SyncOffline when offline.
+export async function prepareImport(): Promise<Prepared | null> {
+  const ctx = await importContext();
+  const client = await getCloudClient();
+  if (!ctx || !client) return null;
+  return prepareGuestImport(client, importLocal, ctx);
+}
+export async function acceptImport(answers: ImportAnswers, prepared?: Prepared): Promise<AcceptResult | null> {
+  const ctx = await importContext();
+  const client = await getCloudClient();
+  if (!ctx || !client) return null;
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  const go = () => acceptGuestImport(client, importLocal, ctx, answers, prepared);
+  const result = locks ? ((await locks.request(`rootmap-guest-import:${ctx.userId}`, go)) as AcceptResult) : await go();
+  runNow?.();
+  return result;
+}
+export const dismissImport = () => dismissGuestImport(importLocal);
+export const guestImportProgress = (): ImportProgress => importProgress(importLocal);
 
 // "Try again" for photos that failed: photos given up on after repeated rejected uploads are tried again, and a
 // round starts at once (without waiting for the back-off). False when sync isn't running.
@@ -100,6 +156,8 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       if (cloudConfig.enabled) {
         const photos = await syncPhotos(client, photoLocal, { familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
         photosFailed = photos.failed;
+        // Then, if earlier memories are being brought in, whether the server now has all of them.
+        await advanceGuestImport(client, importLocal, { familyId, userId });
       }
       lastSyncedAt = new Date().toISOString();
       phase = "idle";
@@ -148,11 +206,14 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   document.addEventListener("visibilitychange", visible);
   const now = () => { failures = 0; if (running) again = true; else schedule(0); };
   runNow = now;
+  const account = { userId, familyId };
+  setRunning(account);
   schedule(0);
 
   return () => {
     stopped = true;
     if (runNow === now) runNow = null;
+    if (isRunning(account)) setRunning(null);
     window.clearTimeout(timer);
     unsubscribe();
     window.removeEventListener("online", online);
@@ -161,6 +222,9 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
     update();
   };
 }
+
+function setRunning(next: { userId: string; familyId: string } | null) { syncAccount = next; }
+const isRunning = (a: { userId: string; familyId: string }) => syncAccount === a;
 
 const outboxSignature = () => pendingOutbox().map(e => `${e.key}@${e.seq}`).join("|");
 

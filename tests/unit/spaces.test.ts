@@ -4,6 +4,7 @@ import { DB_NAME, GUEST, databaseName, isUserId, type OutboxEntry } from "../../
 import { outboxEntries } from "../../src/lib/data/records.ts";
 import { DEVICE_KEY, deviceId } from "../../src/lib/data/device.ts";
 import { planGuestMigration, type GuestSnapshot } from "../../src/lib/data/guestPlan.ts";
+import { buildGuestImport, offerGuestImport, type AccountView } from "../../src/lib/sync/guestImport.ts";
 import { spaceMatches } from "../../src/lib/cloud/space.ts";
 import type { Child } from "../../src/types.ts";
 
@@ -139,4 +140,77 @@ test("plan: photos nothing refers to are never uploaded", () => {
   const s = snapshot({ saved: [] });
   s.photos = [{ id: "photo-33333333-3333-4333-8333-333333333333" } as never];
   assert.deepEqual(planGuestMigration(s, demo).never.orphanPhotos, ["photo-33333333-3333-4333-8333-333333333333"]);
+});
+
+test("plan: memories the app made from demo observations, default saved activities and unchanged demo records stay", () => {
+  const seed = { records: [{ id: "r1", childId: "emma", lesson: "Pouring Water", date: "2026-10-08" }] as never[], observations: [{ id: "o1", childId: "emma", date: "2026-10-08", notes: "Poured", skills: [] }] as never[], saved: ["water-pouring"] };
+  const s = snapshot({
+    records: [{ id: "r1", childId: "emma", lesson: "Pouring Water", date: "2026-10-08", origin: "demo" } as never],
+    entries: [{ id: "obs-o1", childId: "emma", date: "2026-10-08", text: "Poured", photos: [], origin: "user" } as never], // written by the app, so "user"
+  });
+  const plan = planGuestMigration(s, demo, [], seed);
+  assert.deepEqual(plan.upload, [], "Maya stays a demo child");
+  assert.deepEqual(ids(plan.keepDemo), ["children:emma", "children:noah", "entries:obs-o1", "records:r1", "saved:water-pouring"]);
+  assert.equal(plan.needsConfirmation, false);
+  // The parent wrote in the demo memory, or changed the demo record: Maya is theirs.
+  const edited = planGuestMigration(snapshot({ records: [{ id: "r1", childId: "emma", lesson: "Pouring Water", date: "2026-10-08", notes: "She loved it", origin: "demo" } as never] }), demo, [], seed);
+  assert.ok(ids(edited.upload).includes("children:emma"));
+  const wrote = planGuestMigration(snapshot({ entries: [{ id: "obs-o1", childId: "emma", date: "2026-10-08", text: "Poured, then mopped", photos: [], origin: "user" } as never] }), demo, [], seed);
+  assert.ok(ids(wrote.upload).includes("children:emma"));
+});
+
+test("plan: a demo child's stored photo is the parent's only if it isn't the bundled picture", () => {
+  const pic = "photo-44444444-4444-4444-8444-444444444444";
+  const s = snapshot({ children: [{ ...demo[0], origin: "demo" as const, photo: pic }], records: [], saved: [] });
+  assert.deepEqual(planGuestMigration(s, demo, [], { photoSha: ["aa"] }, new Map([[pic, "aa"]])).upload, [], "bundled picture: untouched");
+  assert.deepEqual(ids(planGuestMigration(s, demo, [], { photoSha: ["aa"] }, new Map([[pic, "bb"]])).upload), ["children:emma"], "the parent's picture");
+});
+
+// ---- Building the copy (lib/sync/guestImport.ts) -------------------------------------------------------------
+
+const account = (records: [string, Record<string, unknown>][] = []): AccountView => ({
+  records: new Map(records), photos: new Map(), handled: {},
+  children: records.filter(([k, r]) => k.startsWith("children:") && !r.deletedAt).map(([, r]) => r as unknown as Child),
+});
+const T = "2026-09-01T00:00:00.000Z";
+const kid = (id: string, first: string) => ({ id, first, last: "Li", dob: "2022-01-01", enrolled: "", lessons: 0, group: "Primary", photo: "", origin: "user" as const, createdAt: T, updatedAt: T, deletedAt: null }) as Child;
+let n = 0;
+const build = (s: GuestSnapshot, acc: AccountView, sameChild: Record<string, boolean> = {}) =>
+  buildGuestImport({ snapshot: s, offer: offerGuestImport(s, acc, demo, {}), answers: { includeUncertain: false, sameChild }, account: acc, photoSha: new Map(), userId: "u", deviceId: "d", newId: c => `${c}-new-${++n}` });
+
+test("copy: 'different children' is never combined, even with the same id and details", () => {
+  const ada = kid("c-ada", "Ada");
+  const s = snapshot({ children: [ada], entries: [{ id: "m-1", childId: "c-ada", date: "2026-09-01", photos: [], origin: "user" } as never], records: [], saved: [] });
+  const acc = account([["children:c-ada", { ...ada }]]);
+  const same = build(s, acc, { "c-ada": true });
+  assert.deepEqual(same.records.map(r => r.collection), ["entries"], "same child: only the memory is copied");
+  assert.equal(same.records[0].record.childId, "c-ada");
+  const different = build(s, acc, { "c-ada": false });
+  const copiedChild = different.records.find(r => r.collection === "children")!.record;
+  assert.notEqual(copiedChild.id, "c-ada");
+  assert.equal(copiedChild.legacyId, "c-ada");
+  assert.equal(different.records.find(r => r.collection === "entries")!.record.childId, copiedChild.id, "the memory follows its child");
+});
+
+test("copy: a record already in the account with the same content is not copied again; a different one gets a new id", () => {
+  const ada = kid("c-ada", "Ada");
+  const entry = { id: "m-1", childId: "c-ada", date: "2026-09-01", text: "Hi", photos: [], origin: "user", createdAt: T, updatedAt: T, deletedAt: null };
+  const s = snapshot({ children: [ada], entries: [entry as never], records: [], saved: [] });
+  const sameContent = build(s, account([["children:c-ada", { ...ada, updatedAt: "2026-10-01T00:00:00.000Z" }], ["entries:m-1", { ...entry, position: 4 }]]));
+  assert.deepEqual(sameContent.records, [], "nothing copied twice");
+  assert.deepEqual(sameContent.manifest.records, { children: ["c-ada"], entries: ["m-1"] }, "but both are part of what the server must have");
+  const other = build(s, account([["entries:m-1", { ...entry, text: "Something else" }]]));
+  const copied = other.records.find(r => r.collection === "entries")!.record;
+  assert.notEqual(copied.id, "m-1");
+  assert.equal(copied.origin, "user");
+});
+
+test("copy: memories and records keep their child; a plan's children come along", () => {
+  const s = snapshot({
+    children: [kid("c-ada", "Ada")], records: [], saved: [],
+    plans: [{ id: "p-1", activityId: "dotting", date: "2026-09-02", childIds: ["c-ada"], origin: "user" } as never],
+  });
+  const b = build(s, account());
+  assert.deepEqual(b.records.map(r => `${r.collection}:${r.record.id}`).sort(), ["children:c-ada", "plans:p-1"]);
+  assert.deepEqual(b.sources, { "children:c-ada": "c-ada", "plans:p-1": "p-1" });
 });

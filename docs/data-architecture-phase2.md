@@ -28,9 +28,12 @@ As of 2026-10-12:
     `verify-photo` Edge Function checks each one before it counts as backed up, and other devices download and
     check them. A failed photo shows "Try Again" on the Account page. `verify-photo` is deployed to staging
     (2026-10-12, after its security review).
+  - **M6 (first-login migration) is implemented and awaiting review** (not committed). A parent's guest data is
+    brought into their account after one question, uploaded by the M4/M5 sync and completed only after the server
+    re-checks it (`complete_migration()`, migration `000700`). Tested on the local stack only; migration `000700` is
+    **not applied to staging** (needs approval).
   - Each later milestone starts only after explicit approval.
-- **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
-  started.
+- **Not yet in place:** no production project exists; Capacitor and WeChat are not started.
 
 **Working with the database locally**
 
@@ -753,7 +756,7 @@ Records already on the device are never uploaded before M6 has checked them.
 | M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | **Done** (`a18e414`) |
 | M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | **Done** (`de5f8dc`) |
 | M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | **Done** (`0e454f4` + Try Again) |
-| M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
+| M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Implemented, awaiting review |
 | M7 Sign-out and reliability | Sign-out choices, account switching, full re-sync, sync status | Not started |
 
 **M1 implementation notes.**
@@ -912,6 +915,57 @@ Records already on the device are never uploaded before M6 has checked them.
   `npx supabase functions deploy verify-photo --project-ref cbgkkeveprftddrobzao --no-verify-jwt` (version 1,
   `verify_jwt: false`). The bucket and its policies were already there (migration `000500`). Nothing else changed.
 
+**M6 implementation notes** (`src/lib/sync/guestImport.ts`, `src/pages/GuestImportPage.tsx`, migration `000700`).
+
+- **What the parent sees.** After signing in on a device with memories from before, one screen: "Bring your
+  memories into your account?" with the children's names and counts, which sample children stay on the device, and
+  that everything also stays on the device. Two buttons: **Add to my account** / **Not now**. Further questions
+  appear only when needed: records whose origin isn't known ("Are these yours too?": add / leave on this device)
+  and each child with the same name and birth date as one already in the account ("Is Mia the same child?": same /
+  different). The Account page then shows progress ("… {done} of {total} backed up") and finally "Your earlier
+  memories are in your account". "Not now" copies nothing; the Account page offers it again. Another account
+  signing in on the same device is asked separately and told some of it may already be in another account.
+- **Why one question (not automatic).** Decision 14 says automatic when ownership is clear. On a website or shared
+  device the app can't know that the person signing in is the one who used it as a guest, so the first upload of
+  guest data always takes one tap. Making it automatic (e.g. for the first account on a device) is a small change.
+- **Planner** (`guestPlan.ts`), fixed: the memories the app makes from the demo observations (`obs-o1`, `obs-o2`)
+  are stored with origin `user` (the app wrote them), and older versions stored the demo pictures as photos (SVG).
+  Both made every untouched demo child look "made own". Untouched demo content is now recognised by content (demo
+  records, observations and those memories as shipped, default saved activities, a demo picture by its SHA-256), so
+  only real changes make a demo child the parent's.
+- **Copy** (`importGuestCopy` in `store.ts`): chosen records, photos (metadata and bytes), their outbox entries and
+  the attempt's state (`meta` record `guestImport`) in **one IndexedDB transaction** in the account's space, using
+  `add` (never overwrite). The guest database is only read (`openExisting`). Copied records get origin `user` (the
+  parent confirmed them); the manifest's `sources` map each guest record to its account id.
+- **Ids.** An id the account already uses for something else gets a new id (old one in `legacyId`), with references
+  (child ids, photo ids) rewritten; a record already there with the same content is not copied again; a child is
+  combined with an account child only when the parent answered "same child" (never on id alone). A chosen record
+  always brings its child. Legacy observations stay local (already folded into memories).
+- **Photos.** Bytes are read from the guest database and hashed when the parent says yes. A missing file, a file
+  whose bytes no longer match its recorded SHA-256, or a type the bucket doesn't accept (e.g. SVG) is not uploaded
+  and is reported ("{n} photos couldn't be added"); the reference is left out of the account's copy only. A demo
+  child's bundled picture stays the bundled picture.
+- **Upload** is the ordinary M4/M5 sync. **Completion** (`advanceGuestImport`, after every sync round): every manifest
+  record confirmed by the server with nothing pending, every photo verified, then a field-by-field comparison of the
+  server's rows with this device's records, then `complete_migration(family, id, manifest)`. The server re-checks
+  that every record is in the family (goals: the caller's own) and every photo has `verified_at` and
+  `server_sha256 = sha256` = the manifest's; only then is `cloud_migrations.status` complete. Until then the attempt
+  stays "copied" and is retried each round.
+- **Repeats and interruptions.** The copy is all-or-nothing; a second tap or tab finds the attempt already decided
+  (Web Lock plus a state check inside the transaction). An interrupted upload continues with sync. The manifest is
+  also stored on the server (`cloud_migrations`, per device), so a device whose account space was removed doesn't
+  bring the same records again.
+- **`complete_migration()`** (migration `20261012000700_complete_migration.sql`): `security definer`, no user id
+  argument, caller must be a member of the family, `execute` for `authenticated` only. The status guard now allows
+  the change only inside this function (a transaction-local setting clients can't set). Tested: completes only when
+  everything is there and verified; other families get 42501; claims about records not in the caller's family stay
+  incomplete; clients still can't set the status; no user, no completion.
+- **Cost.** The check after sign-in reads the guest database and the account's matching ids once per app start
+  until the parent has decided; photo files are read and hashed only after "Add to my account".
+- **Not in M6:** the parent's profile, notes pad and other settings are not brought in (settings don't sync yet);
+  guest records added after a completed import are not offered automatically; a "tidy duplicates" screen (likely
+  duplicates are only counted); the "Another version saved" screen.
+
 **Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the
 app. The public website keeps cloud features off. After sign-out the device's guest space opens; it never shows an
@@ -939,7 +993,7 @@ with M6 / M7.)
 
 | Environment | Project | Region | Plan | Schema | Data |
 |---|---|---|---|---|---|
-| Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000600` | Test data only, recreated on every reset |
+| Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000700` | Test data only, recreated on every reset |
 | Staging | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 (does not bind production) | Free | Migrations `20261012000100`–`000600`, applied 2026-10-12 with `supabase db push --linked` | None: 0 users, 0 objects, 0 app rows |
 | Production | **Not created** | Decided by the region test (section 15) | Pro | — | — |
 
@@ -953,6 +1007,7 @@ with M6 / M7.)
 | `20261012000400_rls.sql` | RLS on all 13 tables; 35 policies; no delete policies |
 | `20261012000500_storage.sql` | Private `family-photos` bucket (15 MB; JPEG, PNG, WebP, HEIC); `private.photo_object_allowed()`; storage select and insert policies |
 | `20261012000600_grants.sql` | Nothing for `anon`; column-level insert/update for `authenticated`; no automatic grants on future objects |
+| `20261012000700_complete_migration.sql` (M6; **local only, not on staging**) | `public.complete_migration()`; the `cloud_migrations` status guard lets only that function complete an attempt |
 
 Every database change is a new migration file. An applied migration is never edited.
 
@@ -994,7 +1049,7 @@ The test suite refuses to run against any non-local database, so it has never ru
 - The GitHub Actions workflow (`.github/workflows/db-tests.yml`) runs on every push to `main` and on pull requests.
   Its first run, on commit `002dc21` (2026-10-12), passed: database tests, unit tests, and typecheck, in about
   2 minutes, with no credentials.
-- Not yet built: the purge job, account deletion, `complete_migration()`, and the WeChat identity table.
+- Not yet built: the purge job, account deletion, and the WeChat identity table.
 - Staging is on the Free plan: it pauses after 7 days of inactivity and has no backups. Test data only.
 
 ---
