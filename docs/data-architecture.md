@@ -28,6 +28,10 @@ without a reload. `set` updates at once and saves in the background (a failure s
 
 ## IndexedDB layout (`rootmap`, version 1)
 
+This is the guest space. Builds with cloud features also keep one database per signed-in account
+(`rootmap-account-<userId>`), with the same stores plus `outbox` and `syncRecords`; see
+[data-architecture-phase2.md](data-architecture-phase2.md), M3 notes.
+
 | Store | Key | Contents |
 |---|---|---|
 | `children` | `id` | Child profiles. A profile in **Recently Deleted** is the same record with `deletedAt` set. |

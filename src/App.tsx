@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
@@ -21,14 +21,15 @@ import { AccountPage } from "./pages/AccountPage";
 import OpeningExperience from "./components/OpeningExperience";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
-import { useCollection, useSetting } from "./lib/data/hooks";
-import { backupData, dataMode, restoreData } from "./lib/data/store";
+import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
+import { activeSpace, backupData, dataMode, restoreData } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
 import { cloudConfig } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
-import { confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
+import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
+import { spaceMatches } from "./lib/cloud/space";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
@@ -62,15 +63,41 @@ const seedIds = [
 const OpeningPreview = import.meta.env.DEV ? lazy(() => import("./dev/OpeningPreview")) : null;
 const previewOpening = import.meta.env.DEV && new URLSearchParams(window.location.search).has("opening");
 
-// The sign-in actions the opening screens use (Phase 2B-2 M2). Signing in only creates the session and the empty
-// family and profile on the server; nothing on this device is uploaded, moved or changed.
-const openingAuth = { sendCode: sendSignInCode, confirmCode: confirmSignInCode };
-
 // Set just before the reload that follows a restore, so the reloaded app can confirm it.
 const JUST_RESTORED_KEY = "rootmap-just-restored";
 
+// Signing in or out reloads the app into the other space (lib/cloud/space.ts). What to show after that reload:
+// a confirmation and the screen to open.
+const AFTER_SWITCH_KEY = "rootmap.after-space-switch";
+// Reloads in a row, to stop a loop if the space can't follow the sign-in state (e.g. a session that can't be stored).
+const SWITCH_COUNT_KEY = "rootmap.space-switches";
+type AfterSwitch = { toast: string; screen?: Screen };
+
+function readAfterSwitch(): AfterSwitch | null {
+  try {
+    const raw = sessionStorage.getItem(AFTER_SWITCH_KEY);
+    sessionStorage.removeItem(AFTER_SWITCH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function reloadIntoSpace() {
+  try {
+    const [count, at] = JSON.parse(sessionStorage.getItem(SWITCH_COUNT_KEY) || "[0,0]") as [number, number];
+    const recent = Date.now() - at < 30_000 ? count : 0;
+    if (recent >= 3) { console.warn("RootMap: the local space does not follow the sign-in state; not reloading again."); return; }
+    sessionStorage.setItem(SWITCH_COUNT_KEY, JSON.stringify([recent + 1, Date.now()]));
+  } catch {
+    // sessionStorage unavailable: reload anyway (each reload is caused by a real sign-in change)
+  }
+  window.location.reload();
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("children");
+  const [afterSwitch] = useState(readAfterSwitch);
+  const [screen, setScreen] = useState<Screen>(afterSwitch?.screen ?? "children");
   const [previous, setPrevious] = useState<Screen>("children");
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
@@ -86,7 +113,7 @@ export default function App() {
   // Editable starting title/date for a new entry (the activity just marked as tried).
   const [editorPrefill, setEditorPrefill] = useState<{ title: string; date: string } | undefined>();
   const [momentsFilter, setMomentsFilter] = useState("All");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(afterSwitch?.toast ?? "");
 
   // All persistent data comes from the data layer (src/lib/data): records are stored one by one with sync
   // timestamps, and removing one from a list soft-deletes it. A removed child is a soft-deleted child record,
@@ -124,11 +151,23 @@ export default function App() {
   // before the app records its first run (see lib/welcome.ts).
   const cloud = useCloudState();
   const [welcome, setWelcome] = useSetting<WelcomeState>(WELCOME_KEY, "");
-  const [welcomeStart] = useState(() => (cloudConfig.enabled ? welcomeAtStart() : "skip"));
+  const [welcomeStart] = useState(() => (cloudConfig.enabled && activeSpace().kind === "guest" ? welcomeAtStart() : "skip"));
   useEffect(() => {
     if (welcomeStart === "show" && welcome === "") setWelcome("pending");
   }, [welcomeStart, welcome, setWelcome]);
   const showWelcome = welcomeStart === "show" && welcome !== "done" && cloud.status !== "signed-in";
+  // Each space is opened by a fresh page load; see reloadIntoSpace. Held while a sign-in is completing.
+  const holdSwitch = useRef(false);
+  useEffect(() => {
+    if (holdSwitch.current) return;
+    if (!spaceMatches(activeSpace(), cloud)) reloadIntoSpace();
+    else if (cloud.status === "signed-in" || cloud.status === "signed-out") {
+      try { sessionStorage.removeItem(SWITCH_COUNT_KEY); } catch { /* nothing to reset */ }
+    }
+  }, [cloud]);
+  const afterSwitchTo = (next: AfterSwitch) => {
+    try { sessionStorage.setItem(AFTER_SWITCH_KEY, JSON.stringify(next)); } catch { /* the reload still happens */ }
+  };
 
   // When the bundled seed data changes (SEED_VERSION bumped), merge in new demo items without touching anything
   // already on the device (see mergeSeed). The parent's profile and all their own data are never reset.
@@ -242,16 +281,30 @@ export default function App() {
     else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
   };
 
-  const signedIn = (email: string) => {
-    if (welcomeStart === "show") setWelcome("done");
-    if (screen === "signIn") go("profile");
-    setToast(t.signedInAs.replace("{email}", email));
+  // The sign-in actions the opening screens use. Signing in creates the session and the empty family and profile on
+  // the server, then the app reloads into the account's own space; nothing on this device is uploaded, moved or
+  // changed. The reload waits until sign-in has finished.
+  const openingAuth = {
+    sendCode: sendSignInCode,
+    confirmCode: async (email: string, code: string) => {
+      holdSwitch.current = true;
+      try {
+        const result = await confirmSignInCode(email, code);
+        if (result.ok) {
+          if (welcomeStart === "show") await saveSetting(WELCOME_KEY, "done");
+          afterSwitchTo({ toast: t.signedInAs.replace("{email}", email), screen: screen === "signIn" ? "profile" : undefined });
+        }
+        return result;
+      } finally {
+        holdSwitch.current = false;
+        if (!spaceMatches(activeSpace(), cloudState())) reloadIntoSpace();
+      }
+    },
   };
-  // Signs out of this device only. Everything stored on the device stays as it is.
+  // Signs out of this device only, then reloads into the guest space. Everything stored on the device stays.
   const signOut = async () => {
+    afterSwitchTo({ toast: t.signedOut, screen: "profile" });
     await signOutHere();
-    go("profile");
-    setToast(t.signedOut);
   };
 
   const content = () => {
@@ -503,7 +556,6 @@ export default function App() {
             setLang={setLang}
             startAt={fromProfile ? "final" : "animation"}
             auth={openingAuth}
-            onSignedIn={signedIn}
             onContinueAsGuest={() => (fromProfile ? go("profile") : setWelcome("done"))}
           />
         </div>

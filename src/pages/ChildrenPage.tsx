@@ -1,6 +1,5 @@
 import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
-import { Empty } from "../components/ui";
 import { fmt } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import { entryText, newestFirst } from "../lib/entries";
@@ -50,7 +49,13 @@ export function ChildrenPage({ childrenData, entries, goChild, openAddChild, ope
             </button>
           </div>
         ) : (
-          <Empty text={t.noResults} />
+          // No children yet (a new device, or a new account's space): the same add card, as a first step.
+          <div className="children-carousel">
+            <button className="child-select-card add-child-card" onClick={openAddChild}>
+              <span className="add-child-plus"><Icon name="plus" size={28} /></span>
+              <strong>{t.addFirstChild}</strong>
+            </button>
+          </div>
         )}
         {!!childrenData.length && (
           <>

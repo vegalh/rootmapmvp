@@ -1,4 +1,5 @@
 import type { SyncMeta } from "../../types";
+import { outboxKey, type OutboxCollection, type OutboxEntry } from "./schema";
 
 // Pure helpers that turn "the list as the screen now wants it" into per-record changes ready for sync.
 
@@ -60,4 +61,14 @@ export function applyChanges<T extends Rec>(all: T[], changed: T[]): T[] {
   const map = new Map(all.map(r => [r.id, r]));
   for (const r of changed) map.set(r.id, r);
   return [...map.values()].sort(byPosition);
+}
+
+// Outbox entries for records being written (account spaces). One entry per record: a record changed again before
+// sync keeps its place in the queue (`queuedAt`) and gets the newest `op`, `seq` and `changedAt`; sync then uploads
+// the record as it is at that moment.
+export function outboxEntries(collection: OutboxCollection, records: { id: string; deletedAt?: string | null }[], current: Map<string, OutboxEntry>, ctx: { now: string; deviceId: string; nextSeq: () => number }): OutboxEntry[] {
+  return records.map(r => {
+    const key = outboxKey(collection, r.id);
+    return { key, collection, id: r.id, op: r.deletedAt ? "delete" : "put", seq: ctx.nextSeq(), queuedAt: current.get(key)?.queuedAt ?? ctx.now, changedAt: ctx.now, deviceId: ctx.deviceId };
+  });
 }

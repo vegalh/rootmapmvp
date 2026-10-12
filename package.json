@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "node --import ./tests/loader.mjs --test \"tests/unit/*.test.ts\"",
     "test:e2e": "node tests/e2e/run.mjs",
-    "test:e2e:cloud": "node tests/e2e/cloud.mjs",
+    "test:e2e:cloud": "node tests/e2e/cloud.mjs && node tests/e2e/spaces.mjs",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",

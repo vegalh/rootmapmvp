@@ -1,8 +1,28 @@
 import type { Child, Entry, EntryDraft, Goal, LessonRecord, Observation, Plan, SyncMeta } from "../../types";
 
 // IndexedDB layout for RootMap's local data. See docs/data-architecture.md for the full picture.
+//
+// Each "space" is its own database (Phase 2B-2 M3), so one account's data can never be read from another's:
+// - guest:   "rootmap", the database RootMap has always used. Its name and layout never change, and nothing done
+//            while signed in writes to it.
+// - account: "rootmap-account-<userId>", one per signed-in account on this device. Same stores, plus the outbox
+//            (local changes waiting for sync) and per-record sync state.
 export const DB_NAME = "rootmap";
 export const DB_VERSION = 1;
+export const ACCOUNT_DB_PREFIX = "rootmap-account-";
+export const ACCOUNT_DB_VERSION = 1;
+
+export type Space = { kind: "guest" } | { kind: "account"; userId: string };
+export const GUEST: Space = { kind: "guest" };
+
+const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const isUserId = (value: unknown): value is string => typeof value === "string" && USER_ID.test(value);
+
+export function databaseName(space: Space): string {
+  if (space.kind === "guest") return DB_NAME;
+  if (!isUserId(space.userId)) throw new Error("invalid account id");
+  return ACCOUNT_DB_PREFIX + space.userId;
+}
 
 // A saved Discover activity; the record id is the activity id.
 export type SavedActivity = SyncMeta & { id: string };
@@ -107,7 +127,34 @@ export type MigrationMeta = {
 export type MigrationReport = { counts: Record<string, number>; photos: number; photoBytes: number; archived: number; warnings: string[] };
 
 export const STORE_NAMES = [...COLLECTIONS, "photos", "photoBlobs", "drafts", "settings", "archive", "meta"] as const;
-export type StoreName = (typeof STORE_NAMES)[number];
+// Account spaces only.
+export const ACCOUNT_STORES = ["outbox", "syncRecords"] as const;
+export type StoreName = (typeof STORE_NAMES)[number] | (typeof ACCOUNT_STORES)[number];
+
+// What sync uploads (Phase 2B-2 M4) is decided from the outbox, never from what the screens show. One entry per
+// record with local changes not yet confirmed by the server, written in the same transaction as the record itself,
+// so a record change and its outbox entry are stored together or not at all. Nothing is uploaded in M3.
+export type OutboxCollection = CollectionName | "photos";
+export type OutboxEntry = {
+  key: string; // "<collection>:<id>"
+  collection: OutboxCollection;
+  id: string;
+  // "delete" = the record is soft-deleted (the server keeps a tombstone); "put" = created or changed.
+  op: "put" | "delete";
+  // Local order of changes on this device (increasing).
+  seq: number;
+  // When this record first had a change waiting, and when it last changed.
+  queuedAt: string;
+  changedAt: string;
+  deviceId: string;
+};
+export const outboxKey = (collection: OutboxCollection, id: string) => `${collection}:${id}`;
+
+// Per-record sync state, filled by sync (M4): the server revision and the last version both sides agreed on.
+export type SyncRecord = { key: string; collection: OutboxCollection; id: string; rev: number | null; syncedAt: string | null; syncBase: unknown };
+
+// The account space's own description, in "meta".
+export type SpaceMeta = { key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number };
 
 // Photo ids look like "photo-<uuid>"; anything else in a photo field is an image URL (bundled asset, remote
 // image, or a legacy data URL that could not be converted) and is used as-is.

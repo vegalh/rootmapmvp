@@ -1,4 +1,4 @@
-import { CHILD_INDEXED, COLLECTIONS, DB_NAME, DB_VERSION } from "./schema";
+import { ACCOUNT_DB_VERSION, CHILD_INDEXED, COLLECTIONS, DB_VERSION, GUEST, databaseName, type Space } from "./schema";
 
 // Minimal promise helpers over IndexedDB; no library needed for what RootMap does.
 
@@ -16,7 +16,7 @@ export const done = (tx: IDBTransaction) =>
     tx.onerror = () => { /* reported through onabort */ };
   });
 
-function upgrade(db: IDBDatabase, oldVersion: number) {
+function upgrade(db: IDBDatabase, oldVersion: number, space: Space) {
   if (oldVersion < 1) {
     for (const name of COLLECTIONS) {
       const store = db.createObjectStore(name, { keyPath: "id" });
@@ -29,24 +29,29 @@ function upgrade(db: IDBDatabase, oldVersion: number) {
     db.createObjectStore("settings", { keyPath: "key" });
     db.createObjectStore("archive", { keyPath: "id" });
     db.createObjectStore("meta", { keyPath: "key" });
+    if (space.kind === "account") {
+      db.createObjectStore("outbox", { keyPath: "key" }).createIndex("seq", "seq");
+      db.createObjectStore("syncRecords", { keyPath: "key" });
+    }
   }
 }
 
-// Opens (creating or upgrading) the RootMap database. Rejects instead of hanging if the browser never answers.
-export function openDatabase(timeoutMs = 8000): Promise<IDBDatabase> {
+// Opens (creating or upgrading) a space's database; the guest database by default. Rejects instead of hanging if
+// the browser never answers.
+export function openDatabase(space: Space = GUEST, timeoutMs = 8000): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") { reject(new Error("IndexedDB unavailable")); return; }
     let settled = false;
     const timer = setTimeout(() => { settled = true; reject(new Error("IndexedDB open timed out")); }, timeoutMs);
     let req: IDBOpenDBRequest;
     try {
-      req = indexedDB.open(DB_NAME, DB_VERSION);
+      req = indexedDB.open(databaseName(space), space.kind === "guest" ? DB_VERSION : ACCOUNT_DB_VERSION);
     } catch (e) {
       clearTimeout(timer);
       reject(e);
       return;
     }
-    req.onupgradeneeded = e => upgrade(req.result, e.oldVersion);
+    req.onupgradeneeded = e => upgrade(req.result, e.oldVersion, space);
     req.onsuccess = () => {
       clearTimeout(timer);
       const db = req.result;
@@ -60,3 +65,17 @@ export function openDatabase(timeoutMs = 8000): Promise<IDBDatabase> {
 }
 
 export const getAll = <T>(db: IDBDatabase, store: string) => request<T[]>(db.transaction(store).objectStore(store).getAll() as IDBRequest<T[]>);
+
+// Opens a database only if it already exists, at its current version, for reading. A database that doesn't exist
+// is not created: the open is cancelled before anything is written, and this resolves to null.
+export function openExisting(name: string, timeoutMs = 8000): Promise<IDBDatabase | null> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") { resolve(null); return; }
+    let creating = false;
+    const timer = setTimeout(() => reject(new Error("IndexedDB open timed out")), timeoutMs);
+    const req = indexedDB.open(name);
+    req.onupgradeneeded = () => { creating = true; req.transaction?.abort(); };
+    req.onsuccess = () => { clearTimeout(timer); req.result.onversionchange = () => req.result.close(); resolve(req.result); };
+    req.onerror = () => { clearTimeout(timer); if (creating) resolve(null); else reject(req.error); };
+  });
+}

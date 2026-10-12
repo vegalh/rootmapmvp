@@ -20,9 +20,11 @@ As of 2026-10-12:
     off for the public website), platform adapters, screens that follow store changes, uuid ids.
   - **M1 (account foundation) is done**: commit `ae9f0f6`, GitHub Actions passed. Email-code sign-in, session
     restore and refresh, sign-out, and the family and profile on first sign-in (`src/lib/cloud/`).
-  - **M2 (sign-in screens) is implemented and awaiting review.** Welcome on new devices, email + 6-digit code,
-    "Continue without an account", account and Sign out in Profile, English and Chinese. Only in builds with cloud
-    features; the public website is unchanged. Staging email settings are proposed, not applied (see M2 notes).
+  - **M2 (sign-in screens) is done**: commit `433a91b`, GitHub Actions passed, the public website checked (cloud
+    off, no Supabase in its bundle). Staging email templates: approved, waiting to be changed in the dashboard.
+  - **M3 (account spaces and outbox) is implemented and awaiting review.** A separate local database per account;
+    the guest database is never written while signed in; an outbox written in the same transaction as every
+    account change; device id and sync state stores; a guest migration plan (not run). Nothing is uploaded.
   - Each later milestone starts only after explicit approval.
 - **Not yet in place:** no production project exists; Capacitor, WeChat, and the first-login migration are not
   started.
@@ -744,8 +746,8 @@ Records already on the device are never uploaded before M6 has checked them.
 |---|---|---|
 | M0 Groundwork | Cloud settings per environment (local, staging, production), off by default and locked off for the public website, with a build guard against secret keys; platform adapters; screens follow store changes; uuid ids for goals and repeated plans | **Done** (`cdda37c`) |
 | M1 Account foundation | Session handling, email-code sign-in, sign-out with server revoke, `create_family()` once | **Done** (`ae9f0f6`) |
-| M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | Implemented, awaiting review |
-| M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Not started |
+| M2 Sign-in screens | Opening screens wired up; email + 6-digit code (no password); WeChat hidden; Profile account section | **Done** (`433a91b`) |
+| M3 Account spaces and outbox | Per-account local database; outbox and sync state written with each change; guest database never modified | Implemented, awaiting review |
 | M4 Record sync | Mapping, conditional push, paged pull, resolver, `record_versions`, one syncing tab | Not started |
 | M5 Photo sync | SHA-256 on save (and backfill), upload, `verify-photo`, checked download | Not started |
 | M6 First-login migration | Ownership and duplicate checks, questions only when ambiguous, verified upload, `complete_migration()` | Not started |
@@ -798,8 +800,8 @@ Records already on the device are never uploaded before M6 has checked them.
 - **Errors** are shown in plain words: invalid email, wrong or expired code (Supabase reports both the same way),
   too many tries, no connection ("Everything on this device is safe"), sign-in unavailable.
 - **Not changed:** PKCE / OAuth (with Google and Apple, later), the database, the OTP expiry.
-- **Staging (proposed, not applied; needs the owner's approval).** Staging emails still contain a link. To send
-  the same 6-digit code as the local stack:
+- **Staging (approved for `rootmap-staging` only; to be changed in the dashboard, not yet done).** Staging emails
+  still contain a link. To send the same 6-digit code as the local stack:
   1. Email templates "Confirm signup" (new parents) and "Magic Link" (returning parents): subject
      `Your RootMap code / RootMap 验证码`, body `supabase/templates/email-code.html` (shows `{{ .Token }}`, no link).
   2. Email OTP length: 6 (check the current value; change only if different).
@@ -807,10 +809,38 @@ Records already on the device are never uploaded before M6 has checked them.
   Done in the dashboard (Authentication → Emails / Sign In / Providers → Email). `supabase config push` is not
   used, because it would also push the local stack's other settings (site URL, rate limits).
 
- uses a typed 6-digit code, with no password. The WeChat button stays hidden until
+**M3 implementation notes.**
+
+- **Spaces** (`src/lib/data/schema.ts`). The guest space is the database RootMap has always used (`rootmap`,
+  version 1, same stores). Each account gets `rootmap-account-<userId>` (its own version 1) with the same stores
+  plus `outbox` and `syncRecords`, and a `meta` record `space` (user id, device id, family id and sync cursor for
+  M4). Account spaces never use the localStorage fallback (those keys are the guest's); if IndexedDB fails there,
+  the app shows the "try again" screen.
+- **Which space opens** (`src/lib/cloud/space.ts`): decided at start-up from the stored session, offline. Signing
+  in, signing out, a revoked session or a sign-in in another tab reloads the page into the matching space, so no
+  space's data is ever in memory with another's. The reload waits until sign-in (family and profile) has finished,
+  and stops after three in a row (no loop).
+- **The guest database is never written while signed in.** A new account space reads only the guest's language and
+  appearance (read-only open, which never creates a database). Draft rescue copies are kept per space.
+- **Outbox.** One entry per changed record (`<collection>:<id>`, `put` or `delete`, `seq`, `queuedAt`,
+  `changedAt`, `deviceId`), written in the same IndexedDB transaction as the record, for every write path: screens,
+  photos, restore from backup. Changing a record again keeps its place in the queue. Settings are not queued yet
+  (which settings sync is decided with M4's mapping). Only account spaces have an outbox.
+- **All or nothing.** A change that can't be fully queued (e.g. a value IndexedDB can't store) now aborts its whole
+  transaction. Before M3 such a change could be stored partly; this also applies to the guest space.
+- **Device id**: `rootmap.device-id` in localStorage (per browser profile), recorded in each account space.
+- **Guest migration plan** (`src/lib/data/guestPlan.ts`): a pure function implementing section 11's grouping
+  (upload / keep demo / ask / never, possible duplicates, photos), plus a read-only guest snapshot. Nothing calls
+  it yet; M6 uses it, with the parent's confirmation.
+- **What the parent sees.** After sign-in, a new account's space is empty (guest children are not shown or
+  copied). After sign-out, the guest space reappears exactly as it was. The Account page explains this.
+
+**Product decisions.** Email sign-in uses a typed 6-digit code, with no password. The WeChat button stays hidden until
 WeChat works. The Welcome screen is shown to new devices only; a device that already has data opens straight into the
-app. The public website keeps cloud features off. After sign-out, "continue without an account" starts a fresh guest
-space and never shows another account's data.
+app. The public website keeps cloud features off. After sign-out the device's guest space opens; it never shows an
+account's data. (M3: this is the existing guest space, unchanged, because guest data is kept until its ownership is
+established. Whether a fresh guest space should be used once guest data has been moved into an account is decided
+with M6 / M7.)
 
 **Architecture requirements.**
 

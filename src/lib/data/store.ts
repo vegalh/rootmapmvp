@@ -3,13 +3,15 @@ import { initialChildren } from "../../data/children";
 import { initialObservations, initialRecords } from "../../data/progress";
 import { BACKUP_KEYS } from "../backup";
 import { backupCorrupt, isQuotaError, writeRaw, type StorageFailure } from "../storage";
-import { done, getAll, openDatabase, request } from "./idb";
+import { deviceId } from "./device";
+import { done, getAll, openDatabase, openExisting, request } from "./idb";
 import { buildFromLegacy, readLegacyStorage, type Built, type Defaults } from "./legacy";
 import { isMigrated, migrateFromLocalStorage } from "./migrate";
-import { applyChanges, byPosition } from "./records";
+import { applyChanges, byPosition, outboxEntries } from "./records";
 import {
-  COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
-  type CollectionName, type Collections, type PhotoBlob, type PhotoMeta, type StoreName, type StoredDraft, type StoredSetting,
+  COLLECTIONS, DB_NAME, GUEST, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
+  type CollectionName, type Collections, type OutboxCollection, type OutboxEntry, type PhotoBlob, type PhotoMeta, type Space, type SpaceMeta,
+  type StoreName, type StoredDraft, type StoredSetting,
 } from "./schema";
 
 // The single place RootMap data is read from and written to. Screens never touch a storage API directly.
@@ -21,6 +23,11 @@ import {
 // - "indexeddb": the normal case once the one-time migration from localStorage has completed and verified.
 // - "localStorage": the original storage, used only while IndexedDB is unavailable or the migration has not
 //   yet succeeded on this device; it keeps the original key layout, so the migration can still run later.
+//
+// Spaces (Phase 2B-2 M3, see schema.ts): the store serves exactly one space per page load, the guest space or one
+// signed-in account's. Switching space reloads the page, so nothing of one space is ever held in memory with
+// another's. Account spaces are IndexedDB only (the localStorage keys belong to the guest space) and keep an outbox,
+// written in the same transaction as every record change.
 
 export type DataMode = "indexeddb" | "localStorage";
 export type DataStatus = { mode: DataMode } | { mode: "unavailable"; error: string };
@@ -37,6 +44,11 @@ const RESCUE_KEY = "rootmap-draft-rescue";
 
 let mode: DataMode = "localStorage";
 let db: IDBDatabase | null = null;
+let space: Space = GUEST;
+let spaceMeta: SpaceMeta | null = null;
+// Account spaces: the stored outbox (see OutboxEntry), kept in memory like everything else.
+const outbox = new Map<string, OutboxEntry>();
+let outboxSeq = 0;
 
 const cache = {
   collections: Object.fromEntries(COLLECTIONS.map(n => [n, []])) as unknown as { [K in CollectionName]: Collections[K][] },
@@ -62,7 +74,8 @@ const failureOf = (e: unknown): StorageFailure => (isQuotaError(e) ? "full" : "f
 // ---------------------------------------------------------------------------------------------------------
 // Start-up
 
-export async function initData(): Promise<DataStatus> {
+export async function initData(target: Space = GUEST): Promise<DataStatus> {
+  if (target.kind === "account") return initAccount(target);
   const migratedBefore = readHint() === "indexeddb";
   let opened: IDBDatabase;
   try {
@@ -106,6 +119,74 @@ export async function initData(): Promise<DataStatus> {
   return { mode };
 }
 
+// An account's space: its own database, created empty the first time this account signs in on this device. Nothing
+// is copied from the guest space except the language and appearance chosen on this device; the guest database is
+// only read, never written.
+async function initAccount(target: Extract<Space, { kind: "account" }>): Promise<DataStatus> {
+  let opened: IDBDatabase;
+  try {
+    opened = await openDatabase(target);
+  } catch (e) {
+    // Never fall back to localStorage: those keys belong to the guest space.
+    return { mode: "unavailable", error: String(e) };
+  }
+  try {
+    space = target;
+    spaceMeta = await ensureSpaceMeta(opened, target.userId);
+    await hydrate(opened);
+    db = opened;
+    mode = "indexeddb";
+  } catch (e) {
+    opened.close();
+    return { mode: "unavailable", error: String(e) };
+  }
+  await applyDraftRescue();
+  requestPersistence();
+  return { mode };
+}
+
+const DEVICE_PREFERENCES = ["rootmap-language", "rootmap-appearance"];
+
+async function ensureSpaceMeta(target: IDBDatabase, userId: string): Promise<SpaceMeta> {
+  const existing = await request<SpaceMeta | undefined>(target.transaction("meta").objectStore("meta").get("space"));
+  if (existing) {
+    if (existing.userId !== userId) throw new Error("account space belongs to another account");
+    return existing;
+  }
+  const now = nowIso();
+  const meta: SpaceMeta = { key: "space", userId, deviceId: deviceId(), createdAt: now, familyId: null, cursor: 0 };
+  const preferences = await guestPreferences();
+  const tx = target.transaction(["meta", "settings"], "readwrite");
+  // A second tab creating the space at the same moment writes the same values.
+  tx.objectStore("meta").put(meta);
+  for (const s of preferences) tx.objectStore("settings").put({ ...s, updatedAt: now } satisfies StoredSetting);
+  await done(tx);
+  return meta;
+}
+
+// Language and appearance as chosen in the guest space, read without changing it.
+async function guestPreferences(): Promise<StoredSetting[]> {
+  try {
+    const guest = await openExisting(DB_NAME);
+    if (!guest) return [];
+    try {
+      if (!guest.objectStoreNames.contains("settings")) return [];
+      const all = await getAll<StoredSetting>(guest, "settings");
+      return all.filter(s => DEVICE_PREFERENCES.includes(s.key));
+    } finally {
+      guest.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
+export const activeSpace = () => space;
+// The account space's description (null in the guest space).
+export const activeSpaceMeta = () => spaceMeta;
+// Local changes waiting for sync, oldest first (always empty in the guest space).
+export const pendingOutbox = () => [...outbox.values()].sort((a, b) => a.seq - b.seq);
+
 function withMigrationLock<T>(fn: () => Promise<T>): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   return locks ? (locks.request("rootmap-migration", fn) as Promise<T>) : fn();
@@ -119,6 +200,11 @@ async function hydrate(source: IDBDatabase) {
   for (const name of COLLECTIONS) (cache.collections as Record<string, unknown[]>)[name] = (await getAll<Collections[typeof name]>(source, name)).sort(byPosition);
   cache.settings = new Map((await getAll<StoredSetting>(source, "settings")).map(s => [s.key, s.value]));
   cache.drafts = new Map((await getAll<StoredDraft>(source, "drafts")).map(({ key, ...draft }) => [key, draft]));
+  outbox.clear();
+  if (source.objectStoreNames.contains("outbox")) {
+    for (const entry of await getAll<OutboxEntry>(source, "outbox")) outbox.set(entry.key, entry);
+    outboxSeq = Math.max(0, ...[...outbox.values()].map(e => e.seq));
+  }
   for (const url of photoUrls.values()) URL.revokeObjectURL(url);
   photoUrls.clear();
   for (const p of await getAll<PhotoBlob>(source, "photoBlobs")) photoUrls.set(p.id, URL.createObjectURL(p.blob));
@@ -244,7 +330,9 @@ function applyToCache(change: Change) {
 // taken back out. The IndexedDB transaction is started synchronously, before this function first yields, so a
 // write begun while the page is closing is already queued.
 export function write(change: Change, { rollback = false } = {}): Promise<StorageFailure | null> {
-  const undo = applyToCache(change);
+  const queued = queueOutbox(Object.entries(change.collections || {}) as [CollectionName, { id: string; deletedAt?: string | null }[]][]);
+  const undoCache = applyToCache(change);
+  const undo = () => { undoCache(); queued.undo(); };
   if (!rollback) publish();
   const settle = (failure: StorageFailure | null) => {
     if (rollback) {
@@ -257,8 +345,9 @@ export function write(change: Change, { rollback = false } = {}): Promise<Storag
   if (!Object.keys(change.collections || {}).length && !change.settings?.length && !change.drafts?.length) return Promise.resolve(settle(null));
   let tx: IDBTransaction;
   try {
-    tx = transactionFor(change);
+    tx = transactionFor(change, queued.entries);
   } catch (e) {
+    queued.undo();
     return Promise.resolve(settle(failureOf(e)));
   }
   return done(tx).then(
@@ -266,16 +355,49 @@ export function write(change: Change, { rollback = false } = {}): Promise<Storag
       if (change.drafts) clearRescue(change.drafts.map(([key]) => key));
       return settle(null);
     },
-    e => settle(failureOf(e)),
+    e => {
+      // Nothing of this change was stored, so its outbox entries weren't either.
+      queued.undo();
+      return settle(failureOf(e));
+    },
   );
 }
 
-function transactionFor(change: Change) {
+// Account spaces: the outbox entries for a change's records, already applied to memory (with a way back if the
+// transaction fails). Nothing in the guest space.
+function queueOutbox(changes: [OutboxCollection, { id: string; deletedAt?: string | null }[]][]) {
+  if (space.kind !== "account" || !spaceMeta) return { entries: [] as OutboxEntry[], undo: () => {} };
+  const ctx = { now: nowIso(), deviceId: spaceMeta.deviceId, nextSeq: () => ++outboxSeq };
+  const entries = changes.flatMap(([name, recs]) => outboxEntries(name, recs, outbox, ctx));
+  const before = entries.map(e => [e.key, outbox.get(e.key)] as const);
+  for (const e of entries) outbox.set(e.key, e);
+  return {
+    entries,
+    undo: () => { for (const [key, prev] of before) if (prev) outbox.set(key, prev); else outbox.delete(key); },
+  };
+}
+
+// Starts the transaction for a change. Every part is queued before this returns; if any part can't be (for
+// example a value IndexedDB can't store), the whole transaction is aborted, so a change is stored completely or
+// not at all.
+function transactionFor(change: Change, queued: OutboxEntry[]) {
   if (!db) throw new Error("database closed");
   const stores = new Set<StoreName>(Object.keys(change.collections || {}) as CollectionName[]);
   if (change.settings?.length) stores.add("settings");
   if (change.drafts?.length) stores.add("drafts");
+  if (queued.length) stores.add("outbox");
   const tx = db.transaction([...stores], "readwrite");
+  try {
+    fillTransaction(tx, change, queued);
+  } catch (e) {
+    try { tx.abort(); } catch { /* already finished */ }
+    throw e;
+  }
+  return tx;
+}
+
+function fillTransaction(tx: IDBTransaction, change: Change, queued: OutboxEntry[]) {
+  for (const entry of queued) tx.objectStore("outbox").put(entry);
   for (const [name, recs] of Object.entries(change.collections || {})) {
     const store = tx.objectStore(name);
     for (const rec of recs as unknown[]) store.put(rec);
@@ -289,7 +411,6 @@ function transactionFor(change: Change) {
     if (draft) tx.objectStore("drafts").put({ ...draft, key } satisfies StoredDraft);
     else tx.objectStore("drafts").delete(key);
   }
-  return tx;
 }
 
 // localStorage backend: rewrites each touched key in its original format (soft-deleted records, other than
@@ -331,9 +452,12 @@ function writeLegacy(change: Change): StorageFailure | null {
 
 type Rescue = Record<string, { draft: EntryDraft | null; at: string }>;
 
+// Each space keeps its own rescue copy. Account keys use "rootmap." so the guest migration never reads them.
+const rescueKey = () => (space.kind === "guest" ? RESCUE_KEY : `rootmap.draft-rescue:${space.userId}`);
+
 function readRescue(): Rescue {
   try {
-    const parsed = JSON.parse(localStorage.getItem(RESCUE_KEY) || "{}");
+    const parsed = JSON.parse(localStorage.getItem(rescueKey()) || "{}");
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -344,7 +468,7 @@ function readRescue(): Rescue {
 export function rescueDraft(key: string, draft: EntryDraft | null) {
   if (mode !== "indexeddb") return; // the localStorage backend already writes synchronously
   try {
-    localStorage.setItem(RESCUE_KEY, JSON.stringify({ ...readRescue(), [key]: { draft, at: nowIso() } }));
+    localStorage.setItem(rescueKey(), JSON.stringify({ ...readRescue(), [key]: { draft, at: nowIso() } }));
   } catch {
     // Out of space: the IndexedDB write is still under way.
   }
@@ -352,11 +476,11 @@ export function rescueDraft(key: string, draft: EntryDraft | null) {
 
 function clearRescue(keys: string[]) {
   try {
-    if (localStorage.getItem(RESCUE_KEY) === null) return;
+    if (localStorage.getItem(rescueKey()) === null) return;
     const rescue = readRescue();
     for (const key of keys) delete rescue[key];
-    if (Object.keys(rescue).length) localStorage.setItem(RESCUE_KEY, JSON.stringify(rescue));
-    else localStorage.removeItem(RESCUE_KEY);
+    if (Object.keys(rescue).length) localStorage.setItem(rescueKey(), JSON.stringify(rescue));
+    else localStorage.removeItem(rescueKey());
   } catch {
     // stays until the next start, where it is only applied if newer than the stored draft
   }
@@ -401,12 +525,15 @@ export async function savePhoto(blob: Blob, size?: { width: number; height: numb
   const id = newPhotoId();
   const now = nowIso();
   const meta: PhotoMeta = { id, mimeType: blob.type || "image/jpeg", byteSize: blob.size, width: size?.width ?? null, height: size?.height ?? null, createdAt: now, updatedAt: now, deletedAt: null, source: "upload", storagePath: null, uploadedAt: null };
+  const queued = queueOutbox([["photos", [meta]]]);
   try {
-    const tx = db.transaction(["photos", "photoBlobs"], "readwrite");
+    const tx = db.transaction(queued.entries.length ? ["photos", "photoBlobs", "outbox"] : ["photos", "photoBlobs"], "readwrite");
     tx.objectStore("photos").put(meta);
     tx.objectStore("photoBlobs").put({ id, blob } satisfies PhotoBlob);
+    for (const entry of queued.entries) tx.objectStore("outbox").put(entry);
     await done(tx);
   } catch (e) {
+    queued.undo();
     return { ok: false, failure: failureOf(e) };
   }
   photoUrls.set(id, URL.createObjectURL(blob));
@@ -453,8 +580,17 @@ export async function restoreData(data: Record<string, unknown>): Promise<boolea
   if (mode !== "indexeddb" || !db) return false;
   const now = nowIso();
   const built = buildFromLegacy({ values: data, unplaced: [] }, { now, defaults, extractPhotos: true, newPhotoId, photoSource: "restored" });
+  // Every record the restore writes, by collection (for the outbox in an account space).
+  const written: [OutboxCollection, { id: string; deletedAt?: string | null }[]][] = COLLECTIONS.map(name => {
+    const incoming = new Set(built.collections[name].map(r => r.id));
+    const removed = getCollection(name).filter(r => !r.deletedAt && !incoming.has(r.id)).map(r => ({ id: r.id, deletedAt: now }));
+    return [name, [...built.collections[name], ...removed]];
+  });
+  written.push(["photos", built.photos.map(p => p.meta)]);
+  const queued = queueOutbox(written);
   try {
-    const tx = db.transaction(STORE_NAMES.filter(s => s !== "meta"), "readwrite");
+    const tx = db.transaction([...STORE_NAMES.filter(s => s !== "meta"), ...(queued.entries.length ? ["outbox" as const] : [])], "readwrite");
+    for (const entry of queued.entries) tx.objectStore("outbox").put(entry);
     for (const name of COLLECTIONS) {
       const store = tx.objectStore(name);
       const incoming = new Set(built.collections[name].map(r => r.id));
@@ -476,6 +612,7 @@ export async function restoreData(data: Record<string, unknown>): Promise<boolea
     await done(tx);
     return true;
   } catch {
+    queued.undo();
     return false;
   }
 }

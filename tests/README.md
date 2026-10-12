@@ -5,10 +5,10 @@ drive headless Chrome over the DevTools protocol with Node's built-in WebSocket.
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `npm test` | Data layer logic: legacy → IndexedDB record building, photo extraction, duplicate/corrupt data, demo labels, soft-delete diffing; store change notifications; record ids; cloud environment rules and platform adapters (`tests/unit/`) | Node 24+ |
+| `npm test` | Data layer logic: legacy → IndexedDB record building, photo extraction, duplicate/corrupt data, demo labels, soft-delete diffing; store change notifications; record ids; cloud environment rules and platform adapters; sign-in rules; spaces, outbox entries, device id and the guest migration plan (`tests/unit/`) | Node 24+ |
 | `npm run test:e2e` | The real app in a browser (`tests/e2e/`), each suite on a fresh browser profile | Node 24+, Google Chrome |
 | `npm run test:db` | Database schema, RLS, storage, sync cursor, and email-code sign-in with account setup (`tests/db/`), against the local stack only | Docker, `npm run db:start` (Mailpit must be running) |
-| `npm run test:e2e:cloud` | The app in a browser with cloud features on, against the local stack (`tests/e2e/cloud.mjs`) | Docker, the local stack, Google Chrome |
+| `npm run test:e2e:cloud` | The app in a browser with cloud features on, against the local stack (`tests/e2e/cloud.mjs`, `spaces.mjs`; shared set-up in `cloudkit.mjs`) | Docker, the local stack, Google Chrome |
 | `npm run typecheck` / `npm run build` | TypeScript and the production build | |
 
 `test:e2e` starts its own Vite dev server on a spare port. To use one that's already running:
@@ -26,6 +26,7 @@ drive headless Chrome over the DevTools protocol with Node's built-in WebSocket.
   - Restoring from a backup.
 - `tabs.mjs`: two tabs starting the app for the first time at the same moment.
 - `cloud.mjs` (separate: `npm run test:e2e:cloud`, needs the local Supabase stack): the app with cloud features on, through its screens. Welcome on a new device (English and Chinese; no password, phone or social buttons); invalid email; offline; wrong and expired codes; new-account sign-in creates the family and profile and uploads nothing; a reload restores the session; Sign out from Profile; returning sign-in reaches the same family; "Continue without an account"; a device with RootMap data skips Welcome. Local data identical throughout.
+- `spaces.mjs` (with `cloud.mjs`): guest data preserved; accounts A and B in separate databases; switching between them and back to guest shows only that space's data; every account change has its outbox entry; a failed or interrupted write stores neither record nor outbox entry; nothing uploaded.
 - `reactive.mjs`: changes written to the store outside any screen (children, a soft delete, the language setting, a plan) appear without a reload; a confirmed save is shown only once stored; new goals and repeated plans get `<prefix>-<uuid>` ids.
 
 Every step also fails on any console error, uncaught exception or failed network request.

@@ -107,7 +107,7 @@ export async function restoreSession(client: SupabaseClient, storage: KeyValueSt
 const userOf = (session: Session): StoredUser => ({ userId: session.user.id, email: session.user.email ?? null });
 
 // The user recorded in the stored session, without contacting the server.
-async function storedUser(storage: KeyValueStore): Promise<StoredUser | null> {
+export async function storedUser(storage: KeyValueStore): Promise<StoredUser | null> {
   try {
     const raw = await storage.getItem(SESSION_KEY);
     const parsed = raw ? JSON.parse(raw) : null;

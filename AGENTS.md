@@ -25,14 +25,14 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `data/` - The data access layer. All persistent data goes through it (never call localStorage/IndexedDB from screens). See [docs/data-architecture.md](docs/data-architecture.md).
     - `hooks.ts` - `useCollection(name)` (record lists with soft delete) and `useSetting(key)`.
     - `store.ts` - Start-up load, the single write path, photos, backup export/restore.
-    - `schema.ts` - IndexedDB stores, legacy key names, id helpers. `legacy.ts` / `migrate.ts` - One-time migration from localStorage. `records.ts` - Per-record diffing and timestamps.
+    - `schema.ts` - IndexedDB stores, spaces (guest `rootmap`, one `rootmap-account-<userId>` per account), outbox types, legacy key names, id helpers. `device.ts` - the device id. `guestPlan.ts` - read-only guest snapshot and the first-login migration plan (not run yet). `legacy.ts` / `migrate.ts` - One-time migration from localStorage. `records.ts` - Per-record diffing and timestamps.
   - `storage.ts` - localStorage primitives and storage-error reporting (`onStorageError`).
   - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
   - `welcome.ts` - Whether this device still shows the Welcome screen (new devices only, cloud builds only).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
-  - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state; `hooks.ts` `useCloudState()` for screens.
+  - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state; `hooks.ts` `useCloudState()` for screens; `space.ts` which local space opens (from the stored session) and when to switch.
   - `platform/` - The only code that differs between the website and the future iOS app (session storage, saving a file). Web adapters only so far.
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
