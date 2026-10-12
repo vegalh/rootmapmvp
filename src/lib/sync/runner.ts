@@ -1,8 +1,11 @@
 import { getCloudClient } from "../cloud/client";
+import { cloudConfig } from "../cloud/config";
 import {
-  activeSpace, allPhotoMetas, commitSync, getCollection, pendingOutbox, photoChecksum, photoMeta, refreshFromDisk, subscribe, syncMeta, syncRecordFor, syncRecordValue,
+  activeSpace, allPhotoMetas, commitSync, getCollection, hasPhotoBytes, pendingOutbox, photoBytes, photoChecksum, photoMeta, refreshFromDisk, storePhotoBytes, subscribe,
+  syncMeta, syncRecordFor, syncRecordValue,
 } from "../data/store";
 import { SyncOffline, syncRound, type RoundResult, type SyncLocal } from "./engine";
+import { syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import type { SyncedCollection } from "./mapping";
 import { computeStatus, type SyncPhase, type SyncStatus } from "./status";
 
@@ -21,14 +24,24 @@ const local: SyncLocal = {
   refresh: refreshFromDisk,
 };
 
+const photoLocal: PhotoLocal = {
+  photos: () => allPhotoMetas() as LocalPhoto[],
+  hasBytes: hasPhotoBytes,
+  bytes: photoBytes,
+  storeBytes: storePhotoBytes,
+  syncRecord: syncRecordFor,
+  commit: batch => commitSync(batch),
+};
+
 let phase: SyncPhase = "off";
 let lastSyncedAt: string | null = null;
 let notSent: RoundResult["notSent"] = {};
+let photosFailed: Record<string, string> = {};
 let status: SyncStatus = makeStatus();
 const listeners = new Set<() => void>();
 
 function makeStatus(): SyncStatus {
-  return computeStatus({ phase, lastSyncedAt, outbox: pendingOutbox(), notSent, children: getCollection("children"), entries: getCollection("entries"), photo: photoMeta });
+  return computeStatus({ phase, lastSyncedAt, outbox: pendingOutbox(), notSent, photosFailed, children: getCollection("children"), entries: getCollection("entries"), photo: photoMeta });
 }
 function update() {
   const next = makeStatus();
@@ -71,6 +84,11 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       phase = "syncing"; update();
       const result = await syncRound(client, local, { familyId, userId });
       notSent = result.notSent;
+      // Then the files of photos whose details are on the server (and downloads of others' photos).
+      if (cloudConfig.enabled) {
+        const photos = await syncPhotos(client, photoLocal, { familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
+        photosFailed = photos.failed;
+      }
       lastSyncedAt = new Date().toISOString();
       phase = "idle";
     };

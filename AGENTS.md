@@ -33,7 +33,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
   - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state; `hooks.ts` `useCloudState()` for screens; `space.ts` which local space opens (from the stored session) and when to switch.
-  - `sync/` - Record sync for the signed-in account (Phase 2B-2 M4): `mapping.ts` local records ↔ server rows, `resolver.ts` conflict rules, `engine.ts` push/pull rounds, `runner.ts` when sync runs and its status, `status.ts` what "All backed up" means.
+  - `sync/` - Record sync for the signed-in account (Phase 2B-2 M4): `mapping.ts` local records ↔ server rows, `resolver.ts` conflict rules, `engine.ts` push/pull rounds, `runner.ts` when sync runs and its status, `status.ts` what "All backed up" means, `photos.ts` photo files (upload, server verification, checked download).
   - `platform/` - The only code that differs between the website and the future iOS app (session storage, saving a file). Web adapters only so far.
 - `src/components/` - Reusable building blocks shared across pages:
   - `Icon.tsx` - SVG icon set used throughout the app.
@@ -49,9 +49,10 @@ This is the canonical project structure. Start with task-relevant files below. O
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
 - `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
 - `supabase/` - Cloud backend (Phase 2), not yet used by the app. See [docs/data-architecture-phase2.md](docs/data-architecture-phase2.md).
+  - `functions/verify-photo/` - Edge Function that checks an uploaded photo file against its SHA-256 before it counts as backed up (runs on the local stack; not deployed to staging yet).
   - `migrations/` - The database schema, RLS, storage policies and triggers as versioned SQL. **Every database change is a new migration file; never edit an applied one or change the database by hand.**
   - `config.toml` - Local Supabase stack settings (`npm run db:start`, needs Docker).
-- `tests/db/` - Database tests against the local stack (`npm run test:db`): two-account security, storage, revisions, sync cursor, email-code sign-in and account setup, record sync (`sync.test.ts`).
+- `tests/db/` - Database tests against the local stack (`npm run test:db`): two-account security, storage, revisions, sync cursor, email-code sign-in and account setup, record sync (`sync.test.ts`), photo files and their privacy (`photos.test.ts`).
 
 ## Making common changes
 

@@ -531,7 +531,10 @@ export async function savePhoto(blob: Blob, size?: { width: number; height: numb
   }
   const id = newPhotoId();
   const now = nowIso();
-  const meta: PhotoMeta = { id, mimeType: blob.type || "image/jpeg", byteSize: blob.size, width: size?.width ?? null, height: size?.height ?? null, createdAt: now, updatedAt: now, deletedAt: null, source: "upload", storagePath: null, uploadedAt: null };
+  // The fingerprint is taken when the photo is saved, so a later backup can prove the file is unchanged.
+  let sha256: string | undefined;
+  try { sha256 = await sha256Of(blob); } catch { /* computed later by sync */ }
+  const meta: PhotoMeta = { id, mimeType: blob.type || "image/jpeg", byteSize: blob.size, width: size?.width ?? null, height: size?.height ?? null, createdAt: now, updatedAt: now, deletedAt: null, source: "upload", storagePath: null, uploadedAt: null, ...(sha256 ? { sha256 } : {}) };
   const queued = queueOutbox([["photos", [meta]]]);
   try {
     const tx = db.transaction(queued.entries.length ? ["photos", "photoBlobs", "outbox"] : ["photos", "photoBlobs"], "readwrite");
@@ -643,12 +646,43 @@ export async function syncRecordValue(collection: string, id: string): Promise<R
   return rec && { ...rec };
 }
 
+async function sha256Of(blob: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function photoChecksum(id: string): Promise<string | null> {
+  const blob = await photoBytes(id);
+  return blob ? sha256Of(blob) : null;
+}
+
+// Photo files (lib/sync/photos.ts). Whether this device holds a photo's bytes, and reading them.
+export const hasPhotoBytes = (id: string) => photoUrls.has(id);
+export async function photoBytes(id: string): Promise<Blob | null> {
   if (!db) return null;
   const stored = await request<PhotoBlob | undefined>(db.transaction("photoBlobs").objectStore("photoBlobs").get(id));
-  if (!stored) return null;
-  const digest = await crypto.subtle.digest("SHA-256", await stored.blob.arrayBuffer());
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  return stored?.blob ?? null;
+}
+
+// Keeps a downloaded photo file (already checked against its SHA-256). Only adds bytes this device lacks; an
+// existing local copy is never replaced.
+export async function storePhotoBytes(id: string, blob: Blob): Promise<boolean> {
+  if (space.kind !== "account" || !db || photoUrls.has(id)) return false;
+  try {
+    const tx = db.transaction("photoBlobs", "readwrite");
+    const store = tx.objectStore("photoBlobs");
+    const existing = store.get(id);
+    existing.onsuccess = () => { if (!existing.result) store.put({ id, blob } satisfies PhotoBlob); };
+    await done(tx);
+  } catch {
+    return false;
+  }
+  if (!photoUrls.has(id)) photoUrls.set(id, URL.createObjectURL(blob));
+  // Screens re-render when their list changes: renew the lists that show photos, so the picture appears.
+  cache.collections.children = [...cache.collections.children];
+  cache.collections.entries = [...cache.collections.entries];
+  publish();
+  return true;
 }
 
 export const syncMeta = () => ({ familyId: spaceMeta?.familyId ?? null, cursors: spaceMeta?.cursors ?? {}, deviceId: spaceMeta?.deviceId ?? "" });

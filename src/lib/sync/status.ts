@@ -17,8 +17,10 @@ export type SyncStatus = {
   held: number;
   // Not sent: the server refused them; retried every round.
   failed: number;
-  // Photos shown by records here that the server hasn't verified (photo files are backed up from M5).
+  // Photos shown by records here that the server hasn't verified yet (uploading, or retried after a problem).
   photosWaiting: number;
+  // Of those, the ones whose last transfer failed (retried every round; the local copy is always kept).
+  photosFailed: number;
   // Records whose own data is backed up but which show at least one such photo.
   recordsWaitingForPhotos: number;
   allBackedUp: boolean;
@@ -31,6 +33,8 @@ export function computeStatus(input: {
   lastSyncedAt: string | null;
   outbox: OutboxEntry[];
   notSent: Record<string, { state: EntryState }>;
+  // Photo id → why its last upload or download failed (lib/sync/photos.ts).
+  photosFailed?: Record<string, string>;
   children: Live[];
   entries: Live[];
   photo: (id: string) => PhotoMeta | undefined;
@@ -53,5 +57,6 @@ export function computeStatus(input: {
     if (missing.length) recordsWaitingForPhotos++;
   });
   const allBackedUp = input.phase === "idle" && input.lastSyncedAt !== null && pending + held + failed === 0 && waitingPhotos.size === 0;
-  return { phase: input.phase, lastSyncedAt: input.lastSyncedAt, pending, held, failed, photosWaiting: waitingPhotos.size, recordsWaitingForPhotos, allBackedUp };
+  const photosFailed = [...waitingPhotos].filter(id => input.photosFailed?.[id]).length;
+  return { phase: input.phase, lastSyncedAt: input.lastSyncedAt, pending, held, failed, photosWaiting: waitingPhotos.size, photosFailed, recordsWaitingForPhotos, allBackedUp };
 }

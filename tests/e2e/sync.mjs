@@ -2,8 +2,9 @@
 // `npm run test:e2e:cloud`.
 //
 // Two browser profiles signed in to the same account sync children and memories both ways, including after being
-// offline; backup status never says "All backed up" while anything (or a photo) is waiting; the guest space is
-// never uploaded or changed; another account receives nothing.
+// offline; photos are uploaded privately, verified by the server, then downloaded and shown on the other device;
+// backup status never says "All backed up" while anything (or a photo) is waiting; the guest space (with its photo)
+// is never uploaded or changed; another account receives nothing.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { API, SERVICE, admin, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
@@ -31,7 +32,10 @@ const signInFromProfile = async (u, email, entry) => {
 
 const emailA = `sync-a-${randomUUID()}@example.com`;
 const emailB = `sync-b-${randomUUID()}@example.com`;
-let one, two, u1, u2, familyA, guestBefore, idA;
+let one, two, u1, u2, familyA, guestBefore, idA, guestPhoto;
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const savePhoto = p => store(p, `const blob = await (await fetch("data:image/png;base64,${PNG}")).blob(); return S.savePhoto(blob, { width: 1, height: 1 });`);
+const objects = familyId => fetch(`${API}/storage/v1/object/list/family-photos`, { method: "POST", headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: JSON.stringify({ prefix: familyId }) }).then(r => r.json());
 
 try {
   // Device 1: RootMap already in use as a guest.
@@ -41,8 +45,10 @@ try {
   await u1.appReady();
   await u1.waitCloud("signed-out");
 
-  await step("Device 1 signs in as A; the guest space's records are not uploaded", async () => {
+  await step("Device 1 signs in as A; the guest space's records and photo are not uploaded", async () => {
     assert.equal(await addChild(one, "c-guest", "Gina"), null);
+    guestPhoto = (await savePhoto(one)).ref;
+    assert.match(guestPhoto, /^photo-/);
     await sleep(300);
     guestBefore = JSON.stringify(await u1.dump("rootmap"));
     await signInFromProfile(u1, emailA, "Create an account");
@@ -129,23 +135,36 @@ try {
     assert.notEqual(versions[0].version.notes, a.notes, "the losing notes are kept");
   });
 
-  await step("A memory with a photo: its details are sent, the file is not; status shows the photo waiting, never 'All backed up'", async () => {
+  await step("A photo added offline is kept; back online it is uploaded privately and verified, and only then 'All backed up'", async () => {
     page = one;
-    const photo = await store(one, `const blob = await (await fetch("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")).blob(); return S.savePhoto(blob, { width: 1, height: 1 });`);
-    const now = new Date().toISOString();
-    await store(one, `return S.write({ collections: { entries: [{ id: "m-photo", childId: "c-ada", date: "2026-10-12", title: "Painting", text: "", photos: [${JSON.stringify(photo.ref)}], createdAt: "${now}", updatedAt: "${now}", deletedAt: null, origin: "user", position: 0 }] } }, { rollback: true });`);
-    await waitStatus(one, `s.pending === 0 && s.lastSyncedAt && s.phase === "idle" && s.photosWaiting === 1`, "record sent, photo waiting");
-    const s = await status(one);
-    assert.deepEqual([s.recordsWaitingForPhotos, s.allBackedUp], [1, false]);
-    assert.equal((await admin(`/rest/v1/photos?family_id=eq.${familyA}&select=id,verified_at`)).length, 1);
-    assert.equal((await admin(`/rest/v1/entries?family_id=eq.${familyA}&select=id`)).length, 1);
-    const objects = await fetch(`${API}/storage/v1/object/list/family-photos`, { method: "POST", headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" }, body: JSON.stringify({ prefix: familyA }) }).then(r => r.json());
-    assert.deepEqual(objects, [], "no photo file uploaded");
+    await one.send("Network.setBlockedURLs", { urls: [`${API}/*`] });
+    let photo;
+    try {
+      photo = (await savePhoto(one)).ref;
+      const now = new Date().toISOString();
+      await store(one, `return S.write({ collections: { entries: [{ id: "m-photo", childId: "c-ada", date: "2026-10-12", title: "Painting", text: "", photos: [${JSON.stringify(photo)}], createdAt: "${now}", updatedAt: "${now}", deletedAt: null, origin: "user", position: 0 }] } }, { rollback: true });`);
+      await syncNow(one);
+      await waitStatus(one, `s.phase === "offline" && s.photosWaiting === 1`, "offline, photo waiting");
+      assert.equal((await status(one)).allBackedUp, false);
+    } finally {
+      await one.send("Network.setBlockedURLs", { urls: [] });
+    }
+    await syncNow(one);
+    await waitStatus(one, `s.allBackedUp`, "photo verified");
+    const row = (await admin(`/rest/v1/photos?family_id=eq.${familyA}&id=eq.${photo}&select=sha256,server_sha256,verified_at`))[0];
+    assert.ok(row.verified_at);
+    assert.equal(row.server_sha256, row.sha256);
+    assert.deepEqual((await objects(familyA)).map(o => o.name), [`${photo}.png`]);
     await u1.openProfile();
     await u1.click("RootMap Account");
-    await one.waitFor(`document.querySelector(".sync-summary")?.innerText.includes("photos are not backed up yet")`, 5000, "photo waiting shown");
-    assert.ok(!(await u1.has("All backed up")));
-  });
+    await one.waitFor(`document.querySelector(".sync-summary")?.innerText.includes("All backed up")`, 5000, "status shown");
+    page = two;
+    await syncNow(two);
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.hasPhotoBytes(${JSON.stringify(photo)}))`, 30000, "downloaded on device 2");
+    // Shown on device 2's Moments, from its own verified copy.
+    await two.eval(`[...document.querySelectorAll(".bottom-nav button")][3].click()`);
+    await two.waitFor(`[...document.querySelectorAll("img")].some(i => i.src.startsWith("blob:") && i.complete && i.naturalWidth > 0)`, 10000, "photo displayed");
+  }, /ERR_BLOCKED_BY_CLIENT|Failed to fetch/);
   await two.close();
   two = undefined;
 
@@ -165,6 +184,10 @@ try {
     assert.deepEqual((await serverChildren(familyA)).map(c => c.id).sort(), ["c-ada", "c-off"], "A's family untouched");
     assert.equal(JSON.stringify(await u1.dump("rootmap")), guestBefore);
     assert.ok(!(await admin(`/rest/v1/children?id=eq.c-guest&select=id`)).length, "guest child never uploaded");
+    assert.ok(!(await admin(`/rest/v1/photos?id=eq.${guestPhoto}&select=id`)).length, "guest photo's details never uploaded");
+    for (const f of [familyA, familyB]) assert.ok(!(await objects(f)).some(o => o.name.startsWith(guestPhoto)), "guest photo file never uploaded");
+    const guest = JSON.parse(guestBefore);
+    assert.ok(guest.photoBlobs.some(b => b.id === guestPhoto), "the guest photo is still on the device");
   });
 
   await step("Back to A: A's space and backup state are as left; nothing of B's", async () => {

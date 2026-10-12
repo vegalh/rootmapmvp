@@ -26,7 +26,8 @@ jobs:
       - run: npm ci
       - name: Start local Supabase
         # Mailpit stays on: the sign-in tests (tests/db/auth.test.ts) read the emailed codes from it.
-        run: npx supabase start -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+        # The Edge runtime stays on: the photo tests (tests/db/photos.test.ts) call verify-photo.
+        run: npx supabase start -x realtime,studio,imgproxy,logflare,vector,supavisor,postgres-meta
       - run: npm run test:db
       - run: npm test
       - run: npm run typecheck

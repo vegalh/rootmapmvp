@@ -384,7 +384,8 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [edge_runtime]
-enabled = false
+# On for the local stack: verify-photo (supabase/functions) runs here and in CI. Staging deploys are separate.
+enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
 # `per_worker` (default) — enables hot reload during local development.
 # `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
@@ -424,3 +425,8 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# verify-photo checks the caller itself (asks Auth for the user behind the token), so the gateway's JWT check is off.
+# The function reads the photo row with the caller's token, so row-level security decides access.
+[functions.verify-photo]
+verify_jwt = false

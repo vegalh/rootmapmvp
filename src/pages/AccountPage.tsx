@@ -56,6 +56,7 @@ function SyncSummary({ sync, t }: { sync: SyncStatus; t: Copy }) {
     else if (sync.phase === "error") lines.push(t.syncError);
     if (sync.pending) lines.push(t.syncPending.replace("{n}", String(sync.pending)));
     if (sync.photosWaiting) lines.push(t.syncPhotosWaiting.replace("{n}", String(sync.photosWaiting)));
+    if (sync.photosFailed) lines.push(t.syncPhotosFailed.replace("{n}", String(sync.photosFailed)));
     if (sync.held) lines.push(t.syncHeld.replace("{n}", String(sync.held)));
     if (sync.failed) lines.push(t.syncFailed.replace("{n}", String(sync.failed)));
   }

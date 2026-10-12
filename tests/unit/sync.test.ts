@@ -129,3 +129,13 @@ test("status: 'All backed up' only when nothing is pending, held, failed, or wai
   assert.equal(s({ entries: [{ id: "m-1", photos: [photo] }], photo: () => verified }).allBackedUp, true);
   assert.equal(s({ entries: [{ id: "m-1", photos: [photo], deletedAt: "t" }] }).allBackedUp, true, "deleted records don't wait");
 });
+
+test("photos: a failed upload counts as waiting (and failed), never backed up; the object name is the one the server derives", async () => {
+  const { storagePath } = await import("../../src/lib/sync/photos.ts");
+  const photo = "photo-11111111-1111-4111-8111-111111111111";
+  const s = computeStatus({ phase: "idle", lastSyncedAt: "t", outbox: [], notSent: {}, photosFailed: { [photo]: "didn't match" }, children: [], entries: [{ id: "m-1", photos: [photo] }], photo: () => undefined });
+  assert.deepEqual([s.photosWaiting, s.photosFailed, s.allBackedUp], [1, 1, false]);
+  // Same as photos.storage_path (generated column): <family>/<photo id>.<ext from the type>.
+  assert.equal(storagePath("f-1", { id: photo, mimeType: "image/png" }), `f-1/${photo}.png`);
+  assert.equal(storagePath("f-1", { id: photo, mimeType: "image/heic" }), `f-1/${photo}.heic`);
+});
