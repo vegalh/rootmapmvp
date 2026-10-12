@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
+import { Modal } from "../components/ui";
 import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
@@ -9,7 +10,7 @@ import { activities } from "../data/activities";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
 import { childAge, childTabLabel, groupOptionLabel, lessonLabel, localizeActivity, noteText, recordAreaLabel, stageLabel, type Copy } from "../lib/i18n";
 
-export function ChildProfilePage({ child, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, t }: {
+export function ChildProfilePage({ child, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, deleteRecord, t }: {
   child: Child;
   records: LessonRecord[];
   // The shared Moments collection; the Journal tab shows this child's part of it.
@@ -27,6 +28,8 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
   back: () => void;
   record: () => void;
   remove: () => void;
+  // Deletes one activity record by id; false (with an error already shown) when the device couldn't save.
+  deleteRecord: (id: string) => boolean;
   t: Copy;
 }) {
   // Several attempts on the same day keep the order they were recorded in (newest first).
@@ -56,7 +59,7 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
         {tab === "Activities" ? (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
-            <LessonList records={lessons} lang={lang} t={t} />
+            <LessonList records={lessons} lang={lang} deleteRecord={deleteRecord} t={t} />
             <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
           </>
         ) : (
@@ -111,7 +114,9 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
   );
 }
 
-function LessonList({ records, lang, t }: { records: LessonRecord[]; lang: Lang; t: Copy }) {
+function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[]; lang: Lang; deleteRecord: (id: string) => boolean; t: Copy }) {
+  // Tried record shown in the detail sheet, where a mistaken one can be deleted.
+  const [open, setOpen] = useState<{ record: LessonRecord; title: string; when: string; notes?: string }>();
   return (
     <div className="lesson-list">
       {records.map(r => {
@@ -122,7 +127,7 @@ function LessonList({ records, lang, t }: { records: LessonRecord[]; lang: Lang;
           const title = activity ? localizeActivity(activity, t).title : r.lesson;
           const when = t.triedOn.replace("{date}", fmtLong(r.date, lang));
           return (
-            <button key={r.id} onClick={() => window.alert(`${title}\n${when}${notes ? `\n\n${notes}` : ""}`)}>
+            <button key={r.id} onClick={() => setOpen({ record: r, title, when, notes })}>
               <i><Icon name="check" size={18} /></i>
               <span><strong>{title}</strong><small>{when}</small></span>
               <b className="status tried">{t.tried}</b>
@@ -141,6 +146,26 @@ function LessonList({ records, lang, t }: { records: LessonRecord[]; lang: Lang;
           </button>
         );
       })}
+      {open && (
+        <Modal title={open.title} close={() => setOpen(undefined)}>
+          <div className="record-detail">
+            <b className="status tried">{t.tried}</b>
+            <p>{open.when}</p>
+            {open.notes && <p className="record-notes">{open.notes}</p>}
+          </div>
+          <div className="sheet-buttons even">
+            <button
+              className="danger"
+              onClick={() => {
+                // Removes only this record (by id): other attempts, the Discover activity and journal entries stay.
+                if (!window.confirm(t.confirmDeleteRecord)) return;
+                if (deleteRecord(open.record.id)) setOpen(undefined);
+              }}
+            ><Icon name="trash" size={17} />{t.deleteRecord}</button>
+            <button onClick={() => setOpen(undefined)}>{t.done}</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

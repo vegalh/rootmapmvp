@@ -18,6 +18,10 @@ export type Child = {
   interests?: string[];
 };
 
+// A profile removed from My Children (localStorage "rootmap-deleted-children"). Its records, entries and plans
+// stay keyed by `id`, so restoring the profile brings them back.
+export type DeletedChild = Child & { deletedAt: string };
+
 export type ProfileInfo = {
   name: string;
   photo: string;
@@ -162,6 +166,8 @@ export type Screen =
   | "notificationPrefs"
   | "personal"
   | "privacy"
-  | "help";
+  | "help"
+  | "backup"
+  | "deletedChildren";
 
 export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | "tried" | null;

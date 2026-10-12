@@ -3,11 +3,11 @@ import { PageHeader } from "../components/ui";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 
-export function ProfilePage({ go, lang, appearance, profile, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; profile: ProfileInfo; t: Copy }) {
+export function ProfilePage({ go, lang, appearance, profile, deletedCount, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; profile: ProfileInfo; deletedCount: number; t: Copy }) {
   const groups: [string, [string, string, string, string?][]][] = [
     [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["goals", "target", t.myGoals]]],
     [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications]]],
-    [t.account, [["personal", "user", t.personal], ["privacy", "shield", t.privacy], ["help", "help", t.help]]],
+    [t.account, [["personal", "user", t.personal], ["deletedChildren", "clock", t.recentlyDeleted, deletedCount ? String(deletedCount) : undefined], ["privacy", "shield", t.privacy], ["help", "help", t.help]]],
   ];
   return (
     <main className="page-content profile-page">

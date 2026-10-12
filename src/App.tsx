@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
@@ -15,14 +15,17 @@ import { RecordFormPage } from "./pages/RecordFormPage";
 import { EntryEditorPage } from "./pages/EntryEditorPage";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
-import { onStorageError, readStored, tryStore, useStored, type StorageFailure } from "./lib/storage";
+import { BackupPage } from "./pages/BackupPage";
+import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
+import { onStorageError, tryStore, useStored, type StorageFailure } from "./lib/storage";
+import { LAST_BACKUP_KEY, RESTORED_AT_KEY } from "./lib/backup";
 import { ENTRIES_KEY, MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { Child, Entry, Goal, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
+import type { Child, DeletedChild, Entry, Goal, LessonRecord, Lang, ModalKind, Observation, Plan, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -48,8 +51,15 @@ const seedIds = [
 // Unique even when two records are created within the same millisecond.
 const newId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-// Profiles removed from My Children are kept here (with their photo) so they could be restored later.
+// Profiles removed from My Children are kept here (with their photo) and can be restored from Profile.
 const DELETED_CHILDREN_KEY = "rootmap-deleted-children";
+// Development-only preview of the opening experience (`?opening`, `?opening=final`). Not part of navigation yet;
+// in production builds this is null and the component isn't bundled.
+const OpeningPreview = import.meta.env.DEV ? lazy(() => import("./dev/OpeningPreview")) : null;
+const previewOpening = import.meta.env.DEV && new URLSearchParams(window.location.search).has("opening");
+
+// Set just before the reload that follows a restore, so the reloaded app can confirm it.
+const JUST_RESTORED_KEY = "rootmap-just-restored";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("children");
@@ -83,6 +93,8 @@ export default function App() {
   const [entries, setEntries] = useStored<Entry[]>(ENTRIES_KEY, []);
   const [migrated, setMigrated] = useStored<string[]>(MIGRATED_KEY, []);
   const [goals, setGoals] = useStored<Goal[]>("rootmap-goals", []);
+  const [deletedChildren, , commitDeleted] = useStored<DeletedChild[]>(DELETED_CHILDREN_KEY, []);
+  const [lastBackup, setLastBackup] = useStored<string>(LAST_BACKUP_KEY, "");
   const [lang, setLang] = useStored<Lang>("rootmap-language", "en");
   const [appearance, setAppearance] = useStored<string>("rootmap-appearance", "light");
   const [view, setView] = useStored<string>("rootmap-child-view", "grid");
@@ -121,6 +133,24 @@ export default function App() {
 
   // Background writes (goals, profile, edits…) that fail are reported instead of being lost silently.
   useEffect(() => onStorageError(kind => setToast(kind === "full" ? copy[lang].storageFull : copy[lang].storageFailed)), [lang]);
+
+  // After a restore every open RootMap tab reloads, so none can write its stale in-memory data back.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => { if (e.key === RESTORED_AT_KEY) window.location.reload(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem(JUST_RESTORED_KEY)) return;
+      sessionStorage.removeItem(JUST_RESTORED_KEY);
+      setToast(copy[lang].restoreDone);
+    } catch {
+      // sessionStorage unavailable; the restore itself already succeeded.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Writes synchronously first so a full device (large photos) is reported instead of silently losing the entry.
   const storeEntries = (next: Entry[]) => {
@@ -229,7 +259,7 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} t={t} />;
     if (screen === "child") {
       return (
         <ChildProfilePage
@@ -264,13 +294,18 @@ export default function App() {
               ? t.confirmDeleteChildWithData.split("{name}").join(child.first).replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))
               : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`);
             if (!window.confirm(message)) return;
-            const deleted = readStored<unknown[]>(DELETED_CHILDREN_KEY, []).value;
-            tryStore(DELETED_CHILDREN_KEY, [...deleted, { ...child, deletedAt: new Date().toISOString() }]);
+            // The profile must be safely in the deleted list before it leaves My Children.
+            if (!savedOk(commitDeleted([...deletedChildren, { ...child, deletedAt: new Date().toISOString() }]))) return;
             if (!savedOk(commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
             go("children");
           }}
           back={() => go("children")}
           record={() => go("record")}
+          deleteRecord={id => {
+            if (!savedOk(commitRecords(records.filter(r => r.id !== id)))) return false;
+            setToast(t.recordDeleted);
+            return true;
+          }}
           t={t}
         />
       );
@@ -370,11 +405,60 @@ export default function App() {
         </main>
       );
     }
+    // Developer/migration utility only: no parent-facing navigation leads here. Saving is meant to be
+    // automatic (see the planned cloud sync); the backup library in lib/backup.ts stays for migration.
+    if (screen === "backup") {
+      return (
+        <BackupPage
+          shown={{
+            "rootmap-children": childrenData, "rootmap-records": records, "rootmap-observations": observations, "rootmap-journal": entries,
+            "rootmap-saved": saved, "rootmap-plans": plans, "rootmap-goals": goals, "rootmap-profile": profile,
+            "rootmap-language": lang, "rootmap-appearance": appearance,
+          }}
+          lastBackup={lastBackup}
+          setLastBackup={setLastBackup}
+          restored={() => {
+            try { localStorage.setItem(RESTORED_AT_KEY, new Date().toISOString()); } catch { /* other tabs just won't auto-reload */ }
+            try { sessionStorage.setItem(JUST_RESTORED_KEY, "1"); } catch { /* no confirmation toast */ }
+            window.location.reload();
+          }}
+          back={() => go("profile")}
+          lang={lang}
+          t={t}
+        />
+      );
+    }
+    if (screen === "deletedChildren") {
+      return (
+        <DeletedChildrenPage
+          deleted={deletedChildren}
+          childrenData={childrenData}
+          entries={entries}
+          records={records}
+          restore={d => {
+            if (childrenData.some(c => c.id === d.id)) return;
+            if (!window.confirm(t.confirmRestoreChild.replace("{name}", `${d.first} ${d.last}`))) return;
+            const { deletedAt: _deletedAt, ...profile } = d;
+            if (!savedOk(commitChildren([...childrenData, profile]))) return;
+            // If this second write fails the profile simply also stays listed here, marked as already restored.
+            commitDeleted(deletedChildren.filter(x => x !== d));
+            setToast(t.childRestored.replace("{name}", d.first));
+          }}
+          back={() => go("profile")}
+          lang={lang}
+          t={t}
+        />
+      );
+    }
     if (screen === "notifications") {
       return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={goChild} t={t} />;
     }
     return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
+
+  if (OpeningPreview && previewOpening) {
+    return <Suspense fallback={null}><OpeningPreview lang={lang} setLang={setLang} /></Suspense>;
+  }
 
   return (
     <div className="app-shell">
