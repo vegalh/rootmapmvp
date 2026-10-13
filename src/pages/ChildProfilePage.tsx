@@ -7,7 +7,7 @@ import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
-import { activities } from "../data/activities";
+import { findActivity } from "../lib/catalog";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
 import { childAge, childTabLabel, groupOptionLabel, lessonLabel, localizeActivity, noteText, recordAreaLabel, stageLabel, type Copy } from "../lib/i18n";
 
@@ -124,7 +124,7 @@ function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[
         const notes = noteText(r.notes, r.notesZh, t);
         if (r.kind === "tried") {
           // Parent-friendly: just the activity and when it was tried, no learning stage.
-          const activity = activities.find(a => a.id === r.activityId);
+          const activity = findActivity(r.activityId);
           const title = activity ? localizeActivity(activity, t).title : r.lesson;
           const when = t.triedOn.replace("{date}", fmtLong(r.date, lang));
           return (

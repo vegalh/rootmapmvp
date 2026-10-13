@@ -44,7 +44,7 @@ This is the guest space. Builds with cloud features also keep one database per s
 | `photos` | `id` | Photo metadata: type, size, dimensions, timestamps, future `storagePath` / `uploadedAt`. |
 | `photoBlobs` | `id` | The image bytes (Blob), kept apart from metadata. |
 | `drafts` | `key` (`<childId>:<entryId\|new>`) | Unsaved editor state. Device-local by design. |
-| `settings` | `key` (the old localStorage key name) | Profile, language, appearance, filters, notes pad, notification toggles, seed tracking. |
+| `settings` | `key` (the old localStorage key name) | Profile, language, appearance, filters, notes pad, notification toggles, seed tracking, the Family Bookshelf (`rootmap-bookshelf`: `{ bookId, shelf: "owned" \| "wishlist", addedAt }[]`). |
 | `archive` | `id` | Anything the migration could not place safely, kept verbatim (see below). |
 | `meta` | `key` | `migration`: completion marker and report. |
 

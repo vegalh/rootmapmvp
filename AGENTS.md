@@ -20,6 +20,8 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `children.ts` - The list of children/students. **Add a child or change a photo here.**
   - `progress.ts` - Lesson records, observations, and the lesson options offered per learning area.
   - `activities.ts` - Discover page activities/lessons and category list. **Add a new lesson/activity here.**
+  - `books.ts` - Discover > Books, the curated book collection (currently clearly labelled samples). **Add a book here.**
+  - `music.ts` - Discover > Music, interactive music activities and their recordings. **Add a music activity or connect a recording here.**
   - `thoughts.ts` - The "A Thought for Parents" reflections (English + Chinese) shown on Today, one per day.
 - `src/lib/` - Small framework-agnostic helpers:
   - `i18n.ts` - English/Chinese translation strings (`copy`) and the `Copy` type.
@@ -31,6 +33,8 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
   - `welcome.ts` - Whether this device still shows the Welcome screen (new devices only, cloud builds only).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
+  - `catalog.ts` - Activities and music activities share one id space: `findActivity(id)` resolves either (saved, My Week plans, "Mark as Tried" records). Also age labels/filters and book/music localization.
+  - `bookshelf.ts` - The Family Bookshelf (My Books / Wishlist), stored as the `rootmap-bookshelf` setting; a book is on at most one shelf.
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
   - `cloud/` - Cloud settings. `environment.ts` decides from the Vite mode and `VITE_*` variables whether this build may use Supabase (off by default, always off for the public website); `config.ts` is the app's `cloudConfig`; `client.ts` loads Supabase lazily (never in the public build); `auth.ts` email-code sign-in, session restore, sign-out; `account.ts` idempotent family/profile setup; `session.ts` app-wide sign-in state; `hooks.ts` `useCloudState()` for screens; `space.ts` which local space opens (from the stored session) and when to switch.
@@ -43,8 +47,9 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `OpeningExperience.tsx` - Opening animation, Welcome and the email + 6-digit code sign-in screens.
   - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
   - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
+  - `BooksBrowser.tsx`, `MusicBrowser.tsx` - The Books and Music tabs of Discover. `BookCover.tsx` - book cover (or drawn placeholder) and grid tile. `AudioPlayer.tsx` - play/pause/seek player for music recordings; shows "Recording coming soon" without a playable file.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
-  - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
+  - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx` (Activities | Books | Music), `ActivityDetailPage.tsx`, `BookDetailPage.tsx`, `MusicDetailPage.tsx`, `BookshelfPage.tsx` (Family Bookshelf, from Profile), `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
@@ -58,6 +63,8 @@ This is the canonical project structure. Start with task-relevant files below. O
 ## Making common changes
 
 - **Add a new lesson/activity**: append an entry to the `activities` array in [src/data/activities.ts](src/data/activities.ts).
+- **Add a book**: append an entry to `books` in [src/data/books.ts](src/data/books.ts) (cover image in `src/assets/books/`, imported).
+- **Add a music activity / connect a recording**: edit [src/data/music.ts](src/data/music.ts); put the MP3/M4A in `src/assets/music/`, import it and set `audioSrc`.
 - **Add or edit a child / change a photo**: edit [src/data/children.ts](src/data/children.ts).
 - **Add a new page/screen**: create a file in `src/pages/`, add its name to the `Screen` union in [src/types.ts](src/types.ts), and wire it into the `content()` switch in [src/App.tsx](src/App.tsx).
 - **Change translation text**: edit `copy.en` / `copy.zh` in [src/lib/i18n.ts](src/lib/i18n.ts).

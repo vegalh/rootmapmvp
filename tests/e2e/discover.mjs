@@ -1,0 +1,363 @@
+import assert from "node:assert/strict";
+import { HELPERS, launch, sleep } from "./cdp.mjs";
+import { BASE, tempProfile } from "./env.mjs";
+
+// Discover > Activities | Books | Music, the Family Bookshelf, and music activities in the My Week workflow.
+// Checks are written against whatever books and music the data files hold, so they keep passing as the sample
+// entries are replaced with real ones.
+
+const page = await launch(tempProfile("discover"), 9343);
+await page.send("Page.addScriptToEvaluateOnNewDocument", { source: HELPERS });
+await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+
+const results = [];
+async function step(name, fn) {
+  const errorsBefore = page.errors.length;
+  try {
+    await fn();
+    const newErrors = page.errors.slice(errorsBefore);
+    if (newErrors.length) throw new Error(`console errors: ${newErrors.join(" | ")}`);
+    results.push(["PASS", name]);
+    console.log(`PASS  ${name}`);
+  } catch (e) {
+    results.push(["FAIL", name, e.message]);
+    console.log(`FAIL  ${name}\n      ${e.message.split("\n").join("\n      ")}`);
+  }
+}
+
+const q = s => JSON.stringify(s);
+const appReady = () => page.waitFor(`document.querySelector(".bottom-nav")`, 15000, "app rendered");
+const nav = async index => { await page.eval(`__t.clickSel(".bottom-nav button", ${index})`); await sleep(200); };
+const NAV = { today: 0, discover: 1, kids: 3, profile: 4 };
+const tab = async label => { await page.eval(`__t.click(${q(label)}, ".discover-tabs button")`); await sleep(150); };
+const activeTab = () => page.eval(`document.querySelector(".discover-tabs button.active")?.textContent.trim()`);
+const count = sel => page.eval(`document.querySelectorAll(${q(sel)}).length`);
+const search = async text => { await page.eval(`__t.type(".discover-search input", ${q(text)})`); await sleep(150); };
+const pickAge = async option => {
+  await page.eval(`__t.clickSel(".filter-row .filter-pill")`);
+  await page.waitFor(`document.querySelector(".filter-popover")`, 3000, "age options open");
+  await page.eval(`__t.click(${q(option)}, ".filter-popover-option")`);
+  await sleep(150);
+};
+const setting = async key => (await page.eval(`__t.all("settings")`)).find(s => s.key === key)?.value;
+const live = async store => (await page.eval(`__t.all(${q(store)})`)).filter(r => !r.deletedAt);
+const noOverflow = async label => {
+  const w = await page.eval(`document.documentElement.scrollWidth`);
+  assert.ok(w <= 390, `${label}: page is ${w}px wide at 390px`);
+};
+const AGES = ["0–2", "2–3", "3–4", "4–6", "6+"];
+
+await page.nav(`${BASE}/`);
+await appReady();
+await page.waitFor(`__t.dbExists()`, 10000, "data stored");
+const plansBefore = await live("plans");
+const savedBefore = await live("saved");
+
+await step("Discover shows Activities | Books | Music, with Activities first and selected", async () => {
+  await nav(NAV.discover);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["Activities", "Books", "Music"]);
+  assert.equal(await activeTab(), "Activities");
+  assert.equal(await page.eval(`document.querySelectorAll(".bottom-nav button").length`), 5, "bottom navigation unchanged");
+  assert.ok((await count(".activity-card")) > 0);
+  assert.equal(await count(".filter-row .filter-pill"), 3, "Age, Topic and Area filters");
+  await noOverflow("Activities");
+});
+
+await step("Activities still search, save, open and come back to the Activities tab", async () => {
+  const total = await count(".activity-card");
+  await search("mopping");
+  assert.equal(await count(".activity-card"), 1);
+  await search("");
+  assert.equal(await count(".activity-card"), total);
+  await page.eval(`__t.clickSel(".activity-card .activity-name")`);
+  await page.waitFor(`document.querySelector(".detail-page .material-list")`, 3000, "activity detail");
+  await page.eval(`__t.clickSel(".detail-actions button")`);
+  await page.waitFor(`document.querySelector(".discover-tabs")`, 3000, "back on Discover");
+  assert.equal(await activeTab(), "Activities");
+});
+
+let bookTitle, bookCount;
+await step("Books: search by title and author, and filter by age (a book may be in several ranges)", async () => {
+  await tab("Books");
+  assert.equal(await activeTab(), "Books");
+  bookCount = await count(".book-tile");
+  assert.ok(bookCount > 0, "the collection has books");
+  bookTitle = await page.eval(`document.querySelector(".book-tile strong").textContent`);
+  const author = await page.eval(`document.querySelector(".book-tile small").textContent`);
+  await search(bookTitle.toUpperCase());
+  assert.ok(await page.eval(`[...document.querySelectorAll(".book-tile strong")].some(s => s.textContent === ${q(bookTitle)})`), "title search");
+  await search(author);
+  assert.ok((await count(".book-tile")) >= 1, "author search");
+  await search("zzz-no-such-book");
+  assert.equal(await count(".book-tile"), 0);
+  assert.ok(await page.eval(`!!document.querySelector(".empty")`), "empty result message");
+  await search("");
+  let inRanges = 0;
+  for (const age of AGES) {
+    await pickAge(age);
+    const n = await count(".book-tile");
+    assert.ok(n <= bookCount, `${age}: ${n} of ${bookCount}`);
+    assert.ok(await page.eval(`document.querySelector(".filter-row .filter-pill").textContent.includes(${q(age)})`));
+    inRanges += n;
+  }
+  assert.ok(inRanges >= bookCount, "every book is in at least one age range");
+  await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
+  assert.equal(await count(".book-tile"), bookCount);
+  await noOverflow("Books");
+});
+
+await step("Book details: cover, title, author, ages, description, why we recommend it, Add to Family Bookshelf", async () => {
+  await page.eval(`__t.clickSel(".book-tile")`);
+  await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book detail");
+  assert.equal(await page.eval(`document.querySelector(".book-detail h1").textContent`), bookTitle);
+  for (const sel of [".book-detail-cover .book-cover", ".book-author", ".book-ages", ".description", ".book-why"]) {
+    assert.ok(await page.eval(`!!document.querySelector(${q(sel)})?.textContent.trim() || !!document.querySelector(${q(sel)} + " img")`), sel);
+  }
+  assert.ok(await page.eval(`document.body.innerText.includes("Why We Recommend It")`));
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "Add to Family Bookshelf");
+  await noOverflow("Book details");
+});
+
+const shelf = async () => (await setting("rootmap-bookshelf")) ?? [];
+const openShelfSheet = async () => {
+  await page.eval(`__t.clickSel(".sticky-action button")`);
+  await page.waitFor(`document.querySelector(".overlay .shelf-choices")`, 3000, "bookshelf sheet");
+};
+
+let bookId;
+await step("Books go to My Books, move to Wishlist and back, and are removed, without duplicates", async () => {
+  await openShelfSheet();
+  await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`);
+  await page.waitFor(`!document.querySelector(".overlay")`, 3000, "sheet closed");
+  await page.waitFor(`document.querySelector(".toast")?.textContent === "Added to My Books"`, 3000, "toast");
+  await page.waitFor(`__t.all("settings").then(s => s.find(x => x.key === "rootmap-bookshelf")?.value?.length === 1)`, 3000, "stored");
+  let items = await shelf();
+  assert.equal(items[0].shelf, "owned");
+  bookId = items[0].bookId;
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "In My Books");
+
+  await openShelfSheet();
+  await page.eval(`__t.click("Wishlist", ".overlay .shelf-choices button")`);
+  await page.waitFor(`document.querySelector(".toast")?.textContent === "Moved to Wishlist"`, 3000, "moved toast");
+  await sleep(200);
+  items = await shelf();
+  assert.deepEqual(items.map(i => [i.bookId, i.shelf]), [[bookId, "wishlist"]], "moved, not copied");
+
+  await openShelfSheet();
+  await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`); await sleep(200);
+  await openShelfSheet();
+  await page.eval(`__t.clickSel(".overlay .shelf-remove")`);
+  await page.waitFor(`document.querySelector(".toast")?.textContent === "Removed from Family Bookshelf"`, 3000, "removed toast");
+  await sleep(200);
+  assert.deepEqual(await shelf(), []);
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "Add to Family Bookshelf");
+
+  // Two books: one owned, one wished for.
+  await openShelfSheet();
+  await page.eval(`__t.click("Wishlist", ".overlay .shelf-choices button")`); await sleep(200);
+  await page.eval(`__t.clickSel(".detail-actions button")`);
+  await page.waitFor(`document.querySelector(".book-tile")`, 3000, "back on Books");
+  assert.equal(await activeTab(), "Books", "back returns to the Books tab");
+  if (bookCount > 1) {
+    await page.eval(`__t.clickSel(".book-tile", 1)`);
+    await page.waitFor(`document.querySelector(".book-detail")`, 3000, "second book");
+    await openShelfSheet();
+    await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`); await sleep(200);
+  }
+  const final = await shelf();
+  assert.equal(new Set(final.map(i => i.bookId)).size, final.length, "each book once");
+});
+
+await step("Family Bookshelf (Profile) persists after a refresh and is shared, with My Books and Wishlist", async () => {
+  await page.reload();
+  await appReady();
+  await nav(NAV.profile);
+  const row = await page.eval(`[...document.querySelectorAll(".menu-section button")].find(b => b.textContent.includes("Family Bookshelf"))?.textContent`);
+  assert.ok(row, "Profile has Family Bookshelf");
+  const expected = (await shelf()).length;
+  assert.ok(row.includes(String(expected)), `count ${expected} shown: ${row}`);
+  await page.eval(`__t.click("Family Bookshelf", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf page");
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".bookshelf-page .segmented button")].map(b => b.textContent)`), ["My Books", "Wishlist"]);
+  const items = await shelf();
+  assert.equal(await count(".bookshelf-page .book-tile"), items.filter(i => i.shelf === "owned").length);
+  await page.eval(`__t.click("Wishlist", ".bookshelf-page .segmented button")`); await sleep(150);
+  assert.equal(await count(".bookshelf-page .book-tile"), items.filter(i => i.shelf === "wishlist").length);
+  await noOverflow("Family Bookshelf");
+
+  // Opening a book from the shelf and coming back lands on the shelf, on the same tab.
+  await page.eval(`__t.clickSel(".bookshelf-page .book-tile")`);
+  await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book from shelf");
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "On Wishlist");
+  await openShelfSheet();
+  await page.eval(`__t.clickSel(".overlay .shelf-remove")`); await sleep(200);
+  await page.eval(`__t.clickSel(".detail-actions button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "back on the shelf");
+  assert.equal(await page.eval(`document.querySelector(".bookshelf-page .segmented button.active").textContent`), "Wishlist");
+  assert.ok(await page.eval(`!!document.querySelector(".shelf-empty")`), "empty wishlist invites exploring");
+  await page.eval(`__t.click("Explore Books", ".shelf-empty button")`);
+  await page.waitFor(`document.querySelector(".discover-tabs")`, 3000, "Discover");
+  assert.equal(await activeTab(), "Books");
+});
+
+let musicTitle, musicId;
+await step("Music: search and age filter", async () => {
+  await tab("Music");
+  assert.equal(await activeTab(), "Music");
+  const total = await count(".music-card");
+  assert.ok(total > 0);
+  musicTitle = await page.eval(`document.querySelector(".music-card .activity-name").textContent`);
+  await search(musicTitle.slice(0, 5).toLowerCase());
+  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-name")].some(s => s.textContent === ${q(musicTitle)})`));
+  await search("zzz-no-such-song");
+  assert.equal(await count(".music-card"), 0);
+  await search("");
+  let inRanges = 0;
+  for (const age of AGES) { await pickAge(age); inRanges += await count(".music-card"); }
+  assert.ok(inRanges >= total);
+  await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
+  assert.equal(await count(".music-card"), total);
+  for (const sel of [".music-card img", ".music-card .music-play", ".music-card .heart", ".music-card p", ".music-card small"]) assert.ok((await count(sel)) >= total, sel);
+  await noOverflow("Music");
+});
+
+await step("Music details: missing audio shows 'coming soon' instead of a broken player", async () => {
+  await page.eval(`__t.clickSel(".music-card .activity-image")`);
+  await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music detail");
+  assert.equal(await page.eval(`document.querySelector(".music-detail h1").textContent`), musicTitle);
+  for (const text of ["How to Play", "What Children Explore", "Mark as Tried", "Add to My Week"]) {
+    assert.ok(await page.eval(`document.body.innerText.includes(${q(text)})`), text);
+  }
+  assert.ok(await page.eval(`document.querySelectorAll(".music-detail ol li").length > 0`));
+  assert.ok(await page.eval(`document.querySelectorAll(".explore-tags span").length > 0`));
+  // Sample music has no recordings yet; an activity with a recording shows the player instead.
+  const hasAudio = await page.eval(`!!document.querySelector(".music-detail audio")`);
+  if (!hasAudio) {
+    assert.ok(await page.eval(`document.querySelector(".audio-player.unavailable")?.textContent.includes("Recording coming soon")`));
+  } else {
+    assert.ok(await page.eval(`!!document.querySelector(".audio-toggle") && document.querySelector(".music-detail audio").autoplay === false`));
+  }
+  await noOverflow("Music details");
+});
+
+await step("Music: save, Add to My Week, Mark as Tried, all through the existing records", async () => {
+  await page.eval(`__t.clickSel(".detail-actions div button")`);
+  await page.waitFor(`__t.all("saved").then(s => s.some(x => !x.deletedAt && x.id.startsWith("music-")))`, 3000, "saved");
+  musicId = (await live("saved")).find(x => x.id.startsWith("music-")).id;
+
+  await page.eval(`__t.click("Mark as Tried", ".sticky-action button")`);
+  await page.waitFor(`document.querySelector(".overlay select")`, 3000, "tried sheet");
+  await page.eval(`__t.type(".overlay select", "emma")`);
+  await page.eval(`__t.click("Save", ".overlay .sheet-buttons button")`);
+  await page.waitFor(`document.querySelector(".tried-done")`, 3000, "tried saved");
+  const tried = (await live("records")).filter(r => r.kind === "tried" && r.activityId === musicId);
+  assert.equal(tried.length, 1);
+  assert.equal(tried[0].childId, "emma");
+  await page.eval(`__t.click("Done", ".overlay button")`);
+  await page.waitFor(`!document.querySelector(".overlay")`, 3000, "closed");
+
+  await page.eval(`__t.click("Add to My Week", ".sticky-action button")`);
+  await page.waitFor(`document.querySelector(".overlay .plan-activity")`, 3000, "plan sheet");
+  assert.equal(await page.eval(`document.querySelector(".overlay .plan-activity strong").textContent`), musicTitle);
+  await page.eval(`__t.clickSel(".overlay .modal-primary")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week");
+  const plans = (await live("plans")).filter(p => p.activityId === musicId);
+  assert.equal(plans.length, 1);
+});
+
+await step("My Week shows the music activity in Weekly Plan, Completed and Saved; repeating works", async () => {
+  assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in the weekly plan");
+  const row = `[...document.querySelectorAll(".day-plan")].find(d => d.innerText.includes(${q(musicTitle)}))`;
+  await page.eval(`${row}.querySelector(".plan-actions button").click()`); await sleep(200);
+  assert.equal((await live("plans")).find(p => p.activityId === musicId).completed, true);
+  await page.eval(`__t.click("Completed", ".segmented button")`); await sleep(150);
+  assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in completed");
+  await page.eval(`[...document.querySelectorAll(".week-list .activity-row")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector("button").click()`);
+  await sleep(200);
+  assert.equal((await live("plans")).filter(p => p.activityId === musicId).length, 2, "repeated");
+  await page.eval(`__t.click("Saved", ".segmented button")`); await sleep(150);
+  assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in saved");
+  await page.eval(`[...document.querySelectorAll(".week-list .activity-row")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector("button").click()`);
+  await page.waitFor(`document.querySelector(".music-detail")`, 3000, "opens the music page");
+  await page.eval(`__t.clickSel(".detail-actions button")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "back to My Week");
+});
+
+await step("Existing plans and saved activities are unchanged; Saved Activities and the child's history include music", async () => {
+  const plansNow = await live("plans");
+  for (const p of plansBefore) assert.deepEqual(plansNow.find(x => x.id === p.id), p, `plan ${p.id} untouched`);
+  const savedNow = (await live("saved")).map(s => s.id);
+  for (const s of savedBefore) assert.ok(savedNow.includes(s.id), `saved ${s.id} kept`);
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".profile-page")`, 3000, "Profile");
+  await page.eval(`__t.click("Saved Activities", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".simple-page .week-list")`, 3000, "Saved Activities");
+  assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`));
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".profile-page")`, 3000, "Profile");
+  await nav(NAV.kids);
+  await page.eval(`[...document.querySelectorAll(".child-select-card")].find(c => c.innerText.includes("Maya")).click()`);
+  await page.waitFor(`document.querySelector(".tabs")`, 3000, "child page");
+  await page.eval(`__t.click("Activities", ".tabs button")`); await sleep(150);
+  assert.ok(await page.eval(`document.body.innerText.includes(${q(musicTitle)})`), "tried music in the child's activities");
+  await page.eval(`__t.clickSel(".child-header > button")`);
+  await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on Kids");
+});
+
+await step("Chinese: tabs, Books search in Chinese, Music labels; then back to English", async () => {
+  await nav(NAV.profile);
+  await page.eval(`__t.click("Language", ".menu-section button")`);
+  await page.eval(`__t.click("简体中文")`);
+  await page.waitFor(`document.documentElement.lang === "zh-CN"`, 3000, "Chinese");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+  assert.ok(await page.eval(`document.body.innerText.includes("家庭书架")`), "Profile row");
+  await nav(NAV.discover);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本", "音乐"]);
+  await tab("绘本");
+  const zhTitle = await page.eval(`document.querySelector(".book-tile strong").textContent`);
+  await search(zhTitle);
+  assert.ok((await count(".book-tile")) >= 1, "Chinese title search");
+  await search("");
+  await page.eval(`__t.clickSel(".book-tile")`);
+  await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book");
+  assert.ok(await page.eval(`document.body.innerText.includes("推荐理由") && document.body.innerText.includes("加入家庭书架")`));
+  await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
+  await tab("音乐");
+  await page.eval(`__t.clickSel(".music-card .activity-image")`);
+  await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music");
+  for (const text of ["玩法介绍", "孩子在探索什么", "标记已尝试"]) assert.ok(await page.eval(`document.body.innerText.includes(${q(text)})`), text);
+  await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
+  await nav(NAV.profile);
+  await page.eval(`__t.click("语言", ".menu-section button")`);
+  await page.eval(`__t.click("English")`);
+  await page.waitFor(`document.documentElement.lang === "en"`, 3000, "English");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+});
+
+await step("Dark mode: the new screens use the dark theme and fit 390px", async () => {
+  await page.eval(`__t.click("Appearance", ".menu-section button")`);
+  await page.eval(`__t.click("Dark")`);
+  await page.waitFor(`document.documentElement.dataset.theme === "dark"`, 3000, "dark");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+  await nav(NAV.discover);
+  const bg = sel => page.eval(`getComputedStyle(document.querySelector(${q(sel)})).backgroundColor`);
+  for (const t of ["Books", "Music"]) {
+    await tab(t);
+    await noOverflow(t);
+  }
+  assert.equal(await bg(".music-card"), "rgb(30, 38, 32)", "cards use the dark card colour");
+  await page.eval(`__t.clickSel(".music-card .activity-image")`);
+  await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music");
+  assert.equal(await bg(".music-detail"), "rgb(20, 26, 22)", "page uses the dark background");
+  await noOverflow("Music details (dark)");
+  await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
+  await nav(NAV.profile);
+  await page.eval(`__t.click("Appearance", ".menu-section button")`);
+  await page.eval(`__t.click("Light")`);
+  await page.waitFor(`document.documentElement.dataset.theme === "light"`, 3000, "light");
+});
+
+await page.close();
+const failed = results.filter(r => r[0] === "FAIL");
+console.log(`\n${results.length - failed.length}/${results.length} passed`);
+process.exit(failed.length ? 1 : 0);

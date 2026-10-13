@@ -5,6 +5,7 @@ import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 import { activities } from "../data/activities";
+import { findActivity } from "../lib/catalog";
 import { initialObservations } from "../data/progress";
 import { thoughts } from "../data/thoughts";
 import type { Activity, Child, Entry, Lang, LessonRecord } from "../types";
@@ -52,9 +53,9 @@ function pickMemory(entries: Entry[], records: LessonRecord[], childrenData: Chi
   const withText = mine.filter(e => (e.title || e.text || "").trim());
   if (withText.length) return { kind: "text", entry: pickForDay(preferOlder(withText, today), today, "memory")! };
   // Only "Mark as Tried" records whose activity still exists, so the card always opens something.
-  const tried = records.filter(r => r.kind === "tried" && known.has(r.childId) && activities.some(a => a.id === r.activityId));
+  const tried = records.filter(r => r.kind === "tried" && known.has(r.childId) && !!findActivity(r.activityId));
   const record = pickForDay(preferOlder(tried, today), today, "memory");
-  return record ? { kind: "tried", record, activity: activities.find(a => a.id === record.activityId)! } : undefined;
+  return record ? { kind: "tried", record, activity: findActivity(record.activityId)! } : undefined;
 }
 
 // "last month" / "上个月", "3 days ago" / "3天前".

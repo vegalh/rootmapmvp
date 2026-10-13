@@ -76,6 +76,8 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-read-notifications": "array",
   // Whether this device still shows the Welcome screen (lib/welcome.ts). Device-only: not in backups.
   "rootmap-welcome": "string",
+  // The Family Bookshelf (lib/bookshelf.ts): which curated books the family owns or wishes for.
+  "rootmap-bookshelf": "array",
 };
 // Notification toggles ("rootmap-pref-<label>").
 export const PREF_PREFIX = "rootmap-pref-";

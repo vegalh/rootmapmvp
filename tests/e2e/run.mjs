@@ -12,7 +12,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-const SUITES = ["app.mjs", "resilience.mjs", "tabs.mjs", "reactive.mjs", "navigation.mjs"];
+const SUITES = ["app.mjs", "resilience.mjs", "tabs.mjs", "reactive.mjs", "navigation.mjs", "discover.mjs"];
 
 // Writes an RGB PNG. `pixel(x, y)` returns [r, g, b].
 function writePng(file, width, height, pixel) {

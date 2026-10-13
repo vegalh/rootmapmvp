@@ -1,13 +1,43 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, FilterPill, Empty } from "../components/ui";
+import BooksBrowser from "../components/BooksBrowser";
+import MusicBrowser from "../components/MusicBrowser";
 import { activities, categories } from "../data/activities";
 import type { Activity } from "../types";
 import { ageOptionLabel, discoverCategoryLabel, localizeActivity, topicOptionLabel, type Copy } from "../lib/i18n";
 
 type OpenFilter = "age" | "topic" | "area" | null;
 
-export function DiscoverPage({ saved, toggleSaved, open, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; t: Copy }) {
+export type DiscoverTab = "activities" | "books" | "music";
+
+// Discover: Activities (the default), Books and Music. Music cards open through `open` like activities do.
+export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, t }: {
+  tab: DiscoverTab;
+  setTab: (tab: DiscoverTab) => void;
+  saved: string[];
+  toggleSaved: (id: string) => void;
+  open: (id: string) => void;
+  openBook: (id: string) => void;
+  t: Copy;
+}) {
+  const tabs: [DiscoverTab, string][] = [["activities", t.tabActivities], ["books", t.tabBooks], ["music", t.tabMusic]];
+  return (
+    <main className="page-content discover-page">
+      <PageHeader title={t.discover} subtitle={tab === "books" ? t.booksSubtitle : tab === "music" ? t.musicSubtitle : t.discoverSubtitle} />
+      <div className="segmented discover-tabs" role="tablist">
+        {tabs.map(([x, l]) => (
+          <button role="tab" aria-selected={tab === x} className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{l}</button>
+        ))}
+      </div>
+      {tab === "activities" && <ActivitiesBrowser saved={saved} toggleSaved={toggleSaved} open={open} t={t} />}
+      {tab === "books" && <BooksBrowser openBook={openBook} t={t} />}
+      {tab === "music" && <MusicBrowser saved={saved} toggleSaved={toggleSaved} open={open} t={t} />}
+    </main>
+  );
+}
+
+function ActivitiesBrowser({ saved, toggleSaved, open, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; t: Copy }) {
   const [q, setQ] = useState("");
   const [age, setAge] = useState("All Ages");
   const [topic, setTopic] = useState("All");
@@ -20,8 +50,7 @@ export function DiscoverPage({ saved, toggleSaved, open, t }: { saved: string[];
     (area === "All" || a.area === area)
   );
   return (
-    <main className="page-content discover-page">
-      <PageHeader title={t.discover} subtitle={t.discoverSubtitle} />
+    <>
       <label className="search discover-search"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t.searchActivities} /></label>
       <div className="filter-row">
         <FilterPill
@@ -48,7 +77,7 @@ export function DiscoverPage({ saved, toggleSaved, open, t }: { saved: string[];
         {result.map(a => <ActivityCard activity={a} saved={saved.includes(a.id)} toggleSaved={toggleSaved} open={open} t={t} key={a.id} />)}
       </div>
       {!result.length && <Empty text={t.noResults} />}
-    </main>
+    </>
   );
 }
 

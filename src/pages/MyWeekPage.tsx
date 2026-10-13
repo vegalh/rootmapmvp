@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, Empty } from "../components/ui";
-import { activities } from "../data/activities";
+import { findActivity } from "../lib/catalog";
 import { newRecordId } from "../lib/data/schema";
 import { fmt, isoToday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
@@ -43,14 +43,14 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
       </div>
       <div className="week-list">
         {tab === "saved" && saved.map(id => {
-          const a = activities.find(x => x.id === id);
+          const a = findActivity(id);
           if (!a) return null;
           return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)}><Icon name="chevron" /></button>} key={id} />;
         })}
         {tab === "plan" && (
           <>
             {planned.map(p => {
-              const a = activities.find(x => x.id === p.activityId);
+              const a = findActivity(p.activityId);
               if (!a) return null;
               return (
                 <article className="day-plan" key={p.id}>
@@ -70,7 +70,7 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
         {tab === "completed" && (
           <>
             {complete.map(p => {
-              const a = activities.find(x => x.id === p.activityId);
+              const a = findActivity(p.activityId);
               if (!a) return null;
               return (
                 <ActivityRow

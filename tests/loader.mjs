@@ -1,5 +1,5 @@
 import { register } from "node:module";
-// Extensionless relative imports resolve to .ts or a folder's index.ts (as in Vite). Image imports become their file URL, the way Vite
+// Extensionless relative imports resolve to .ts or a folder's index.ts (as in Vite). Image (and audio) imports become their file URL, the way Vite
 // turns an imported asset into a URL string, so modules that import bundled images (seed data) load in Node.
 register("data:text/javascript," + encodeURIComponent(`
 export async function resolve(spec, ctx, next) {
@@ -9,6 +9,6 @@ export async function resolve(spec, ctx, next) {
   }
 }
 export async function load(url, ctx, next) {
-  if (/\\.(svg|png|jpe?g|webp)$/.test(url)) return { format: "module", source: "export default " + JSON.stringify(url), shortCircuit: true };
+  if (/\\.(svg|png|jpe?g|webp|mp3|m4a|wav)$/.test(url)) return { format: "module", source: "export default " + JSON.stringify(url), shortCircuit: true };
   return next(url, ctx);
 }`));

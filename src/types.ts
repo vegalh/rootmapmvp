@@ -110,6 +110,54 @@ export type Activity = {
   };
 };
 
+// Age bands shared by the Discover filters. A book or music activity can belong to several.
+export type AgeRange = "0–2" | "2–3" | "3–4" | "4–6" | "6+";
+
+// A book in the curated Discover > Books collection (src/data/books.ts). `*Zh` fields are optional Chinese
+// variants; the English fields are always present.
+export type Book = {
+  id: string;
+  title: string;
+  titleZh?: string;
+  author: string;
+  authorZh?: string;
+  ageRanges: AgeRange[];
+  // Imported image (portrait, about 3:4). Without one, a soft placeholder cover with the title is drawn.
+  cover?: string;
+  description: string;
+  descriptionZh?: string;
+  whyWeRecommend: string;
+  whyWeRecommendZh?: string;
+  // Placeholder content, labelled "Sample" in the app until replaced by a verified book.
+  sample?: boolean;
+};
+
+// Where a book sits on the Family Bookshelf: owned ("My Books") or wanted ("Wishlist").
+export type Shelf = "owned" | "wishlist";
+// One book on the Family Bookshelf (setting "rootmap-bookshelf"). A book is on at most one shelf.
+export type ShelfItem = { bookId: string; shelf: Shelf; addedAt: string };
+
+// An interactive music activity (src/data/music.ts). Its id shares the activity id space, so saving, My Week
+// plans and "Mark as Tried" records work exactly as they do for Discover activities.
+export type MusicActivity = {
+  id: string;
+  title: string;
+  titleZh?: string;
+  ageRanges: AgeRange[];
+  // How long the activity takes, in minutes (the recording's own length is read from the file).
+  duration: number;
+  // Imported image; a soft illustrated cover is used when absent.
+  coverImage?: string;
+  // Imported audio file (MP3 or M4A). Absent until a recording is added; the page then says it's coming soon.
+  audioSrc?: string;
+  description: string;
+  descriptionZh?: string;
+  howToPlay: string[];
+  howToPlayZh?: string[];
+  whatChildrenExplore: string[];
+  whatChildrenExploreZh?: string[];
+};
+
 export type Plan = SyncMeta & {
   id: string;
   activityId: string;
@@ -174,6 +222,9 @@ export type Screen =
   | "record"
   | "discover"
   | "activity"
+  | "book"
+  | "music"
+  | "bookshelf"
   | "observations"
   | "profile"
   | "week"

@@ -4,7 +4,7 @@ import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
 import { TodayPage } from "./pages/TodayPage";
 import { ChildrenPage } from "./pages/ChildrenPage";
-import { DiscoverPage } from "./pages/DiscoverPage";
+import { DiscoverPage, type DiscoverTab } from "./pages/DiscoverPage";
 import { ActivityDetailPage } from "./pages/ActivityDetailPage";
 import { MomentsPage } from "./pages/MomentsPage";
 import { ChildProfilePage } from "./pages/ChildProfilePage";
@@ -20,6 +20,9 @@ import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
 import { GuestImportPage } from "./pages/GuestImportPage";
+import BookDetailPage from "./pages/BookDetailPage";
+import MusicDetailPage from "./pages/MusicDetailPage";
+import BookshelfPage from "./pages/BookshelfPage";
 import OpeningExperience from "./components/OpeningExperience";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
@@ -38,8 +41,12 @@ import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
+import { books } from "./data/books";
+import { musicActivities } from "./data/music";
+import { findActivity, findMusic, isMusicId } from "./lib/catalog";
+import { shelfOf, useBookshelf } from "./lib/bookshelf";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { DeletedChild, Entry, LessonRecord, Lang, ModalKind, ProfileInfo, Screen } from "./types";
+import type { DeletedChild, Entry, LessonRecord, Lang, ModalKind, ProfileInfo, Screen, Shelf } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -105,7 +112,11 @@ export default function App() {
   const [previous, setPrevious] = useState<Screen>("today");
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
+  // A Discover activity or a music activity: both share one id space (lib/catalog.ts).
   const [selectedActivity, setSelectedActivity] = useState("water-pouring");
+  const [selectedBook, setSelectedBook] = useState(books[0]?.id ?? "");
+  const [discoverTab, setDiscoverTab] = useState<DiscoverTab>("activities");
+  const [bookshelfTab, setBookshelfTab] = useState<Shelf>("owned");
   const [childTab, setChildTab] = useState("Journal");
   // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
@@ -150,6 +161,8 @@ export default function App() {
   const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
   const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
+  // The Family Bookshelf belongs to the family, not to a child (lib/bookshelf.ts).
+  const bookshelf = useBookshelf();
 
   // Sign-in state (always "off" on the public website). New devices see the Welcome screen until the parent signs in
   // or continues without an account; devices that already have RootMap data open straight into the app. Decided
@@ -210,7 +223,7 @@ export default function App() {
       setRecords(current => mergeSeed(current, initialRecords, "record", seen));
       setObservations(current => mergeSeed(current, initialObservations, "obs", seen));
       // Hide saved-activity ids that no longer exist, which previously caused a white-screen crash.
-      setSaved(current => current.filter(id => activities.some(a => a.id === id)));
+      setSaved(current => current.filter(id => !!findActivity(id)));
       setSeedVersion(SEED_VERSION);
     }
     const all = [...new Set([...seen, ...seedIds])];
@@ -219,7 +232,9 @@ export default function App() {
 
   const t = copy[lang];
   const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
-  const activity = activities.find(a => a.id === selectedActivity) || activities[0];
+  const activity = findActivity(selectedActivity) || activities[0];
+  const music = findMusic(selectedActivity) || musicActivities[0];
+  const book = books.find(b => b.id === selectedBook) || books[0];
   const entry = entries.find(e => e.id === selectedEntry);
 
   const storageMessage = (failure: StorageFailure) => (failure === "full" ? t.storageFull : t.storageFailed);
@@ -286,7 +301,11 @@ export default function App() {
   // Moments is no longer a tab, but keeps the bottom bar (it opens after saving a memory from Quick Add).
   const topLevel = ["today", "children", "discover", "observations", "profile"].includes(screen);
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
-  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? "activity" : entryOrigin === "today" ? "today" : "observations";
+  // An activity or music activity page (whichever is selected) opens through the same route.
+  const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
+  const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
+  const toggleSaved = (id: string) => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
+  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : "observations";
   const openEntry = (id: string, origin: "moments" | "child" | "today") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
     if (!childrenData.length) { setModal("addChild"); return; }
@@ -350,7 +369,7 @@ export default function App() {
           records={records}
           childrenData={childrenData}
           lang={lang}
-          openActivity={id => { setSelectedActivity(id); go("activity"); }}
+          openActivity={openActivity}
           openEntry={id => openEntry(id, "today")}
           t={t}
         />
@@ -370,7 +389,47 @@ export default function App() {
       );
     }
     if (screen === "discover") {
-      return <DiscoverPage saved={saved} toggleSaved={id => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id])} open={id => { setSelectedActivity(id); go("activity"); }} t={t} />;
+      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} t={t} />;
+    }
+    if (screen === "music") {
+      if (!music) return null;
+      return (
+        <MusicDetailPage
+          music={music}
+          saved={saved.includes(music.id)}
+          toggleSaved={() => toggleSaved(music.id)}
+          back={() => go(previous === "week" || previous === "today" ? previous : "discover")}
+          openPlan={() => setModal("plan")}
+          openTried={() => setModal("tried")}
+          t={t}
+        />
+      );
+    }
+    if (screen === "book") {
+      if (!book) return null;
+      return (
+        <BookDetailPage
+          book={book}
+          shelf={shelfOf(bookshelf.items, book.id)}
+          place={bookshelf.place}
+          back={() => go(previous === "bookshelf" ? "bookshelf" : "discover")}
+          notify={setToast}
+          t={t}
+        />
+      );
+    }
+    if (screen === "bookshelf") {
+      return (
+        <BookshelfPage
+          items={bookshelf.items}
+          tab={bookshelfTab}
+          setTab={setBookshelfTab}
+          openBook={id => { setSelectedBook(id); go("book"); }}
+          explore={() => { setDiscoverTab("books"); go("discover"); }}
+          back={() => go("profile")}
+          t={t}
+        />
+      );
     }
     if (screen === "activity") {
       return (
@@ -400,7 +459,7 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} cloud={cloud} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
       return <GuestImportPage userId={syncUser} back={() => go(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
@@ -526,7 +585,7 @@ export default function App() {
           childFilter={weekFilter}
           setChildFilter={setWeekFilter}
           childrenData={childrenData}
-          openActivity={id => { setSelectedActivity(id); go("activity"); }}
+          openActivity={openActivity}
           openAdd={() => setModal("weekAdd")}
           back={() => go("profile")}
           t={t}
@@ -539,9 +598,9 @@ export default function App() {
           <PageHeader title={t.savedActivities} back={() => go("profile")} />
           <div className="week-list">
             {saved.map(id => {
-              const a = activities.find(x => x.id === id);
+              const a = findActivity(id);
               if (!a) return null;
-              return <ActivityRow a={a} t={t} action={<button onClick={() => { setSelectedActivity(id); go("activity"); }}><Icon name="chevron" /></button>} key={id} />;
+              return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(id)}><Icon name="chevron" /></button>} key={id} />;
             })}
           </div>
         </main>
