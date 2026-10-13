@@ -157,12 +157,12 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
       {lockChild ? (
         <div className="entry-child-pick">
           {child && <img src={photoUrl(child.photo)} alt="" />}
-          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
+          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>
         </div>
       ) : (
         <label className="entry-child-pick">
           {child && <img src={photoUrl(child.photo)} alt="" />}
-          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}` : ""}</strong></span>
+          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>
           <Icon name="down" size={16} />
           <select value={fields.childId} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
             {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}

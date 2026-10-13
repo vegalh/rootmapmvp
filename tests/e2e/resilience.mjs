@@ -26,12 +26,10 @@ const appReady = () => page.waitFor(`document.querySelector(".app-shell")`, 1500
 const nav = async label => {
   if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
   if (label === "Moments") {
-    // Moments is no longer a tab; cancelling Quick Add → Add Moment returns to the Moments timeline.
-    await page.eval(`document.querySelector(".nav-add").click()`);
-    await page.waitFor(`document.querySelector(".quick-actions")`);
-    await page.eval(`__t.click("Add Moment", ".quick-actions button")`);
-    await page.waitFor(`document.querySelector(".journal-editor-bar")`);
-    await page.eval(`document.querySelector(".journal-editor-bar button").click()`);
+    // Moments is no longer a tab; Kids → All Moments opens the timeline.
+    await page.eval(`__t.click("Kids", ".bottom-nav button")`);
+    await page.waitFor(`document.querySelector(".recent-title .text-action")`);
+    await page.eval(`document.querySelector(".recent-title .text-action").click()`);
     await page.waitFor(`document.querySelector(".moments-page")`);
   } else await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
   await sleep(150);

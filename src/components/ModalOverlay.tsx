@@ -38,11 +38,24 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   const [chosen, setChosen] = useState<string[]>(selectedChild ? [selectedChild] : []);
   const [planNote, setPlanNote] = useState("");
 
+  const editing = modal === "editChild" ? childrenData.find(c => c.id === selectedChild) : undefined;
+
   useEffect(() => {
     if (modal === "plan") setChosen(selectedChild ? [selectedChild] : []);
   }, [modal, selectedChild]);
 
-  if (!modal) return null;
+  // Add Child starts empty and Edit Child starts from the saved profile, so closing either one discards what was typed.
+  // Only when the sheet opens: a sync arriving while it's open must not overwrite what the parent is typing.
+  useEffect(() => {
+    if (modal !== "addChild" && modal !== "editChild") return;
+    setName(editing ? `${editing.first} ${editing.last}`.trim() : "");
+    setDob(editing?.dob || "2023-01-01");
+    setGroup(editing?.group || "Primary");
+    setNotes(editing?.notes || "");
+    setPhoto(editing?.photo || "");
+  }, [modal, editing?.id]);
+
+  if (!modal || (modal === "editChild" && !editing)) return null;
 
   // Profile pictures are shown as small avatars, so they're downscaled before being stored on this device.
   const pickPhoto = (file: File | undefined, onLoad: (ref: string) => void) => {
@@ -51,12 +64,18 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   };
 
   const addChild = async () => {
-    const [first, ...last] = name.trim().split(" ");
+    const [first, ...last] = name.trim().split(/\s+/);
     if (!first) return;
+    if (editing) {
+      // The same record (same id, photos, moments and records stay attached); only the fields on this form change.
+      const fields = { first, last: last.join(" "), dob, group, notes, photo: photo || editing.photo };
+      if (await setChildrenData(childrenData.map(c => (c.id === editing.id ? { ...c, ...fields } : c)))) close();
+      return;
+    }
     const added = await setChildrenData([...childrenData, {
       id: newRecordId("c"),
       first,
-      last: last.join(" ") || "Child",
+      last: last.join(" "),
       dob,
       enrolled: "October 2026",
       lessons: 0,
@@ -117,9 +136,9 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
     );
   }
 
-  if (modal === "addChild") {
+  if (modal === "addChild" || (modal === "editChild" && editing)) {
     return (
-      <Modal title={t.addChild} close={close}>
+      <Modal title={editing ? t.editChild : t.addChild} close={close}>
         <div className="sheet-fields">
           <Field label={t.childFullName}><input value={name} onChange={e => setName(e.target.value)} /></Field>
           <Field label={t.dateOfBirth}><input type="date" value={dob} onChange={e => setDob(e.target.value)} /></Field>
@@ -136,7 +155,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
           <Field label={t.classroomGroupLabel}><select value={group} onChange={e => setGroup(e.target.value)}><option value="Toddler">{t.toddler}</option><option value="Primary">{t.primaryGroup}</option><option value="Other">{t.otherGroup}</option></select></Field>
           <Field label={t.notesOptional}><textarea value={notes} onChange={e => setNotes(e.target.value)} /></Field>
         </div>
-        <button className="modal-primary" onClick={addChild}>{t.addChild}</button>
+        <button className="modal-primary" onClick={addChild}>{editing ? t.save : t.addChild}</button>
       </Modal>
     );
   }

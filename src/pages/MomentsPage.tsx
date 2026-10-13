@@ -8,7 +8,7 @@ import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
 // Main timeline of every child's entries, the same collection each child's Journal reads from.
-export function MomentsPage({ entries, childrenData, childFilter, setChildFilter, lang, open, write, t }: {
+export function MomentsPage({ entries, childrenData, childFilter, setChildFilter, lang, open, write, back, t }: {
   entries: Entry[];
   childrenData: Child[];
   // "All" or a child id; owned by App so it survives opening an entry.
@@ -18,6 +18,7 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
   open: (id: string) => void;
   // Opens the editor for a new entry, preselecting `childId` (e.g. to continue its draft).
   write: (childId?: string) => void;
+  back: () => void;
   t: Copy;
 }) {
   const [searching, setSearching] = useState(false);
@@ -29,12 +30,12 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
   const pending = latestNewDraft(filter === "All" ? known : [filter]);
   const name = (id: string) => {
     const c = childrenData.find(x => x.id === id);
-    return c ? `${c.first} ${c.last}` : id;
+    return c ? `${c.first} ${c.last}`.trim() : id;
   };
 
   return (
     <main className="page-content moments-page">
-      <PageHeader title={t.observations} subtitle={t.momentsSubtitle} />
+      <PageHeader title={t.observations} subtitle={t.momentsSubtitle} back={back} />
       <div className="moments-controls">
         <FilterSelect label="" value={filter} onChange={setChildFilter} options={["All", ...known]} renderLabel={v => (v === "All" ? t.allChildren : name(v))} />
         <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>

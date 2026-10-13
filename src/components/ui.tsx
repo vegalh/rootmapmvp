@@ -158,7 +158,7 @@ export function Modal({ title, close, children: content }: { title: string; clos
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}>
       <section className="bottom-sheet">
         <i />
-        <header><h2>{title}</h2><button onClick={close}>×</button></header>
+        <header><h2>{title}</h2><button onClick={() => close()}>×</button></header>
         {content}
       </section>
     </div>

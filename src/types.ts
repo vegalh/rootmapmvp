@@ -195,4 +195,4 @@ export type Screen =
   | "guestImport"
   | "signIn";
 
-export type ModalKind = "quick" | "filters" | "addChild" | "plan" | "weekAdd" | "tried" | null;
+export type ModalKind = "quick" | "filters" | "addChild" | "editChild" | "plan" | "weekAdd" | "tried" | null;

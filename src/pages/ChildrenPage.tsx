@@ -6,12 +6,14 @@ import { entryText, newestFirst } from "../lib/entries";
 import type { Child, Entry } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
 
-export function ChildrenPage({ childrenData, entries, goChild, openAddChild, openNotifications, t }: {
+export function ChildrenPage({ childrenData, entries, goChild, openAddChild, openMoments, openNotifications, t }: {
   childrenData: Child[];
   // The shared Moments collection.
   entries: Entry[];
   goChild: (id: string) => void;
   openAddChild: () => void;
+  // The full Moments timeline (no longer a tab).
+  openMoments: () => void;
   openNotifications: () => void;
   t: Copy;
 }) {
@@ -59,7 +61,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openAddChild, ope
         )}
         {!!childrenData.length && (
           <>
-            <div className="section-title recent-title"><h2>{t.recentMomentsLabel}</h2></div>
+            <div className="section-title recent-title"><h2>{t.recentMomentsLabel}</h2><button className="text-action" onClick={openMoments}>{t.allMoments}</button></div>
             <div className="recent-activity">
               {recent.slice(0, 3).map(o => {
                 const c = childrenData.find(x => x.id === o.childId);

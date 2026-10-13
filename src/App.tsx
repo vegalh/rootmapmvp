@@ -116,6 +116,7 @@ export default function App() {
   const [editorChild, setEditorChild] = useState<string | undefined>();
   // Editable starting title/date for a new entry (the activity just marked as tried).
   const [editorPrefill, setEditorPrefill] = useState<{ title: string; date: string } | undefined>();
+  const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
 
@@ -293,6 +294,7 @@ export default function App() {
     setEntryOrigin(origin);
     setEditorChild(childId);
     setEditorPrefill(prefill);
+    setEditorReturn(screen);
     go("entryEdit");
   };
 
@@ -305,6 +307,9 @@ export default function App() {
 
   const closeModal = (destination?: Screen | ModalKind) => {
     setModal(null);
+    // Closing without a destination (×, Cancel, tapping outside) stays where the parent was; a stray argument
+    // such as a click event must never be treated as a screen (it used to fall through to Help & Support).
+    if (typeof destination !== "string") return;
     if (destination === "record") go("record");
     else if (destination === "entryEdit") startEntry("moments", momentsFilter === "All" ? undefined : momentsFilter);
     else if (destination === "addChild") setModal("addChild");
@@ -358,6 +363,7 @@ export default function App() {
           entries={entries}
           goChild={goChild}
           openAddChild={() => setModal("addChild")}
+          openMoments={() => go("observations")}
           openNotifications={() => go("notifications")}
           t={t}
         />
@@ -389,6 +395,7 @@ export default function App() {
           lang={lang}
           open={id => openEntry(id, "moments")}
           write={childId => startEntry("moments", childId)}
+          back={() => go("children")}
           t={t}
         />
       );
@@ -417,12 +424,7 @@ export default function App() {
             setMigrated([...migrated, `notes:${child.id}`]);
             setToast(t.entrySaved);
           }}
-          edit={() => {
-            const fullName = window.prompt(t.childFullName, `${child.first} ${child.last}`);
-            if (!fullName?.trim()) return;
-            const [first, ...last] = fullName.trim().split(" ");
-            setChildrenData(childrenData.map(c => (c.id === child.id ? { ...c, first, last: last.join(" ") || c.last } : c)));
-          }}
+          edit={() => setModal("editChild")}
           remove={async () => {
             // The child's journal entries, activity records, plans and drafts are never deleted with the profile;
             // the warning says how much is attached so nothing disappears from view unexpectedly.
@@ -430,7 +432,7 @@ export default function App() {
             const recordCount = records.filter(r => r.childId === child.id).length;
             const message = entryCount || recordCount
               ? t.confirmDeleteChildWithData.split("{name}").join(child.first).replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))
-              : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`);
+              : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`.trim());
             if (!window.confirm(message)) return;
             // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
             if (!savedOk(await commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
@@ -451,7 +453,8 @@ export default function App() {
       return (
         <RecordFormPage
           child={child}
-          cancel={() => go("child")}
+          // Cancel returns to wherever the form was opened (a child's page, or any tab through Quick Add).
+          cancel={() => go(previous)}
           t={t}
           save={async r => {
             const item = { ...r, id: newRecordId("r"), childId: child.id, createdAt: new Date().toISOString() };
@@ -490,7 +493,9 @@ export default function App() {
           entry={entry}
           prefill={entry ? undefined : editorPrefill}
           lang={lang}
-          back={() => go(entry ? "entry" : originScreen)}
+          // Leaving without saving returns to where the editor was opened (a tab through Quick Add, a child, an activity,
+          // Moments); saving still lands on the origin. The autosaved draft is kept either way.
+          back={() => go(entry ? "entry" : editorReturn)}
           save={async (f, draft) => {
             const now = new Date().toISOString();
             const fields = { childId: f.childId, date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
@@ -574,7 +579,7 @@ export default function App() {
           records={records}
           restore={async d => {
             if (childrenData.some(c => c.id === d.id)) return;
-            if (!window.confirm(t.confirmRestoreChild.replace("{name}", `${d.first} ${d.last}`))) return;
+            if (!window.confirm(t.confirmRestoreChild.replace("{name}", `${d.first} ${d.last}`.trim()))) return;
             // Clearing deletedAt brings the same record (same id) back, with its entries and records.
             const { deletedAt: _deletedAt, ...profile } = d;
             if (!savedOk(await commitChildren([...childrenData, profile]))) return;
