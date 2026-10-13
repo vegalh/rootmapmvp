@@ -44,9 +44,10 @@ import { activities } from "./data/activities";
 import { books } from "./data/books";
 import { musicActivities } from "./data/music";
 import { findActivity, findMusic, isMusicId } from "./lib/catalog";
+import { buildActivityRecord, problemMessage, type RecordInput } from "./lib/activityRecords";
 import { shelfOf, useBookshelf } from "./lib/bookshelf";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { DeletedChild, Entry, LessonRecord, Lang, ModalKind, ProfileInfo, Screen, Shelf } from "./types";
+import type { DeletedChild, Entry, Lang, ModalKind, ProfileInfo, Screen, Shelf } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -118,6 +119,8 @@ export default function App() {
   const [discoverTab, setDiscoverTab] = useState<DiscoverTab>("activities");
   const [bookshelfTab, setBookshelfTab] = useState<Shelf>("owned");
   const [childTab, setChildTab] = useState("Journal");
+  // Where Add Activity was opened: a child's Activities tab (child already known) or Quick Add (child chosen in the form).
+  const [recordFrom, setRecordFrom] = useState<"child" | "quick">("child");
   // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
   // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal,
@@ -317,19 +320,27 @@ export default function App() {
     go("entryEdit");
   };
 
-  // "Mark as Tried": one more record in the existing activity history. Repeat attempts are separate records.
-  const saveTried = async (childId: string, date: string, notes: string) => {
-    const record: LessonRecord = { id: newRecordId("t"), childId, kind: "tried", activityId: activity.id, lesson: activity.title, date, createdAt: new Date().toISOString(), ...(notes ? { notes } : {}) };
-    const failure = await commitRecords([record, ...records]);
+  // Every activity record (Add Activity and Mark as Tried) is built and stored here, through the same builder.
+  // Repeat attempts are separate records. Resolves to an error message, or null once stored.
+  const addActivityRecord = async (input: RecordInput) => {
+    const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), new Date().toISOString());
+    if ("problem" in built) return problemMessage(built.problem, t);
+    const failure = await commitRecords([built.record, ...records]);
     return failure ? storageMessage(failure) : null;
   };
+  // "Mark as Tried": the quick record for the activity already open in Discover.
+  const saveTried = (childId: string, date: string, notes: string) => addActivityRecord({ kind: "tried", childId, date, activityId: activity.id, notes });
 
   const closeModal = (destination?: Screen | ModalKind) => {
     setModal(null);
     // Closing without a destination (×, Cancel, tapping outside) stays where the parent was; a stray argument
     // such as a click event must never be treated as a screen (it used to fall through to Help & Support).
     if (typeof destination !== "string") return;
-    if (destination === "record") go("record");
+    if (destination === "record") {
+      if (!childrenData.length) { setModal("addChild"); return; }
+      setRecordFrom("quick");
+      go("record");
+    }
     else if (destination === "entryEdit") startEntry("moments", momentsFilter === "All" ? undefined : momentsFilter);
     else if (destination === "addChild") setModal("addChild");
     else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
@@ -498,7 +509,7 @@ export default function App() {
             go("children");
           }}
           back={() => go("children")}
-          record={() => go("record")}
+          record={() => { setRecordFrom("child"); go("record"); }}
           deleteRecord={async id => {
             if (!savedOk(await commitRecords(records.filter(r => r.id !== id)))) return false;
             setToast(t.recordDeleted);
@@ -511,15 +522,22 @@ export default function App() {
     if (screen === "record") {
       return (
         <RecordFormPage
-          child={child}
+          childrenData={childrenData}
+          childId={child?.id ?? ""}
+          lockChild={recordFrom === "child"}
+          records={records}
           // Cancel returns to wherever the form was opened (a child's page, or any tab through Quick Add).
           cancel={() => go(previous)}
           t={t}
           save={async r => {
-            const item = { ...r, id: newRecordId("r"), childId: child.id, createdAt: new Date().toISOString() };
             // Activity notes stay on the activity record (Activities tab); memories are recorded through Moments.
-            if (!savedOk(await commitRecords([item, ...records]))) return;
+            const failure = await addActivityRecord(r);
+            if (failure) return failure;
+            setToast(t.entrySaved);
+            setSelectedChild(r.childId);
+            setChildTab("Activities");
             go("child");
+            return null;
           }}
         />
       );

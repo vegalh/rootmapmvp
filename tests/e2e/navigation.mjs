@@ -91,8 +91,18 @@ await step("Cancel on an activity record opened from Quick Add returns to that t
   const before = await count("records");
   await nav("Today");
   await openQuick();
-  await page.eval(`__t.click("Try This Activity", ".overlay button")`);
-  await page.waitFor(`document.querySelector(".form-page")`, 3000, "record form open");
+  await page.eval(`__t.click("Add Activity", ".overlay button")`);
+  await page.waitFor(`document.querySelector(".picker-page")`, 3000, "activity picker open");
+  // Back from the picker leaves without saving.
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await appReady();
+  assert.equal(await activeTab(), "Today");
+  await openQuick();
+  await page.eval(`__t.click("Add Activity", ".overlay button")`);
+  await page.waitFor(`document.querySelector(".picker-page")`, 3000, "activity picker open");
+  // Cancel on the form (after choosing an activity) also leaves without saving.
+  await page.eval(`__t.clickSel(".picker-row")`);
+  await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "record form open");
   await page.eval(`__t.click("Cancel", ".form-bottom button")`);
   await appReady();
   assert.equal(await activeTab(), "Today");
@@ -105,10 +115,12 @@ await step("Cancel on an activity record opened from a child returns to that chi
   await page.eval(`__t.clickSel(".child-select-card:not(.add-child-card)")`);
   await page.waitFor(`document.querySelector(".child-tabs, .child-profile, main")`, 3000, "child open");
   await page.eval(`__t.click("Activities")`);
-  await page.eval(`__t.click("Try This Activity", ".wide-primary")`);
-  await page.waitFor(`document.querySelector(".form-page")`, 3000, "record form open");
+  await page.eval(`__t.click("Add Activity", ".wide-primary")`);
+  await page.waitFor(`document.querySelector(".picker-page")`, 3000, "activity picker open");
+  await page.eval(`__t.clickSel(".picker-row")`);
+  await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "record form open");
   await page.eval(`__t.click("Cancel", ".form-bottom button")`);
-  await page.waitFor(`document.body.innerText.includes("Try This Activity") && !document.querySelector(".form-page")`, 3000, "back on the child");
+  await page.waitFor(`document.body.innerText.includes("Add Activity") && !document.querySelector(".form-page")`, 3000, "back on the child");
   await notHelp();
 });
 

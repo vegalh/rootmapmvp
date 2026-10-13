@@ -8,7 +8,7 @@ import { saveSetting } from "../lib/data/hooks";
 import { readSetting } from "../lib/data/store";
 import { newRecordId } from "../lib/data/schema";
 import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
-import { groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
+import { discoverCategoryLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 
 export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, t }: {
   modal: ModalKind;
@@ -94,7 +94,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
     return (
       <Modal title={t.quickAdd} close={close}>
         <div className="quick-actions">
-          <button onClick={() => close("record")}><Icon name="book" />{t.recordLessonPresentation}</button>
+          <button onClick={() => close("record")}><Icon name="book" />{t.addActivity}</button>
           <button onClick={() => close("entryEdit")}><Icon name="note" />{t.addMoment}</button>
           <button onClick={() => close("addChild")}><Icon name="user" />{t.addChild}</button>
         </div>
@@ -215,7 +215,7 @@ function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: 
     const c = childrenData.find(x => x.id === savedFor.childId);
     return (
       <Modal title={t.markAsTried} close={close}>
-        <div className="plan-activity"><img src={a.image} alt="" /><strong>{a.title}</strong></div>
+        <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{discoverCategoryLabel(a.area, t)}</small></span></div>
         <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", c?.first || "")} · {fmtLong(savedFor.date, t.code as "en" | "zh")}</p>
         <div className="sheet-buttons">
           <button onClick={() => addMemory(savedFor.childId, savedFor.date)}>{t.addMemory}</button>
@@ -228,7 +228,7 @@ function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: 
   return (
     <Modal title={t.markAsTried} close={close}>
       <div className="sheet-fields">
-        <div className="plan-activity"><img src={a.image} alt="" /><strong>{a.title}</strong></div>
+        <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{discoverCategoryLabel(a.area, t)}</small></span></div>
         <Field label={t.childLabel}>
           <select value={childId} onChange={e => { setChildId(e.target.value); setError(""); }}>
             <option value="" disabled>{t.selectChild}</option>

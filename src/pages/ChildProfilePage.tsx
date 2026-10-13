@@ -7,9 +7,9 @@ import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
-import { findActivity } from "../lib/catalog";
+import { recordView } from "../lib/activityRecords";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
-import { childAge, childTabLabel, groupOptionLabel, lessonLabel, localizeActivity, noteText, recordAreaLabel, stageLabel, type Copy } from "../lib/i18n";
+import { childAge, childTabLabel, groupOptionLabel, noteText, skillLabel, type Copy } from "../lib/i18n";
 
 export function ChildProfilePage({ child, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, deleteRecord, t }: {
   child: Child;
@@ -61,7 +61,7 @@ export function ChildProfilePage({ child, records, entries, pendingNotes, tab, s
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
             <LessonList records={lessons} lang={lang} deleteRecord={deleteRecord} t={t} />
-            <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.recordLesson}</button>
+            <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.addActivity}</button>
           </>
         ) : (
           <ChildJournal child={child} entries={entries} pendingNotes={pendingNotes} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />
@@ -116,43 +116,40 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
 }
 
 function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[]; lang: Lang; deleteRecord: (id: string) => Promise<boolean>; t: Copy }) {
-  // Tried record shown in the detail sheet, where a mistaken one can be deleted.
-  const [open, setOpen] = useState<{ record: LessonRecord; title: string; when: string; notes?: string }>();
+  // Record shown in the detail sheet, where a mistaken one can be deleted.
+  const [open, setOpen] = useState<LessonRecord>();
+  const view = open && recordView(open, t);
   return (
     <div className="lesson-list">
       {records.map(r => {
-        const notes = noteText(r.notes, r.notesZh, t);
+        const v = recordView(r, t);
         if (r.kind === "tried") {
           // Parent-friendly: just the activity and when it was tried, no learning stage.
-          const activity = findActivity(r.activityId);
-          const title = activity ? localizeActivity(activity, t).title : r.lesson;
-          const when = t.triedOn.replace("{date}", fmtLong(r.date, lang));
           return (
-            <button key={r.id} onClick={() => setOpen({ record: r, title, when, notes })}>
-              <i><Icon name="check" size={18} /></i>
-              <span><strong>{title}</strong><small>{when}</small></span>
+            <button key={r.id} onClick={() => setOpen(r)}>
+              <i><Icon name={v.music ? "music" : "check"} size={18} /></i>
+              <span><strong>{v.title}</strong><small>{t.triedOn.replace("{date}", fmtLong(r.date, lang))}</small></span>
               <b className="status tried">{t.tried}</b>
               <Icon name="chevron" size={15} />
             </button>
           );
         }
-        const area = r.area ? recordAreaLabel(r.area, t) : "";
-        const stage = r.stage ? stageLabel(r.stage, t) : "";
         return (
-          <button key={r.id} onClick={() => window.alert(`${lessonLabel(r.lesson, t)}\n${[area, stage].filter(Boolean).join(" · ")}\n${fmt(r.date)}${notes ? `\n\n${notes}` : ""}`)}>
-            <i><Icon name="book" size={18} /></i>
-            <span><strong>{lessonLabel(r.lesson, t)}</strong><small>{area ? `${area} · ` : ""}{fmt(r.date)}</small></span>
-            {stage ? <b className={`status ${r.stage!.toLowerCase()}`}>{stage}</b> : <b />}
+          <button key={r.id} onClick={() => setOpen(r)}>
+            <i><Icon name={v.music ? "music" : "book"} size={18} /></i>
+            <span><strong>{v.title}</strong><small>{v.area ? `${v.area} · ` : ""}{fmt(r.date)}</small></span>
+            {v.stage ? <b className={`status ${r.stage!.toLowerCase()}`}>{v.stage}</b> : <b />}
             <Icon name="chevron" size={15} />
           </button>
         );
       })}
-      {open && (
-        <Modal title={open.title} close={() => setOpen(undefined)}>
+      {open && view && (
+        <Modal title={view.title} close={() => setOpen(undefined)}>
           <div className="record-detail">
-            <b className="status tried">{t.tried}</b>
-            <p>{open.when}</p>
-            {open.notes && <p className="record-notes">{open.notes}</p>}
+            {open.kind === "tried" ? <b className="status tried">{t.tried}</b> : view.stage && <b className={`status ${open.stage!.toLowerCase()}`}>{view.stage}</b>}
+            <p>{open.kind === "tried" ? t.triedOn.replace("{date}", fmtLong(open.date, lang)) : [view.area, fmtLong(open.date, lang)].filter(Boolean).join(" · ")}</p>
+            {open.skills?.length ? <p className="record-notes">{open.skills.map(s => skillLabel(s, t)).join(" · ")}</p> : null}
+            {noteText(open.notes, open.notesZh, t) && <p className="record-notes">{noteText(open.notes, open.notesZh, t)}</p>}
           </div>
           <div className="sheet-buttons even">
             <button
@@ -160,7 +157,7 @@ function LessonList({ records, lang, deleteRecord, t }: { records: LessonRecord[
               onClick={() => {
                 // Removes only this record (by id): other attempts, the Discover activity and journal entries stay.
                 if (!window.confirm(t.confirmDeleteRecord)) return;
-                void deleteRecord(open.record.id).then(ok => ok && setOpen(undefined));
+                void deleteRecord(open.id).then(ok => ok && setOpen(undefined));
               }}
             ><Icon name="trash" size={17} />{t.deleteRecord}</button>
             <button onClick={() => setOpen(undefined)}>{t.done}</button>

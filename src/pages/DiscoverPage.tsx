@@ -4,6 +4,7 @@ import { PageHeader, FilterPill, Empty } from "../components/ui";
 import BooksBrowser from "../components/BooksBrowser";
 import MusicBrowser from "../components/MusicBrowser";
 import { activities, categories } from "../data/activities";
+import { matchesCatalogQuery } from "../lib/catalog";
 import type { Activity } from "../types";
 import { ageOptionLabel, discoverCategoryLabel, localizeActivity, topicOptionLabel, type Copy } from "../lib/i18n";
 
@@ -44,7 +45,7 @@ function ActivitiesBrowser({ saved, toggleSaved, open, t }: { saved: string[]; t
   const [area, setArea] = useState("All");
   const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
   const result = activities.filter(a =>
-    (!q || `${a.title} ${a.topic} ${a.area} ${a.materials.join(" ")} ${a.keywords}`.toLowerCase().includes(q.toLowerCase())) &&
+    matchesCatalogQuery(a, q) &&
     (age === "All Ages" || a.ageKey === age) &&
     (topic === "All" || a.topic === topic) &&
     (area === "All" || a.area === area)

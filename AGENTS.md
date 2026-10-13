@@ -33,7 +33,8 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
   - `welcome.ts` - Whether this device still shows the Welcome screen (new devices only, cloud builds only).
   - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
-  - `catalog.ts` - Activities and music activities share one id space: `findActivity(id)` resolves either (saved, My Week plans, "Mark as Tried" records). Also age labels/filters and book/music localization.
+  - `catalog.ts` - The one activity catalog: Discover activities and music activities share one id space. `findActivity(id)` resolves either (saved, My Week plans, activity records); `catalogItems()`, `catalogCategories()` and `searchCatalog()` (bilingual search, shared by Discover and Add Activity) list, group and search them. Also age labels/filters and book/music localization.
+  - `activityRecords.ts` - The single way an activity record is built (`buildActivityRecord`, used by Add Activity and Mark as Tried), how a record reads in a child's history (`recordView`, incl. legacy and custom records) and Recently Used (`recentActivityIds`, derived from records).
   - `bookshelf.ts` - The Family Bookshelf (My Books / Wishlist), stored as the `rootmap-bookshelf` setting; a book is on at most one shelf.
   - `entries.ts` - Helpers for the unified Moments/Journal entry collection: search, month grouping, and the idempotent import of legacy observations and child notes.
   - `journalDrafts.ts` - Autosaved editor drafts (IndexedDB store `drafts`).
@@ -46,10 +47,11 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `ui.tsx` - Shared UI atoms: `PageHeader`, `BottomNav`, `Shell`, `FilterSelect`, `Field`, `Modal`, `Empty`, `NotificationToggle`.
   - `OpeningExperience.tsx` - Opening animation, Welcome and the email + 6-digit code sign-in screens.
   - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
+  - `ActivityPicker.tsx` - Add Activity's search-first picker over the shared catalog (search, category chips, Recently Used, Other / Custom Activity).
   - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
   - `BooksBrowser.tsx`, `MusicBrowser.tsx` - The Books and Music tabs of Discover. `BookCover.tsx` - book cover (or drawn placeholder) and grid tile. `AudioPlayer.tsx` - play/pause/seek player for music recordings; shows "Recording coming soon" without a playable file.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
-  - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx` (Activities | Books | Music), `ActivityDetailPage.tsx`, `BookDetailPage.tsx`, `MusicDetailPage.tsx`, `BookshelfPage.tsx` (Family Bookshelf, from Profile), `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
+  - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx` (Activities | Books | Music), `ActivityDetailPage.tsx`, `BookDetailPage.tsx`, `MusicDetailPage.tsx`, `BookshelfPage.tsx` (Family Bookshelf, from Profile), `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (Add Activity: picker, then the record form; activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
@@ -62,7 +64,7 @@ This is the canonical project structure. Start with task-relevant files below. O
 
 ## Making common changes
 
-- **Add a new lesson/activity**: append an entry to the `activities` array in [src/data/activities.ts](src/data/activities.ts).
+- **Add a new lesson/activity**: append an entry to the `activities` array in [src/data/activities.ts](src/data/activities.ts). It appears in Discover and in Kids › Add Activity automatically (no other list to update). Optional Chinese search words go in `zh.keywords`. A new `area` shows up as a category everywhere; add it to `categories` to set its order and icon, and to `discoverCategoryLabel` for its Chinese name.
 - **Add a book**: append an entry to `books` in [src/data/books.ts](src/data/books.ts) (cover image in `src/assets/books/`, imported).
 - **Add a music activity / connect a recording**: edit [src/data/music.ts](src/data/music.ts); put the MP3/M4A in `src/assets/music/`, import it and set `audioSrc`.
 - **Add or edit a child / change a photo**: edit [src/data/children.ts](src/data/children.ts).

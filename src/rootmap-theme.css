@@ -79,6 +79,7 @@ html:lang(zh) {
 .activity-name:lang(zh),
 .activity-row strong:lang(zh),
 .plan-activity strong:lang(zh),
+.picker-row strong:lang(zh),
 .add-child-card strong:lang(zh) {
   font-family: var(--font-heading-zh);
   font-size: 19px;

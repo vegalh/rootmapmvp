@@ -179,6 +179,14 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .quick-actions { display: flex; flex-direction: column; gap: 8px; }.quick-actions button { min-height: 55px; padding: 0 14px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); display: flex; align-items: center; gap: 11px; text-align: left; font-size: 15px; font-weight: 600; }.quick-actions svg { color: var(--primary); }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1.6fr; gap: 9px; margin-top: 17px; }.sheet-buttons button,.modal-primary { height: 48px; border-radius: 13px; border: 1px solid var(--border); background: var(--card); font-size: 15px; font-weight: 700; }.sheet-buttons button:last-child,.modal-primary { color: white; background: var(--primary); border: 0; }.modal-primary { width: 100%; }
 .plan-activity { display: flex; align-items: center; gap: 10px; padding: 9px; background: var(--card); border-radius: 13px; margin-bottom: 14px; }.plan-activity img { width: 58px; height: 45px; border-radius: 8px; object-fit: cover; }.plan-activity strong { font: 600 20px var(--font-heading); }
+/* Add Activity: search-first picker over the shared catalog (components/ActivityPicker.tsx). */
+.search-clear { border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; padding: 4px; }
+.category-chips { display: flex; gap: 6px; overflow-x: auto; margin: 0 -20px 4px; padding: 0 20px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }.category-chips::-webkit-scrollbar { display: none; }.category-chips button { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 17px; background: var(--card); color: var(--text); padding: 7px 12px; font-size: 14px; white-space: nowrap; }.category-chips button.active { color: var(--primary); border-color: var(--primary); background: var(--lavender); font-weight: 700; }
+.picker-list { display: flex; flex-direction: column; gap: 8px; }.picker-row { width: 100%; display: grid; grid-template-columns: 56px 1fr 15px; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--border); border-radius: 13px; background: var(--card); color: var(--text); padding: 8px 10px 8px 8px; }.picker-row img { width: 56px; height: 44px; border-radius: 8px; object-fit: cover; }.picker-row span { min-width: 0; }.picker-row strong,.picker-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.picker-row strong { font: 600 19px var(--font-heading); }.picker-row small { color: var(--muted); font-size: 14px; margin-top: 2px; }.picker-row > svg { color: var(--muted); }
+.picker-more { display: block; margin: 6px auto 0; }
+.picker-custom { width: 100%; min-height: 48px; margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px dashed var(--primary); border-radius: 13px; background: var(--lavender); color: var(--primary); font-size: 15px; font-weight: 700; }
+.plan-activity > span { min-width: 0; flex: 1; }.plan-activity > span strong,.plan-activity > span small { display: block; }.plan-activity > span small { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.picked-activity { border: 1px solid var(--border); margin-bottom: 0; }.picked-activity .text-action { flex: 0 0 auto; }
 .tried-done { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 13px; border-radius: 13px; background: var(--lavender); color: var(--primary); font-size: 15px; font-weight: 700; line-height: 1.4; }.sheet-buttons button:disabled { opacity: .5; }
 .backup-card p { margin: 10px 0 0; }.backup-card .backup-includes { font-size: 14px; }.backup-card .backup-last { color: var(--text); font-weight: 600; }
 .wide-secondary { width: 100%; min-height: 48px; margin-top: 10px; border: 1.5px solid var(--primary); border-radius: 13px; color: var(--primary); background: var(--card); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 700; cursor: pointer; }
@@ -317,6 +325,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 }
 @media (max-width: 359px) {
   .page-content,.week-page,.simple-page,.form-page { padding-left: 15px; padding-right: 15px; }
+  .category-chips { margin-left: -15px; margin-right: -15px; padding-left: 15px; padding-right: 15px; }
 }
 
 /* Welcome and sign-in (OpeningExperience), full screen above the app; same frame as the development preview. */

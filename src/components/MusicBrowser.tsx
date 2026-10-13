@@ -2,16 +2,16 @@ import { useState } from "react";
 import { Icon } from "./Icon";
 import { Empty, FilterPill } from "./ui";
 import { musicActivities } from "../data/music";
-import { AGE_RANGES, localizeMusic, matchesAge, matchesQuery, musicCover } from "../lib/catalog";
+import { AGE_RANGES, localizeMusic, matchesAge, matchesCatalogQuery, musicAsActivity, musicCover } from "../lib/catalog";
 import { ageOptionLabel, type Copy } from "../lib/i18n";
 import type { MusicActivity } from "../types";
 
-// Discover > Music: interactive music activities, searchable by title (English or Chinese) and by age.
+// Discover > Music: interactive music activities, searchable (shared catalog search, English or Chinese) and by age.
 export default function MusicBrowser({ saved, toggleSaved, open, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; t: Copy }) {
   const [q, setQ] = useState("");
   const [age, setAge] = useState("All Ages");
   const [ageOpen, setAgeOpen] = useState(false);
-  const result = musicActivities.filter(m => matchesQuery(q, [m.title, m.titleZh]) && matchesAge(m.ageRanges, age));
+  const result = musicActivities.filter(m => matchesCatalogQuery(musicAsActivity(m), q) && matchesAge(m.ageRanges, age));
   return (
     <>
       <label className="search discover-search"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t.searchMusic} /></label>

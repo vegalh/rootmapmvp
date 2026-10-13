@@ -1,60 +1,167 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PageHeader, Field } from "../components/ui";
-import { areaLessons } from "../data/progress";
+import ActivityPicker from "../components/ActivityPicker";
+import { catalogCategories, findActivity } from "../lib/catalog";
+import type { RecordInput } from "../lib/activityRecords";
+import { localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
-import type { Area, Child, LessonRecord, Stage } from "../types";
-import { childAge, lessonLabel, recordAreaLabel, skillLabel, stageLabel, type Copy } from "../lib/i18n";
+import type { Child, LessonRecord, Stage } from "../types";
+import { childAge, discoverCategoryLabel, localizeActivity, skillLabel, stageLabel, type Copy } from "../lib/i18n";
 
-export function RecordFormPage({ child, save, cancel, t }: {
-  child: Child;
-  save: (r: Omit<LessonRecord, "id" | "childId">) => void;
+const STAGES: Stage[] = ["Introduced", "Practicing", "Independent"];
+const SKILLS = ["Hand-eye coordination", "Concentration", "Independence", "Fine motor control", "Order"];
+
+// The activity being recorded: one from the catalog, or the parent's own.
+type Choice = { activityId: string } | { custom: true };
+
+// Add Activity: pick an activity from the shared catalog (or Other / Custom Activity), then record the child's
+// experience. Stage, notes and skills are optional. Saving goes through the same record builder as Mark as Tried.
+export function RecordFormPage({ childrenData, childId: initialChild, lockChild, records, save, cancel, t }: {
+  childrenData: Child[];
+  childId: string;
+  // Opened from a child's Activities tab: the child is known and not asked again.
+  lockChild: boolean;
+  records: LessonRecord[];
+  // Resolves to an error message, or null once the record is stored.
+  save: (r: RecordInput) => Promise<string | null>;
   cancel: () => void;
   t: Copy;
 }) {
-  const [area, setArea] = useState<Area>("Practical Life");
-  const [lesson, setLesson] = useState("Pouring Water");
-  const [date, setDate] = useState("2026-10-08");
-  const [stage, setStage] = useState<Stage>("Practicing");
-  const [notes, setNotes] = useState(t.defaultRecordNoteTemplate.replace("{name}", child.first));
-  const [skills, setSkills] = useState<string[]>(["Concentration"]);
+  const [choice, setChoice] = useState<Choice>();
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("All");
+  const [childId, setChildId] = useState(initialChild);
+  const child = childrenData.find(c => c.id === childId);
 
-  const changeArea = (a: Area) => { setArea(a); setLesson(areaLessons[a][0]); };
+  const pick = (c: Choice) => { setChoice(c); window.scrollTo({ top: 0 }); };
+
+  if (!choice) {
+    return (
+      <main className="form-page picker-page">
+        <PageHeader title={t.addActivity} subtitle={lockChild && child ? `${t.recordingFor} ${child.first}` : undefined} back={cancel} />
+        <ActivityPicker
+          query={query} setQuery={setQuery} category={category} setCategory={setCategory}
+          records={records} childId={childId}
+          pick={activityId => pick({ activityId })} pickCustom={() => pick({ custom: true })}
+          t={t}
+        />
+      </main>
+    );
+  }
+
+  return (
+    <RecordForm
+      key={"activityId" in choice ? choice.activityId : "custom"}
+      choice={choice}
+      childrenData={childrenData}
+      childId={childId}
+      setChildId={setChildId}
+      lockChild={lockChild}
+      change={() => setChoice(undefined)}
+      save={save}
+      cancel={cancel}
+      t={t}
+    />
+  );
+}
+
+function RecordForm({ choice, childrenData, childId, setChildId, lockChild, change, save, cancel, t }: {
+  choice: Choice;
+  childrenData: Child[];
+  childId: string;
+  setChildId: (id: string) => void;
+  lockChild: boolean;
+  change: () => void;
+  save: (r: RecordInput) => Promise<string | null>;
+  cancel: () => void;
+  t: Copy;
+}) {
+  const activity = "activityId" in choice ? findActivity(choice.activityId) : undefined;
+  const a = activity && localizeActivity(activity, t);
+  const child = childrenData.find(c => c.id === childId);
+  const [title, setTitle] = useState("");
+  const [area, setArea] = useState("");
+  const [date, setDate] = useState(localIsoToday());
+  const [stage, setStage] = useState<Stage>();
+  const [notes, setNotes] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  // Guards against a double tap storing the same record twice.
+  const saving = useRef(false);
+
+  const submit = async () => {
+    if (saving.current) return;
+    saving.current = true;
+    const failure = await save(activity
+      ? { childId, date, activityId: activity.id, stage, notes, skills }
+      : { childId, date, customTitle: title, customArea: area, stage, notes, skills });
+    saving.current = false;
+    if (failure) setError(failure);
+  };
+  const optional = (label: string) => `${label}${t.optionalSuffix}`;
 
   return (
     <main className="form-page">
-      <PageHeader title={t.recordLesson} back={cancel} />
-      <section className="form-child">
-        <img src={photoUrl(child.photo)} alt="" />
-        <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>
-      </section>
+      <PageHeader title={t.addActivity} back={change} />
+      {lockChild && child ? (
+        <section className="form-child">
+          <img src={photoUrl(child.photo)} alt="" />
+          <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>
+        </section>
+      ) : null}
       <div className="form-fields">
-        <Field label={t.learningArea}>
-          <select value={area} onChange={e => changeArea(e.target.value as Area)}>{Object.keys(areaLessons).map(x => <option value={x} key={x}>{recordAreaLabel(x, t)}</option>)}</select>
-        </Field>
-        <Field label={t.lessonActivityLabel}>
-          <select value={lesson} onChange={e => setLesson(e.target.value)}>{areaLessons[area].map(x => <option value={x} key={x}>{lessonLabel(x, t)}</option>)}</select>
-        </Field>
-        <Field label={t.date}><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+        {!lockChild && (
+          <Field label={t.childLabel}>
+            <select value={childId} onChange={e => { setChildId(e.target.value); setError(""); }}>
+              {!child && <option value="" disabled>{t.selectChild}</option>}
+              {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}
+            </select>
+          </Field>
+        )}
+        {a ? (
+          <fieldset>
+            <legend>{t.lessonActivityLabel}</legend>
+            <div className="plan-activity picked-activity">
+              <img src={a.image} alt="" />
+              <span><strong>{a.title}</strong><small>{[discoverCategoryLabel(a.area, t), a.age].filter(Boolean).join(" · ")}</small></span>
+              <button className="text-action" onClick={change}>{t.changeActivity}</button>
+            </div>
+          </fieldset>
+        ) : (
+          <>
+            <Field label={t.customActivityNamePrompt}>
+              <input value={title} onChange={e => { setTitle(e.target.value); setError(""); }} maxLength={200} />
+            </Field>
+            <Field label={t.learningArea}>
+              <select value={area} onChange={e => { setArea(e.target.value); setError(""); }}>
+                <option value="" disabled>{t.chooseArea}</option>
+                {catalogCategories().map(c => <option value={c} key={c}>{discoverCategoryLabel(c, t)}</option>)}
+              </select>
+            </Field>
+          </>
+        )}
+        <Field label={t.date}><input type="date" value={date} max={localIsoToday()} onChange={e => e.target.value && setDate(e.target.value)} /></Field>
         <fieldset>
-          <legend>{t.learningStage}</legend>
+          <legend>{optional(t.learningStage)}</legend>
           <div className="stage-choices">
-            {(["Introduced", "Practicing", "Independent"] as Stage[]).map(x => (
-              <button className={stage === x ? "active" : ""} onClick={() => setStage(x)} key={x}>{stageLabel(x, t)}</button>
+            {STAGES.map(x => (
+              <button className={stage === x ? "active" : ""} aria-pressed={stage === x} onClick={() => setStage(stage === x ? undefined : x)} key={x}>{stageLabel(x, t)}</button>
             ))}
           </div>
         </fieldset>
-        <Field label={t.observationNotesLabel}><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={5} /></Field>
+        <Field label={optional(t.observationNotesLabel)}><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder={t.whatDidYouNotice} /></Field>
         <fieldset>
-          <legend>{t.skillsObserved}</legend>
+          <legend>{optional(t.skillsObserved)}</legend>
           <div className="chips">
-            {["Hand-eye coordination", "Concentration", "Independence", "Fine motor control", "Order"].map(x => (
-              <button className={skills.includes(x) ? "active" : ""} onClick={() => setSkills(skills.includes(x) ? skills.filter(y => y !== x) : [...skills, x])} key={x}>{skillLabel(x, t)}</button>
+            {SKILLS.map(x => (
+              <button className={skills.includes(x) ? "active" : ""} aria-pressed={skills.includes(x)} onClick={() => setSkills(skills.includes(x) ? skills.filter(y => y !== x) : [...skills, x])} key={x}>{skillLabel(x, t)}</button>
             ))}
           </div>
         </fieldset>
+        {error && <p className="journal-status error" role="alert">{error}</p>}
       </div>
       <div className="form-bottom">
-        <button onClick={() => save({ area, lesson, date, stage, notes, skills })}>{t.save}</button>
+        <button onClick={submit}>{t.save}</button>
         <button onClick={cancel}>{t.cancel}</button>
       </div>
     </main>

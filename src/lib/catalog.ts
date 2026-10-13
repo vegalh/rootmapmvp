@@ -1,11 +1,14 @@
-import { activities } from "../data/activities";
+import { activities, categories } from "../data/activities";
 import { musicActivities } from "../data/music";
 import defaultMusicCover from "../assets/music/cover-sage.svg";
 import type { Activity, AgeRange, Book, Lang, MusicActivity } from "../types";
-import type { Copy } from "./i18n";
+import { copy, discoverCategoryLabel, topicOptionLabel, type Copy } from "./i18n";
 
-// Lookups shared by Discover activities and Music activities. Both live in one id space: a saved activity, a
-// My Week plan or a "Mark as Tried" record may refer to either, so screens resolve ids through `findActivity`.
+// The one activity catalog: Discover activities (src/data/activities.ts) and Music activities (src/data/music.ts).
+// Both live in one id space: a saved activity, a My Week plan or an activity record may refer to either, so
+// screens resolve ids through `findActivity`, list them with `catalogItems` and search them with `searchCatalog`.
+// Nothing else keeps a copy of activity titles or categories: adding an activity to either data file makes it
+// appear everywhere (Discover, Add Activity, Recently Used, history).
 
 export const AGE_RANGES: AgeRange[] = ["0–2", "2–3", "3–4", "4–6", "6+"];
 
@@ -91,4 +94,64 @@ export function findActivity(id: string | undefined): Activity | undefined {
   if (activity) return activity;
   const music = findMusic(id);
   return music ? musicAsActivity(music) : undefined;
+}
+
+export type CatalogType = "activity" | "music";
+// A catalog entry in the shared activity shape (music is converted with `musicAsActivity`, category "Music").
+export type CatalogItem = Activity & { type: CatalogType };
+
+let items: CatalogItem[] | undefined;
+// Every activity and music activity, in Discover order (activities first, then music).
+export function catalogItems(): CatalogItem[] {
+  items ??= [
+    ...activities.map(a => ({ ...a, type: "activity" as const })),
+    ...musicActivities.map(m => ({ ...musicAsActivity(m), type: "music" as const })),
+  ];
+  return items;
+}
+
+// Learning areas, from the Discover category list (its order), followed by any category an activity uses that
+// the list doesn't name yet, so a new category is never hidden. `inUse` keeps only categories with activities
+// (the picker's filters); without it every Discover category is offered (a custom activity's learning area).
+export function catalogCategories({ inUse = false } = {}): string[] {
+  const used = new Set(catalogItems().map(a => a.area).filter(Boolean));
+  const listed = categories.map(c => c[0]);
+  const all = [...listed, ...[...used].filter(c => !listed.includes(c))];
+  return inUse ? all.filter(c => used.has(c)) : all;
+}
+
+// Lower-case text a search query is matched against: titles, categories, topics, keywords, what children explore and
+// materials, in English and Chinese whatever the interface language. Built once per activity.
+const searchIndex = new Map<string, string>();
+export function searchText(a: Activity): string {
+  const cached = searchIndex.get(a.id);
+  if (cached !== undefined) return cached;
+  const music = musicActivities.find(m => m.id === a.id);
+  const text = [
+    a.title, a.zh?.title,
+    a.area, discoverCategoryLabel(a.area, copy.en), discoverCategoryLabel(a.area, copy.zh),
+    a.topic, a.topic && topicOptionLabel(a.topic, copy.zh),
+    a.keywords, a.zh?.keywords, music?.keywords, music?.keywordsZh,
+    ...a.domains, ...(a.zh?.domains ?? []),
+    ...a.materials, ...(a.zh?.materials ?? []),
+  ].filter(Boolean).join(" ").toLowerCase();
+  searchIndex.set(a.id, text);
+  return text;
+}
+
+// Case-insensitive, partial match; with several words, each must appear ("water pour").
+export function matchesCatalogQuery(a: Activity, query: string): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const text = searchText(a);
+  return words.every(w => text.includes(w));
+}
+
+// Catalog search shared by Discover and Add Activity: query and category together, title matches first.
+export function searchCatalog(query: string, { category = "All", within = catalogItems() }: { category?: string; within?: CatalogItem[] } = {}): CatalogItem[] {
+  const q = query.trim().toLowerCase();
+  const found = within.filter(a => (category === "All" || a.area === category) && matchesCatalogQuery(a, q));
+  if (!q) return found;
+  const inTitle = (a: Activity) => a.title.toLowerCase().includes(q) || !!a.zh?.title?.toLowerCase().includes(q);
+  return [...found.filter(inTitle), ...found.filter(a => !inTitle(a))];
 }

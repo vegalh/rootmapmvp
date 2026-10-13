@@ -18,7 +18,9 @@ export type SyncMeta = {
 };
 
 export type Stage = "Introduced" | "Practicing" | "Independent";
-export type Area = "Practical Life" | "Sensorial" | "Language" | "Mathematics" | "Cultural Studies";
+// The five learning areas of the first Record form. Records made with it keep these values; newer records use the
+// Discover categories (src/data/activities.ts `categories`), so a record's `area` is any of either.
+export type LegacyArea = "Practical Life" | "Sensorial" | "Language" | "Mathematics" | "Cultural Studies";
 
 export type Child = SyncMeta & {
   id: string;
@@ -49,19 +51,25 @@ export type ProfileInfo = {
   contact: string;
 };
 
-// One activity done with a child (collection "records"), shown on the child's Activities tab.
-// Records from the Record form carry a learning area and stage; "Mark as Tried" records (kind "tried") only
-// say the parent tried a Discover activity on a date, so area and stage are absent there.
+// One activity done with a child (collection "records"), shown on the child's Activities tab. Built only by
+// `buildActivityRecord` (lib/activityRecords.ts), whichever screen it was recorded from. Four shapes:
+// - catalog record (Add Activity): `activityId` + the activity's English title and category as a snapshot;
+// - custom record (Add Activity › Other): no `activityId`, the parent's own title and a Discover category;
+// - legacy record (the first Record form): no `activityId`, a lesson from `areaLessons` and a LegacyArea;
+// - "Mark as Tried" (kind "tried"): `activityId` + title snapshot, no area or stage.
+// Stage, notes and skills are optional on all of them.
 export type LessonRecord = SyncMeta & {
   id: string;
   childId: string;
-  // Display name; for tried records the activity's English title, kept in case the activity is later removed.
+  // Display name, never rewritten: the activity's English title when recorded (shown if it's later removed from
+  // Discover), the custom name exactly as typed, or the legacy lesson name.
   lesson: string;
-  area?: Area;
+  // Learning area: a Discover category (catalog and custom records) or a LegacyArea (legacy records).
+  area?: string;
   stage?: Stage;
   date: string;
   kind?: "tried";
-  // Discover activity id (src/data/activities.ts), set on tried records.
+  // Catalog activity id (an activity or a music activity, see lib/catalog.ts); absent on custom and legacy records.
   activityId?: string;
   notes?: string;
   nextSteps?: string;
@@ -98,9 +106,12 @@ export type Activity = {
   materials: string[];
   steps: string[];
   keywords: string;
-  // Chinese translations of the display fields above; English fields remain the stored/searchable source of truth.
+  // Chinese translations of the display fields above; English fields remain the stored source of truth. Search
+  // (lib/catalog.ts) matches both languages.
   zh?: {
     title?: string;
+    // Extra Chinese search words, space-separated (e.g. "倒水 水壶"). Optional; add them when you have accurate ones.
+    keywords?: string;
     age?: string;
     materialsLabel?: string;
     description?: string;
@@ -156,6 +167,9 @@ export type MusicActivity = {
   howToPlayZh?: string[];
   whatChildrenExplore: string[];
   whatChildrenExploreZh?: string[];
+  // Optional extra search words (space-separated), English and Chinese.
+  keywords?: string;
+  keywordsZh?: string;
 };
 
 export type Plan = SyncMeta & {
