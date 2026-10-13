@@ -110,7 +110,7 @@ await step("Category and search filter together; Music is a category", async () 
 });
 
 let musicTitle;
-await step("Choosing an activity opens the form prefilled; optional fields start empty; saving stores a catalog record", async () => {
+await step("Choosing an activity opens the form prefilled; notes start empty; saving stores a catalog record", async () => {
   musicTitle = (await rows())[0].title;
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
@@ -119,11 +119,16 @@ await step("Choosing an activity opens the form prefilled; optional fields start
   assert.ok(await page.eval(`!!document.querySelector(".form-child")`), "child shown, not asked again");
   assert.ok(!(await page.eval(`!!document.querySelector(".form-fields select")`)), "no child or activity dropdown");
   assert.equal(await page.eval(`document.querySelector(".form-fields input[type=date]").value`), today, "today's local date");
-  assert.equal(await page.eval(`document.querySelectorAll(".stage-choices button.active").length`), 0, "no stage assumed");
-  assert.equal(await page.eval(`document.querySelectorAll(".chips button.active").length`), 0, "no skills preselected");
+  assert.ok(!(await page.eval(`!!document.querySelector(".stage-choices")`)), "no learning stage");
+  assert.ok(!(await page.eval(`!!document.querySelector(".form-fields .chips")`)), "no skill selector");
+  assert.ok(!(await page.eval(`document.body.innerText.includes("Learning Stage") || document.body.innerText.includes("Skills Observed")`)));
+  const musicSkills = await page.eval(`[...document.querySelectorAll(".activity-skills span")].map(s => s.textContent)`);
+  assert.ok(musicSkills.length > 0, "music shows What Children Explore");
+  assert.ok(!(await page.eval(`!!document.querySelector(".activity-skills button")`)), "skills are read-only tags");
+  assert.ok(await page.eval(`document.body.innerText.includes("Skills") && !document.body.innerText.includes("Skills (optional)")`));
   assert.equal(await page.eval(`document.querySelector(".form-fields textarea").value`), "", "no prefilled notes");
   assert.equal(await page.eval(`document.querySelector(".form-fields textarea").placeholder`), "What did you notice?");
-  assert.ok(await page.eval(`document.body.innerText.includes("Learning Stage (optional)")`));
+  assert.ok(await page.eval(`document.body.innerText.includes("Notes (optional)")`));
   await noOverflow("form");
   await save();
   await page.waitFor(`document.querySelector(".child-profile") && document.querySelector(".tabs button.active")?.textContent === "Activities"`, 3000, "back on the child's Activities");
@@ -140,7 +145,7 @@ await step("Choosing an activity opens the form prefilled; optional fields start
   assert.ok((await history())[0].startsWith(musicTitle), "first in the history");
 });
 
-await step("Recently Used shows it once; a detailed record keeps stage, notes and skills", async () => {
+await step("Recently Used shows it once; the activity's skills are shown, not saved; notes are kept", async () => {
   await openPicker();
   assert.ok(await page.eval(`document.body.innerText.includes("Recently Used")`));
   const recentTitles = await page.eval(`[...document.querySelectorAll(".picker-list")][0].innerText`);
@@ -149,15 +154,15 @@ await step("Recently Used shows it once; a detailed record keeps stage, notes an
   assert.ok(!(await page.eval(`document.body.innerText.includes("Recently Used")`)), "hidden while searching");
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
-  await page.eval(`__t.click("Practicing", ".stage-choices button")`);
-  await page.eval(`__t.click("Concentration", ".chips button")`);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".activity-skills span")].map(s => s.textContent)`),
+    ["Care of Environment", "Gross Motor Coordination", "Concentration", "Independence"], "catalog skills");
   await page.eval(`__t.type(".form-fields textarea", "Careful strokes")`);
   await save();
   await page.waitFor(`document.querySelector(".child-profile")`, 3000, "saved");
   const r = (await live("records")).find(x => x.activityId === "mopping" && !recordsBefore.some(y => y.id === x.id));
   assert.ok(r);
-  assert.equal(r.stage, "Practicing");
-  assert.deepEqual(r.skills, ["Concentration"]);
+  assert.equal(r.stage, undefined, "no stage");
+  assert.equal(r.skills, undefined, "skills are not recorded as observed");
   assert.equal(r.notes, "Careful strokes");
   assert.equal(r.area, "Practical Life");
   await openPicker();
@@ -172,6 +177,7 @@ await step("Custom activity: name and learning area, stored as typed and never a
   await openPicker();
   await page.eval(`__t.clickSel(".picker-custom")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
+  assert.ok(!(await page.eval(`!!document.querySelector(".activity-skills")`)), "no skills for a custom activity");
   const before = (await live("records")).length;
   await page.eval(`__t.type(".form-fields input:not([type=date])", "Climbing at the playground")`);
   await save();
@@ -255,7 +261,9 @@ await step("Chinese: picker, search and history", async () => {
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
   assert.equal(await page.eval(`document.querySelector(".form-fields textarea").placeholder`), "你观察到了什么？");
-  assert.ok(await page.eval(`document.body.innerText.includes("学习阶段（可选）")`));
+  assert.ok(await page.eval(`document.body.innerText.includes("随手记（可选）") && document.body.innerText.includes("探索技能")`));
+  assert.ok(!(await page.eval(`document.body.innerText.includes("学习阶段") || document.body.innerText.includes("观察到的技能")`)));
+  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-skills span")].every(s => /[一-鿿]/.test(s.textContent))`), "skills in Chinese");
   await page.eval(`__t.click("取消", ".form-bottom button")`);
   await openChild();
   const h = await history();

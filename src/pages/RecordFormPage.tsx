@@ -5,17 +5,15 @@ import { catalogCategories, findActivity } from "../lib/catalog";
 import type { RecordInput } from "../lib/activityRecords";
 import { localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
-import type { Child, LessonRecord, Stage } from "../types";
-import { childAge, discoverCategoryLabel, localizeActivity, skillLabel, stageLabel, type Copy } from "../lib/i18n";
-
-const STAGES: Stage[] = ["Introduced", "Practicing", "Independent"];
-const SKILLS = ["Hand-eye coordination", "Concentration", "Independence", "Fine motor control", "Order"];
+import type { Child, LessonRecord } from "../types";
+import { childAge, discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 
 // The activity being recorded: one from the catalog, or the parent's own.
 type Choice = { activityId: string } | { custom: true };
 
 // Add Activity: pick an activity from the shared catalog (or Other / Custom Activity), then record the child's
-// experience. Stage, notes and skills are optional. Saving goes through the same record builder as Mark as Tried.
+// experience. Notes are optional. The activity's skills (Music: What Children Explore) are shown read-only as what
+// the activity explores; they are not saved on the record. Saving goes through the same record builder as Mark as Tried.
 export function RecordFormPage({ childrenData, childId: initialChild, lockChild, records, save, cancel, t }: {
   childrenData: Child[];
   childId: string;
@@ -82,9 +80,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
   const [title, setTitle] = useState("");
   const [area, setArea] = useState("");
   const [date, setDate] = useState(localIsoToday());
-  const [stage, setStage] = useState<Stage>();
   const [notes, setNotes] = useState("");
-  const [skills, setSkills] = useState<string[]>([]);
   const [error, setError] = useState("");
   // Guards against a double tap storing the same record twice.
   const saving = useRef(false);
@@ -93,8 +89,8 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
     if (saving.current) return;
     saving.current = true;
     const failure = await save(activity
-      ? { childId, date, activityId: activity.id, stage, notes, skills }
-      : { childId, date, customTitle: title, customArea: area, stage, notes, skills });
+      ? { childId, date, activityId: activity.id, notes }
+      : { childId, date, customTitle: title, customArea: area, notes });
     saving.current = false;
     if (failure) setError(failure);
   };
@@ -141,23 +137,15 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
           </>
         )}
         <Field label={t.date}><input type="date" value={date} max={localIsoToday()} onChange={e => e.target.value && setDate(e.target.value)} /></Field>
-        <fieldset>
-          <legend>{optional(t.learningStage)}</legend>
-          <div className="stage-choices">
-            {STAGES.map(x => (
-              <button className={stage === x ? "active" : ""} aria-pressed={stage === x} onClick={() => setStage(stage === x ? undefined : x)} key={x}>{stageLabel(x, t)}</button>
-            ))}
-          </div>
-        </fieldset>
-        <Field label={optional(t.observationNotesLabel)}><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder={t.whatDidYouNotice} /></Field>
-        <fieldset>
-          <legend>{optional(t.skillsObserved)}</legend>
-          <div className="chips">
-            {SKILLS.map(x => (
-              <button className={skills.includes(x) ? "active" : ""} aria-pressed={skills.includes(x)} onClick={() => setSkills(skills.includes(x) ? skills.filter(y => y !== x) : [...skills, x])} key={x}>{skillLabel(x, t)}</button>
-            ))}
-          </div>
-        </fieldset>
+        {a?.domains.length ? (
+          <fieldset>
+            <legend>{t.activitySkills}</legend>
+            <div className="skill-tags activity-skills">
+              {a.domains.map(x => <span key={x}>{x}</span>)}
+            </div>
+          </fieldset>
+        ) : null}
+        <Field label={optional(t.notesLabel)}><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder={t.whatDidYouNotice} /></Field>
         {error && <p className="journal-status error" role="alert">{error}</p>}
       </div>
       <div className="form-bottom">
