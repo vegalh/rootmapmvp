@@ -112,7 +112,7 @@ test("catalog: book and music data are complete", () => {
   }
 });
 
-test("books: the eight curated books, one record per book with both editions' titles", () => {
+test("books: the ten curated books, one record per book with both editions' titles", () => {
   assert.deepEqual(books.map(b => [b.id, b.title, b.titleZh, b.author]), [
     ["guess-how-much-i-love-you", "Guess How Much I Love You", "猜猜我有多爱你", "Sam McBratney"],
     ["the-carrot-seed", "The Carrot Seed", "胡萝卜种子", "Ruth Krauss"],
@@ -122,6 +122,8 @@ test("books: the eight curated books, one record per book with both editions' ti
     ["the-giving-tree", "The Giving Tree", "爱心树", "Shel Silverstein"],
     ["charlie-needs-a-cloak", "Charlie Needs a Cloak", "阿利的红斗篷", "Tomie dePaola"],
     ["a-squash-and-a-squeeze", "A Squash and a Squeeze", "小房子变大房子", "Julia Donaldson"],
+    ["the-smartest-giant-in-town", "The Smartest Giant in Town", "城里最漂亮的巨人", "Julia Donaldson"],
+    ["lazy-ozzie", "Lazy Ozzie", "懒奥西", "Michael Coleman"],
   ]);
   assert.ok(!books.some(b => b.id.startsWith("sample-")), "no sample books left");
   for (const b of books) assert.ok(b.authorZh && b.descriptionZh && b.whyWeRecommendZh, `${b.id} has Chinese text`);
@@ -136,6 +138,17 @@ test("books: listed under every age filter the reading age overlaps", () => {
   const carrot = books.find(b => b.id === "the-carrot-seed")!;
   assert.equal(readingAgeLabel(carrot, "en"), "2–5 years");
   assert.equal(readingAgeLabel(books.find(b => b.id === "the-giving-tree")!, "zh"), "4–6+岁");
+});
+
+test("books: each edition's cover is its own file; editions without one have none", () => {
+  const editions = (lang: "en" | "zh") => books.filter(b => lang === "en" ? b.coverEn : b.coverZh).map(b => b.id);
+  const withBoth = ["guess-how-much-i-love-you", "a-pocketful-of-kisses", "something-from-nothing", "the-runaway-bunny", "the-giving-tree", "charlie-needs-a-cloak", "the-smartest-giant-in-town"];
+  assert.deepEqual(editions("en"), withBoth);
+  assert.deepEqual(editions("zh"), [...withBoth, "lazy-ozzie"]);
+  for (const b of books) {
+    if (b.coverEn) assert.match(b.coverEn, new RegExp(`${b.id}-en\\.jpg`), `${b.id} English cover`);
+    if (b.coverZh) assert.match(b.coverZh, new RegExp(`${b.id}-zh\\.jpg`), `${b.id} Chinese cover`);
+  }
 });
 
 test("books: each language shows its own edition's cover, never the other one's", () => {

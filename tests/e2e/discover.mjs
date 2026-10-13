@@ -304,8 +304,8 @@ await step("Existing plans and saved activities are unchanged; Saved Activities 
   await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on Kids");
 });
 
-const BOOKS_EN = ["Guess How Much I Love You", "The Carrot Seed", "A Pocketful of Kisses", "Something from Nothing", "The Runaway Bunny", "The Giving Tree", "Charlie Needs a Cloak", "A Squash and a Squeeze"];
-const BOOKS_ZH = ["猜猜我有多爱你", "胡萝卜种子", "一口袋的吻", "爷爷一定有办法", "逃家小兔", "爱心树", "阿利的红斗篷", "小房子变大房子"];
+const BOOKS_EN = ["Guess How Much I Love You", "The Carrot Seed", "A Pocketful of Kisses", "Something from Nothing", "The Runaway Bunny", "The Giving Tree", "Charlie Needs a Cloak", "A Squash and a Squeeze", "The Smartest Giant in Town", "Lazy Ozzie"];
+const BOOKS_ZH = ["猜猜我有多爱你", "胡萝卜种子", "一口袋的吻", "爷爷一定有办法", "逃家小兔", "爱心树", "阿利的红斗篷", "小房子变大房子", "城里最漂亮的巨人", "懒奥西"];
 const setLanguage = async (from, to, check) => {
   await nav(NAV.profile);
   await page.eval(`__t.click(${q(from)}, ".menu-section button")`);
@@ -326,12 +326,16 @@ const checkCovers = (list, titles, badge) => {
   }
 };
 
-await step("Books: the eight curated books, covers and titles follow the language without a refresh; the bookshelf never doubles", async () => {
+await step("Books: the ten curated books, covers and titles follow the language without a refresh; the bookshelf never doubles", async () => {
   await nav(NAV.discover);
   await tab("Books");
   const en = await covers(".book-grid .book-tile");
   assert.deepEqual(en.map(c => c.title), BOOKS_EN);
   checkCovers(en, BOOKS_EN, "Cover coming soon");
+  const enImg = title => en.find(c => c.title === title).img;
+  assert.match(enImg("The Giving Tree") ?? "", /the-giving-tree-en\.jpg/, "English edition cover");
+  assert.equal(enImg("Lazy Ozzie"), null, "no English cover yet: placeholder, not the Chinese one");
+  assert.ok(en.every(c => !c.img || /-en\.jpg/.test(c.img)), "only English covers in English");
   const stored = await shelf();
   await setLanguage("Language", "简体中文", `document.documentElement.lang === "zh-CN"`);
   await nav(NAV.discover);
@@ -339,9 +343,13 @@ await step("Books: the eight curated books, covers and titles follow the languag
   const zh = await covers(".book-grid .book-tile");
   assert.deepEqual(zh.map(c => c.title), BOOKS_ZH);
   checkCovers(zh, BOOKS_ZH, "封面即将上线");
-  for (const [text, expect] of [["胡萝卜", "胡萝卜种子"], ["Carrot", "胡萝卜种子"], ["Krauss", "胡萝卜种子"], ["唐纳森", "小房子变大房子"]]) {
+  const zhImg = title => zh.find(c => c.title === title).img;
+  assert.match(zhImg("爱心树") ?? "", /the-giving-tree-zh\.jpg/, "Chinese edition cover");
+  assert.match(zhImg("懒奥西") ?? "", /lazy-ozzie-zh\.jpg/);
+  assert.ok(zh.every(c => !c.img || /-zh\.jpg/.test(c.img)), "only Chinese covers in Chinese");
+  for (const [text, expect] of [["胡萝卜", ["胡萝卜种子"]], ["Carrot", ["胡萝卜种子"]], ["Krauss", ["胡萝卜种子"]], ["唐纳森", ["小房子变大房子", "城里最漂亮的巨人"]]]) {
     await search(text);
-    assert.deepEqual((await covers(".book-grid .book-tile")).map(c => c.title), [expect], `search ${text}`);
+    assert.deepEqual((await covers(".book-grid .book-tile")).map(c => c.title), expect, `search ${text}`);
   }
   await search("");
   await page.eval(`__t.click("胡萝卜种子", ".book-tile")`);

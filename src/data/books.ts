@@ -1,4 +1,19 @@
 import type { Book } from "../types";
+import guessHowMuchILoveYouEn from "../assets/books/guess-how-much-i-love-you-en.jpg";
+import guessHowMuchILoveYouZh from "../assets/books/guess-how-much-i-love-you-zh.jpg";
+import aPocketfulOfKissesEn from "../assets/books/a-pocketful-of-kisses-en.jpg";
+import aPocketfulOfKissesZh from "../assets/books/a-pocketful-of-kisses-zh.jpg";
+import somethingFromNothingEn from "../assets/books/something-from-nothing-en.jpg";
+import somethingFromNothingZh from "../assets/books/something-from-nothing-zh.jpg";
+import theRunawayBunnyEn from "../assets/books/the-runaway-bunny-en.jpg";
+import theRunawayBunnyZh from "../assets/books/the-runaway-bunny-zh.jpg";
+import theGivingTreeEn from "../assets/books/the-giving-tree-en.jpg";
+import theGivingTreeZh from "../assets/books/the-giving-tree-zh.jpg";
+import charlieNeedsACloakEn from "../assets/books/charlie-needs-a-cloak-en.jpg";
+import charlieNeedsACloakZh from "../assets/books/charlie-needs-a-cloak-zh.jpg";
+import theSmartestGiantInTownEn from "../assets/books/the-smartest-giant-in-town-en.jpg";
+import theSmartestGiantInTownZh from "../assets/books/the-smartest-giant-in-town-zh.jpg";
+import lazyOzzieZh from "../assets/books/lazy-ozzie-zh.jpg";
 
 // The curated Discover > Books collection: picture books chosen for RootMap. There are no categories, ratings or
 // "featured" lists. Ages are RootMap's recommendations for reading together, not publisher ratings.
@@ -28,6 +43,8 @@ export const books: Book[] = [
     descriptionZh: "睡觉前，小栗色兔子想让大栗色兔子知道自己有多爱他：把手臂张得大大的，跳得高高的。每一次，大栗色兔子都用自己的方式回应，把爱说得再多一点，直到小兔子在这场温柔的比赛中慢慢睡着。",
     whyWeRecommend: "This is a conversation about love that young children can actually picture: arms, hops, the path to the river, the moon. The gentle back-and-forth mirrors how children play with big feelings, and the closing lines give the grown-up the last, quiet word. Many families find themselves inventing their own versions (\"I love you all the way to…\") long after the book is closed.",
     whyWeRecommendZh: "这是一场孩子“看得见”的关于爱的对话：张开的手臂、跳起的高度、通往小河的小路，还有月亮。你一句我一句的温柔“比赛”，正是孩子和大人一起玩味大情感的方式，结尾那句轻声的话则留给了大人。很多家庭读完后，还会继续编出属于自己的版本——“我爱你，一直爱到……”",
+    coverEn: guessHowMuchILoveYouEn,
+    coverZh: guessHowMuchILoveYouZh,
   },
   {
     id: "the-carrot-seed",
@@ -53,6 +70,8 @@ export const books: Book[] = [
     descriptionZh: "迪比要去上学了，想到要和妈妈分开，他心里很紧张。出门前，妈妈往他的口袋里装满了吻，需要的时候就可以拿出一个。这是一个关于分离的温柔故事，也是关于把爸爸妈妈的爱带进新地方的故事。",
     whyWeRecommend: "Starting school or nursery is one of the first big separations in a child's life, and this story gives that worry a shape a child can hold onto. The pocket of kisses is simple enough to borrow: many families invent their own small ritual before a goodbye. Reading it together before a new start lets children talk about missing someone, and hear that the feeling is normal.",
     whyWeRecommendZh: "上幼儿园或上学，是孩子生命中最早的几次大分离之一。这个故事给了这份担心一个孩子握得住的形状。“一口袋的吻”简单到可以直接借用：很多家庭会在告别前创造属于自己的小仪式。在新的开始之前一起读它，能让孩子说出“我会想你”，也让他们知道，这样的感觉很正常。",
+    coverEn: aPocketfulOfKissesEn,
+    coverZh: aPocketfulOfKissesZh,
   },
   {
     id: "something-from-nothing",
@@ -65,6 +84,8 @@ export const books: Book[] = [
     descriptionZh: "约瑟还是婴儿的时候，爷爷为他缝了一条奇妙的毯子。约瑟慢慢长大，毯子也慢慢旧了，爷爷每次都把布料改成一件更小的新东西。故事改编自犹太民间故事，地板下还住着一家老鼠，过着属于它们自己的故事。",
     whyWeRecommend: "Children love the rhythm of this book: each time something wears out, they can guess what Grandpa will make next. It shows a grandparent's skill and steady care, and treats old things as material for something new rather than rubbish. Look closely at the mice under the floor; spotting what they do with the scraps becomes a second story for children to discover and tell themselves.",
     whyWeRecommendZh: "孩子们很喜欢这本书的节奏：每当东西旧了，他们都会猜爷爷接下来会做成什么。书里有祖辈的手艺和一份不急不躁的关爱，也让孩子看到，旧东西不是垃圾，而是做新东西的材料。别忘了留意地板下的老鼠一家——发现它们怎样用碎布，会成为孩子自己发现、自己讲述的第二个故事。",
+    coverEn: somethingFromNothingEn,
+    coverZh: somethingFromNothingZh,
   },
   {
     id: "the-runaway-bunny",
@@ -77,6 +98,8 @@ export const books: Book[] = [
     descriptionZh: "小兔子告诉妈妈，他要离家出走。他想象自己变成一条鱼、一块石头、一只小鸟……每一次，妈妈都平静地说，她会变成什么来找到他。本书首次出版于1942年，由克雷门·赫德绘图。",
     whyWeRecommend: "Young children often test how far they can go and still be safe, and this book lets them do it in imagination. The question-and-answer pattern is easy to anticipate, so children quickly join in with what the mother will become. Some grown-ups find the mother a little too watchful; it can be worth asking your child how the bunny feels, and how the mother does.",
     whyWeRecommendZh: "小孩子常常会试探：自己能走多远，还依然是安全的。这本书让他们在想象中做这样的试探。一问一答的结构很好预测，孩子很快就会抢着说出妈妈要变成什么。也有大人觉得书里的妈妈“看得有点紧”，读的时候不妨问问孩子：小兔子是什么感觉？妈妈又是什么感觉？",
+    coverEn: theRunawayBunnyEn,
+    coverZh: theRunawayBunnyZh,
   },
   {
     id: "the-giving-tree",
@@ -89,6 +112,8 @@ export const books: Book[] = [
     descriptionZh: "一棵树爱着一个男孩。男孩小时候，他们每天一起玩；男孩长大后，一次次回来向树要东西，树也一次次把自己能给的都给了他。故事用简短的句子和简单的黑白线条画，讲述了他们相伴的一生。",
     whyWeRecommend: "Few picture books start as many different conversations. Some readers see unconditional love; others see a relationship where one side only takes, and a giver who never asks for anything back. Rather than handing children a single lesson, read it slowly and ask what they notice: Is the tree happy? What could the boy have given? It suits children old enough to hold two feelings at once.",
     whyWeRecommendZh: "很少有绘本能引出这么多不同的讨论。有人从中读到无条件的爱；也有人看到一段只有一方在索取的关系，以及一个从不为自己要求什么的付出者。与其直接告诉孩子一个道理，不如慢慢读，问问他们看到了什么：树真的快乐吗？男孩本可以给树什么？这本书更适合已经能同时感受两种情绪的大一点的孩子。",
+    coverEn: theGivingTreeEn,
+    coverZh: theGivingTreeZh,
   },
   {
     id: "charlie-needs-a-cloak",
@@ -101,6 +126,8 @@ export const books: Book[] = [
     descriptionZh: "牧羊人阿利的斗篷破旧了，他决定自己做一件新的：剪羊毛，再把羊毛洗净、梳理、纺成线、织成布、染上颜色，最后缝起来。一路上，总有一只调皮的羊在捣乱。",
     whyWeRecommend: "Children wear clothes every day without knowing where they come from. This book follows wool all the way from a sheep's back to a finished cloak, one clear step at a time, so children can see that the things around them are made with hands and time. It is also funny: watching the troublesome sheep in the corners of the pictures rewards slow, careful looking.",
     whyWeRecommendZh: "孩子们每天穿衣服，却很少知道衣服从哪里来。这本书一步一步，跟着羊毛从羊身上一路变成一件斗篷，让孩子看到：身边的东西，是靠一双双手和时间做出来的。它也很好笑——留意画面角落里那只捣蛋的羊，会让孩子越看越仔细。",
+    coverEn: charlieNeedsACloakEn,
+    coverZh: charlieNeedsACloakZh,
   },
   {
     id: "a-squash-and-a-squeeze",
@@ -113,5 +140,32 @@ export const books: Book[] = [
     descriptionZh: "一位老奶奶觉得自己的房子太小了。一位聪明的老爷爷给了她一些出人意料的建议，没过多久，她的屋子里就挤满了农场的动物。故事用轻快押韵的文字，幽默地讲出：一个空间是大是小，常常取决于你拿它和什么比。",
     whyWeRecommend: "The rhyme and repeated refrain invite children to join in, and the growing chaos of animals is pure fun to read aloud. Underneath the jokes is a real idea that young children can grasp: how big or small something feels can change, even when nothing about it has changed. Afterwards, children often enjoy acting it out, or remembering a time something felt different from before.",
     whyWeRecommendZh: "押韵的文字和反复出现的句子，会让孩子忍不住跟着一起念；动物越来越多、屋里越来越乱，读出声来非常有趣。笑声背后藏着一个小孩子也能理解的道理：东西本身没有变，感觉上的大小却可以改变。读完后，孩子们常常喜欢把故事演一遍，或者聊聊自己有没有过“前后感觉不一样”的时候。",
+  },
+  {
+    id: "the-smartest-giant-in-town",
+    title: "The Smartest Giant in Town",
+    titleZh: "城里最漂亮的巨人",
+    author: "Julia Donaldson",
+    authorZh: "朱莉娅·唐纳森",
+    readingAge: { from: 3, to: 6 },
+    description: "George is the scruffiest giant in town, so he buys himself a smart new outfit. On the way home he meets animals in trouble, and one by one he gives each piece away: his tie, his shirt, a shoe, a sock, his belt. In bouncy rhyme, illustrated by Axel Scheffler.",
+    descriptionZh: "乔治是城里最邋遢的巨人，于是他给自己买了一身漂亮的新衣服。回家路上，他遇到一个个需要帮助的动物，就把领带、衬衫、鞋子、袜子和腰带一件件送了出去。故事文字押韵轻快，由阿克塞尔·舍夫勒绘图。",
+    whyWeRecommend: "Children love predicting what George will give away next and how each animal will use it, and the repeating song invites them to join in. Underneath the fun is a warm idea about kindness: George ends up in his old clothes again, yet happier than ever. It opens easy conversations about helping others, and about what really makes someone special.",
+    whyWeRecommendZh: "孩子们很喜欢猜乔治下一件会送出什么、小动物又会怎么用它，反复出现的小歌谣也会让他们忍不住跟着唱。欢乐背后是一份温暖的善意：乔治最后又穿回了旧衣服，却比任何时候都快乐。读完后，很自然就能和孩子聊聊帮助别人，以及什么才真正让一个人与众不同。",
+    coverEn: theSmartestGiantInTownEn,
+    coverZh: theSmartestGiantInTownZh,
+  },
+  {
+    id: "lazy-ozzie",
+    title: "Lazy Ozzie",
+    titleZh: "懒奥西",
+    author: "Michael Coleman",
+    authorZh: "迈克尔·科尔曼",
+    readingAge: { from: 3, to: 6 },
+    description: "Ozzie is a young owl who is far too lazy to learn to fly. When his mother tells him he must show her he can, Ozzie thinks up a clever plan to get out of practising. But his mother may be wiser than he thinks. Illustrated by Gwyneth Williamson.",
+    descriptionZh: "小猫头鹰奥西太懒了，懒得学飞。妈妈说要看看他会不会飞，奥西就想出了一个“聪明”的办法，好不用练习。可是妈妈也许比他想的要聪明得多。由格温妮丝·威廉森绘图。",
+    whyWeRecommend: "Young children recognise Ozzie straight away: everyone has wanted to skip something hard. The fun is in watching his plan unfold and guessing whether it will work, and the ending lets a grown-up and child laugh together about shortcuts. It is a gentle way to talk about effort, about trying, and about how the people who love us often know us very well.",
+    whyWeRecommendZh: "小孩子一眼就能认出奥西：谁都有过想偷懒、不想做难事的时候。看他的计划一步步展开、猜猜会不会成功，是这本书最有趣的地方；结局又能让大人和孩子一起笑着聊聊“走捷径”。这是一种温和的方式，和孩子谈谈努力、尝试，以及爱我们的人往往最了解我们。",
+    coverZh: lazyOzzieZh,
   },
 ];
