@@ -66,7 +66,7 @@ try {
     await u.openProfile();
     await u.click("Sign in or create an account");
     await u.welcomeShown();
-    await u.signIn(emailA, "Create an account");
+    await u.signIn(emailA, "Continue with Email");
     await u.skipImport();
     idA = (await u.cloudState()).user.userId;
     assert.deepEqual(await u.space(), { kind: "account", userId: idA });
@@ -150,7 +150,7 @@ try {
     await u.openProfile();
     await u.click("Sign in or create an account");
     await u.welcomeShown();
-    await u.signIn(emailB, "Create an account");
+    await u.signIn(emailB, "Continue with Email");
     await u.skipImport();
     idB = (await u.cloudState()).user.userId;
     assert.notEqual(idB, idA);

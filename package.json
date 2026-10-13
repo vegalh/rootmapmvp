@@ -9,6 +9,7 @@
     "dev:staging": "vite --mode staging",
     "build": "vite build",
     "build:staging": "vite build --mode staging",
+    "build:beta-guest": "VITE_ROOTMAP_CLOUD=off VITE_SUPABASE_URL= VITE_SUPABASE_PUBLISHABLE_KEY= VITE_TURNSTILE_SITE_KEY= vite build --mode staging",
     "preview": "vite preview",
     "format": "oxfmt",
     "typecheck": "tsc --noEmit -p .",

@@ -51,7 +51,7 @@ try {
     assert.match(guestPhoto, /^photo-/);
     await sleep(300);
     guestBefore = JSON.stringify(await u1.dump("rootmap"));
-    await signInFromProfile(u1, emailA, "Create an account");
+    await signInFromProfile(u1, emailA, "Continue with Email");
     const state = await u1.cloudState();
     idA = state.user.userId;
     familyA = state.account.familyId;
@@ -216,7 +216,7 @@ try {
     await u1.signOut();
     assert.equal(JSON.stringify(await u1.dump("rootmap")), guestBefore);
     await sleep(1100);
-    await signInFromProfile(u1, emailB, "Create an account");
+    await signInFromProfile(u1, emailB, "Continue with Email");
     const familyB = (await u1.cloudState()).account.familyId;
     await waitStatus(one, `s.lastSyncedAt && s.phase === "idle"`, "B synced");
     assert.deepEqual(await store(one, `return S.getCollection("children").map(c => c.id);`), []);

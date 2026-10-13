@@ -33,7 +33,8 @@ export default defineConfig(({ mode }) => {
     plugins: [
 react(),
       tailwindcss(),
-      figmaSiteConfiguration(siteConfiguration),
+      // The private beta (staging) is titled as such and asks search engines not to index it.
+      figmaSiteConfiguration(mode === 'staging' ? { ...siteConfiguration, title: 'RootMap Beta', robots: { index: false } } : siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),

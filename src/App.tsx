@@ -21,6 +21,7 @@ import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
 import { GuestImportPage } from "./pages/GuestImportPage";
 import OpeningExperience from "./components/OpeningExperience";
+import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
@@ -28,7 +29,7 @@ import { activeSpace, backupData, dataMode, guestImportState, restoreData, syncM
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
-import { cloudConfig } from "./lib/cloud/config";
+import { cloudConfig, isBeta } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
 import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
 import { spaceMatches } from "./lib/cloud/space";
@@ -604,6 +605,7 @@ export default function App() {
             onContinueAsGuest={() => (fromProfile ? go("profile") : setWelcome("done"))}
           />
         </div>
+        {isBeta && <BetaNotice t={t} />}
       </div>
     );
   }
@@ -633,6 +635,7 @@ export default function App() {
         t={t}
       />
       {toast && <div className="toast" role="status">{toast}</div>}
+      {isBeta && <BetaNotice t={t} />}
     </div>
   );
 }

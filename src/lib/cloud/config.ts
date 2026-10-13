@@ -10,3 +10,7 @@ export const cloudConfig = resolveCloudConfig(env);
 if (env.DEV && !cloudConfig.enabled && cloudConfig.reason !== "not-enabled") {
   console.warn(`RootMap cloud features are off (${cloudConfig.reason}). Check .env.${env.MODE}.local; see .env.example.`);
 }
+
+// The beta: any staging build. `npm run build:beta-guest` is guest-only (cloud off: no sign-in, no Supabase), for
+// while email codes can't be delivered yet; `npm run build:staging` adds email sign-in and sync (cloud on).
+export const isBeta = cloudConfig.environment === "staging";

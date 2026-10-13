@@ -368,3 +368,11 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-eyebrow:lang(zh), .today-feature-caption small:lang(zh) { letter-spacing: .04em; font-size: 13.5px; }
 .today-feature-caption strong:lang(zh), .today-memory-caption strong:lang(zh), .today-memory.tried strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 22px; font-weight: 500; line-height: 1.35; }
 .today-thought blockquote:lang(zh) { font-family: var(--font-heading-zh); font-size: 19px; font-weight: 500; line-height: 1.75; }
+
+/* Private beta label and notice (staging builds only, components/BetaNotice.tsx); above the opening screens too. */
+.beta-badge { position: fixed; z-index: 1100; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 12px; background: #a4532c; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .02em; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.beta-layer .overlay { z-index: 1101; }
+.beta-points { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.55; color: var(--text); }
+.beta-points li + li { margin-top: 6px; }
+/* Cloudflare Turnstile check for code requests (lib/cloud/captcha.ts); only visible when it needs a tap. */
+.captcha-box { position: fixed; z-index: 1200; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); }

@@ -3,7 +3,7 @@
 //
 // Welcome on a new device (English and Chinese), email + 6-digit code (new and returning account, wrong, expired,
 // offline), the account's own space after sign-in, session restore after a reload, sign-out from Profile back to
-// the guest space, "Continue without an account", and a device with RootMap data opening straight into the app.
+// the guest space, "Continue as Guest", and a device with RootMap data opening straight into the app.
 // The guest database is compared before and after every step: signing in or out uploads and changes nothing in it.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -37,7 +37,7 @@ try {
 
   await step("New device: Welcome is shown, without password, phone, WeChat, Apple or Google; nothing is sent", async () => {
     const t = await u.text();
-    for (const s of ["Create an account", "I already have an account", "Continue without an account"]) assert.ok(t.includes(s), s);
+    for (const s of ["Continue with Email", "Continue as Guest", "Explore without an account. Your data will only be saved on this device."]) assert.ok(t.includes(s), s);
     for (const s of ["WeChat", "Apple", "Google", "Password", "Phone"]) assert.ok(!t.includes(s), `${s} is hidden`);
     assert.equal(await page.eval(`document.querySelectorAll("input[type=password]").length`), 0);
     assert.deepEqual(page.requests, []);
@@ -53,9 +53,9 @@ try {
   await step("Chinese: Welcome and the email step, including its error message, are translated", async () => {
     await page.eval(`__t.click("中文")`);
     await page.waitFor(`document.body.innerText.includes("欢迎来到 RootMap")`, 3000, "zh welcome");
-    for (const s of ["创建账户", "我已有账户", "暂不登录，直接使用"]) assert.ok(await u.has(s), s);
-    await u.click("创建账户");
-    for (const s of ["创建你的账户", "邮箱", "发送验证码"]) assert.ok(await u.has(s), s);
+    for (const s of ["使用邮箱继续", "以访客身份继续", "无需账户即可体验，数据只会保存在这台设备上。"]) assert.ok(await u.has(s), s);
+    await u.click("使用邮箱继续");
+    for (const s of ["第一次使用 RootMap？", "邮箱", "发送验证码"]) assert.ok(await u.has(s), s);
     await u.type("input[name=email]", "not-an-email");
     await u.click("发送验证码");
     assert.equal(await u.errorShown(), "请输入有效的邮箱地址。");
@@ -67,8 +67,8 @@ try {
     guestBefore = await guestDump();
   });
 
-  await step("Create an account: an invalid email is explained and nothing is sent", async () => {
-    await u.click("Create an account");
+  await step("Continue with Email: an invalid email is explained and nothing is sent", async () => {
+    await u.click("Continue with Email");
     await u.type("input[name=email]", "parent@");
     await u.click("Send code");
     assert.equal(await u.errorShown(), "Please enter a valid email address.");
@@ -79,7 +79,7 @@ try {
   await step("Offline: sending a code explains there is no connection; nothing is stored", async () => {
     await page.send("Network.emulateNetworkConditions", { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
     try {
-      await u.click("Create an account");
+      await u.click("Continue with Email");
       await u.type("input[name=email]", email);
       await u.click("Send code");
       await page.waitFor(`document.querySelector("[role=alert]")`, 10000, "offline message");
@@ -95,7 +95,7 @@ try {
 
   let code;
   await step("Send code opens the code step for that address; a wrong code is explained and does not sign in", async () => {
-    code = await u.requestCode("Create an account", email);
+    code = await u.requestCode("Continue with Email", email);
     assert.ok(await u.has(email));
     assert.ok(await u.has("New code in"), "resend waits");
     const wrong = code === "000000" ? "111111" : "000000";
@@ -173,7 +173,7 @@ try {
     await u.click("Sign in or create an account");
     await u.welcomeShown();
     await sleep(1100);
-    const expired = await u.requestCode("I already have an account", email);
+    const expired = await u.requestCode("Continue with Email", email);
     await expireCodes(email);
     await u.type("input[name=code]", expired);
     await page.waitFor(`document.querySelector("[role=alert]")`, 10000, "expired-code message");
@@ -182,7 +182,7 @@ try {
     assert.deepEqual(await u.sessionKeys(), []);
     await u.click("Use a different email");
     await u.click("Back");
-    await u.click("Continue without an account");
+    await u.click("Continue as Guest");
     await page.waitFor(`document.querySelector(".profile-page")`, 5000, "back on Profile");
     assert.equal(await guestDump(), guestBefore);
   }, /status of 403 .*\/auth\/v1\/verify/);
@@ -195,10 +195,10 @@ try {
   await page.nav(`${BASE}/`);
   await u.welcomeShown();
 
-  await step("Continue without an account: RootMap opens, nothing is sent, and Welcome is not shown again", async () => {
-    await page.waitFor(`document.body.innerText.includes("Continue without an account")`, 5000, "guest button");
+  await step("Continue as Guest: RootMap opens, nothing is sent, and Welcome is not shown again", async () => {
+    await page.waitFor(`document.body.innerText.includes("Continue as Guest")`, 5000, "guest button");
     const before = await guestDump();
-    await u.click("Continue without an account");
+    await u.click("Continue as Guest");
     await u.appReady();
     assert.ok(await u.has("Maya"));
     assert.equal(await welcomeSetting(), "done");

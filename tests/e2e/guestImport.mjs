@@ -60,7 +60,7 @@ try {
   });
 
   await step("Signing in: one question, with what would come and what stays", async () => {
-    await signInFromProfile(emailA, "Create an account");
+    await signInFromProfile(emailA, "Continue with Email");
     familyA = (await u.cloudState()).account.familyId;
     await page.waitFor(`document.querySelector(".guest-import [data-testid=import-summary]")`, 15000, "the question opens by itself");
     const text = await u.text();
@@ -112,7 +112,7 @@ try {
     await u.signOut();
     assert.equal(await guestDump(), guestBefore, "signing out shows the guest space as it was");
     await sleep(1100);
-    await signInFromProfile(emailB, "Create an account");
+    await signInFromProfile(emailB, "Continue with Email");
     familyB = (await u.cloudState()).account.familyId;
     await page.waitFor(`document.querySelector(".guest-import [data-testid=import-summary]")`, 15000, "asked");
     assert.ok(await u.has("Some of this may already have been added to another RootMap account on this device."));

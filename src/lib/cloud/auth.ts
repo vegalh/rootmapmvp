@@ -29,6 +29,7 @@ export type AuthFailure =
   | "rate-limited" // too many codes or attempts; try again shortly
   | "offline" // the server could not be reached
   | "unavailable" // sign-in is switched off on the server
+  | "captcha" // the security check (CAPTCHA) didn't complete or the server refused its token
   | "unknown";
 
 export type AuthResult<T = undefined> = { ok: true; value: T } | { ok: false; failure: AuthFailure };
@@ -46,17 +47,19 @@ export function authFailure(error: ErrorLike | unknown): AuthFailure {
   if (e.name === "AuthRetryableFetchError" || e.status === 0 || e instanceof TypeError) return "offline";
   if (e.status === 429 || e.code === "over_email_send_rate_limit" || e.code === "over_request_rate_limit") return "rate-limited";
   if (e.code === "otp_expired") return "code-rejected";
+  if (e.code === "captcha_failed") return "captcha";
   if (e.code === "signup_disabled" || e.code === "otp_disabled" || e.code === "email_provider_disabled") return "unavailable";
   if (e.code === "email_address_invalid" || e.code === "email_address_not_authorized") return "invalid-email";
   if (e.status === 403 || e.status === 401) return "code-rejected";
   return "unknown";
 }
 
-// Emails a 6-digit code. Creates the account on first use, so "Create an account" and "Log in" are the same step.
-export async function requestEmailCode(client: SupabaseClient, email: string): Promise<AuthResult> {
+// Emails a 6-digit code. Creates the account on first use, so signing up and signing in are the same step.
+// `captchaToken` is required by the server when its CAPTCHA protection is on (see lib/cloud/captcha.ts).
+export async function requestEmailCode(client: SupabaseClient, email: string, captchaToken?: string): Promise<AuthResult> {
   if (!isValidEmail(email)) return { ok: false, failure: "invalid-email" };
   try {
-    const { error } = await client.auth.signInWithOtp({ email: normalizeEmail(email), options: { shouldCreateUser: true } });
+    const { error } = await client.auth.signInWithOtp({ email: normalizeEmail(email), options: { shouldCreateUser: true, ...(captchaToken ? { captchaToken } : {}) } });
     return error ? { ok: false, failure: authFailure(error) } : { ok: true, value: undefined };
   } catch (e) {
     return { ok: false, failure: authFailure(e) };

@@ -119,7 +119,7 @@ export function ui(page) {
     sessionKeys: () => page.eval(`Object.keys(__t.ls()).filter(k => k.startsWith("rootmap.session:"))`),
     // Waits for the page load that follows signing in or out (the app reloads into the other space).
     reloaded: async (fn) => { const loaded = page.waitEvent("Page.loadEventFired", 20000); await fn(); await loaded; await self.appReady(); },
-    // Requests a code through the screens (Welcome → Create / I already have an account → email → Send code).
+    // Requests a code through the screens (Welcome → Continue with Email → email → Send code).
     requestCode: async (entry, email) => {
       await self.click(entry);
       await page.waitFor(`document.querySelector("input[name=email]")`, 5000, "email step");
@@ -130,7 +130,7 @@ export function ui(page) {
       return latestCode(email, before);
     },
     // From Welcome (or the sign-in screen): signs in with an emailed code and waits for the account's space.
-    signIn: async (email, entry = "I already have an account") => {
+    signIn: async (email, entry = "Continue with Email") => {
       const code = await self.requestCode(entry, email);
       await self.reloaded(() => self.type("input[name=code]", code));
       await page.waitFor(`import("/src/lib/cloud/session.ts").then(C => C.cloudState().status === "signed-in" && C.cloudState().account)`, 15000, "signed in, account ready");

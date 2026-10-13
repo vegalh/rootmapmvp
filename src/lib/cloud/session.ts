@@ -1,7 +1,8 @@
 import type { Session } from "@supabase/supabase-js";
 import { platform } from "../platform";
 import { ensureAccount, type Account } from "./account";
-import { requestEmailCode, restoreSession, signOut, verifyEmailCode, type AuthResult, type StoredUser } from "./auth";
+import { isValidEmail, requestEmailCode, restoreSession, signOut, verifyEmailCode, type AuthResult, type StoredUser } from "./auth";
+import { captchaSiteKey, captchaToken } from "./captcha";
 import { getCloudClient } from "./client";
 
 // The parent's sign-in state for the whole app, and the actions the sign-in screens (M2) will call. No screen
@@ -78,7 +79,11 @@ const cloudOff = { ok: false, failure: "unavailable" } as const;
 // Step 1 of signing in (or creating an account): email a 6-digit code.
 export async function sendSignInCode(email: string): Promise<AuthResult> {
   const client = await getCloudClient();
-  return client ? requestEmailCode(client, email) : cloudOff;
+  if (!client) return cloudOff;
+  if (!captchaSiteKey || !isValidEmail(email)) return requestEmailCode(client, email);
+  // Open registration: the server only sends a code with a fresh CAPTCHA token (one token per request).
+  const token = await captchaToken().catch(() => null);
+  return token ? requestEmailCode(client, email, token) : { ok: false, failure: "captcha" };
 }
 
 // Step 2: check the code, then make sure the family and profile exist.

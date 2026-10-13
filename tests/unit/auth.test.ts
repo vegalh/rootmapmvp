@@ -24,6 +24,7 @@ test("server errors become a small set of explainable failures", () => {
   assert.equal(authFailure({ status: 403, code: "otp_expired" }), "code-rejected");
   assert.equal(authFailure({ status: 401 }), "code-rejected");
   assert.equal(authFailure({ status: 422, code: "signup_disabled" }), "unavailable");
+  assert.equal(authFailure({ status: 400, code: "captcha_failed" }), "captcha");
   assert.equal(authFailure({ status: 400, code: "email_address_invalid" }), "invalid-email");
   assert.equal(authFailure({ status: 500, code: "unexpected_failure" }), "unknown");
   assert.equal(authFailure(null), "unknown");

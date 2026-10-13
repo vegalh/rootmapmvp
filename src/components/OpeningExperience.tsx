@@ -8,10 +8,10 @@ import { isValidCode, isValidEmail, normalizeCode, normalizeEmail, type AuthFail
 // are carried over unchanged; at 390×844 the layout below resolves to the original pixel positions. On other
 // screen sizes the logo and sheet positions are derived from measurements instead of fixed pixels.
 //
-// Sign-in (Phase 2B-2 M2): an email and a typed 6-digit code, no password. "Create an account" and "I already have
-// an account" are the same flow with different words, because the server creates the account on first use. The
-// screens only collect what is typed and pass it to `auth`; without it (the development preview) they show a short
-// "not available yet" notice and send nothing.
+// Sign-in (Phase 2B-2 M2): an email and a typed 6-digit code, no password. Welcome offers "Continue with Email" and
+// "Continue as Guest"; signing up and signing in are the same step, because the server creates the account on first
+// use. The screens only collect what is typed and pass it to `auth`; without it (the development preview) they show a
+// short "not available yet" notice and send nothing.
 
 // The sign-in actions (lib/cloud/session.ts in the app).
 export type OpeningAuth = {
@@ -19,7 +19,7 @@ export type OpeningAuth = {
   confirmCode: (email: string, code: string) => Promise<AuthResult<unknown>>;
 };
 
-type View = "welcome" | "signup" | "login" | "code";
+type View = "welcome" | "email" | "code";
 
 // WeChat, Apple and Google stay hidden until their sign-in works (later phase). Listing one here shows its button.
 const SOCIAL_PROVIDERS: ("wechat" | "apple")[] = [];
@@ -32,7 +32,8 @@ const failureText = (failure: AuthFailure, c: Copy) =>
       : failure === "code-rejected" ? c.authCodeRejected
         : failure === "rate-limited" ? c.authRateLimited
           : failure === "offline" ? c.authOffline
-            : c.authUnavailable;
+            : failure === "captcha" ? c.authCaptcha
+              : c.authUnavailable;
 
 const OUT = "cubic-bezier(.22,1,.36,1)";
 const POP = "cubic-bezier(.34,1.56,.64,1)";
@@ -84,7 +85,6 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
   const [view, setView] = useState<View>("welcome");
   const [notice, setNotice] = useState("");
   // The email step the code view came from, so Back returns there with the same words.
-  const [emailView, setEmailView] = useState<"signup" | "login">("signup");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -278,11 +278,6 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
   const lf: Record<string, number> = {}, lt: Record<string, string> = {};
   (Object.keys(LEAF_DELAYS) as (keyof typeof LEAF_DELAYS)[]).forEach(k => { lf[k] = st >= 3 ? 1 : 0; lt[k] = tr([["transform", 460, LEAF_DELAYS[k], POP]]); });
 
-  const isLogin = view === "login";
-  const f = {
-    title: isLogin ? c.openingLoginTitle : c.openingSignupTitle,
-    body: isLogin ? c.openingLoginBody : c.openingSignupBody,
-  };
   const zh = lang === "zh";
   const headFont = zh ? "'Noto Sans SC', sans-serif" : "'Caveat', cursive";
   const headSize = compact ? (zh ? 23 : 32) : zh ? 26 : 38;
@@ -385,10 +380,12 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
             <div style={{ display: "flex", flexDirection: "column", gap: k.gap, flex: 1 }}>
               <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{c.openingWelcomeTitle}</h1>
               <p style={{ margin: `0 0 ${k.bodyMb}px 0`, fontSize: k.bodySize, lineHeight: k.bodyLh, color: "#76654f" }}>{c.openingWelcomeBody}</p>
-              <button type="button" onClick={() => { setEmailView("signup"); goTo("signup"); }} style={primaryBtn}>{c.openingCreate}</button>
-              <button type="button" onClick={() => { setEmailView("login"); goTo("login"); }} style={{ ...primaryBtn, border: "1.5px solid #4b7c63", background: "transparent", color: "#2f4d3d" }}>{c.openingHave}</button>
+              <button type="button" onClick={() => goTo("email")} style={primaryBtn}>{c.openingEmail}</button>
               {onContinueAsGuest && (
-                <button type="button" className="opening-link" onClick={onContinueAsGuest} style={{ ...linkBtn, alignSelf: "center", fontSize: 15 }}>{c.openingGuest}</button>
+                <>
+                  <button type="button" onClick={onContinueAsGuest} style={{ ...primaryBtn, border: "1.5px solid #4b7c63", background: "transparent", color: "#2f4d3d" }}>{c.openingGuest}</button>
+                  <p style={{ margin: "-4px 0 0 0", fontSize: 13.5, lineHeight: 1.45, color: "#76654f", textAlign: "center" }}>{c.openingGuestNote}</p>
+                </>
               )}
               {SOCIAL_PROVIDERS.length > 0 && (
                 <>
@@ -408,7 +405,7 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
             </div>
           ) : view === "code" ? (
             <form onSubmit={submitCode} noValidate style={{ display: "flex", flexDirection: "column", gap: k.gap, flex: 1 }}>
-              {backButton(emailView)}
+              {backButton("email")}
               <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{c.openingCodeTitle}</h1>
               <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f", overflowWrap: "anywhere" }}>{c.openingCodeBody.replace("{email}", normalizeEmail(email))}</p>
               <label style={labelStyle}>
@@ -421,14 +418,14 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
                 <button type="button" className="opening-link" onClick={() => void sendCode(true)} disabled={busy || resendIn > 0} style={{ ...linkBtn, opacity: resendIn > 0 ? 0.6 : 1, cursor: resendIn > 0 ? "default" : "pointer" }}>
                   {resendIn > 0 ? c.openingResendIn.replace("{s}", String(resendIn)) : c.openingResend}
                 </button>
-                <button type="button" className="opening-link" onClick={() => goTo(emailView)} style={linkBtn}>{c.openingChangeEmail}</button>
+                <button type="button" className="opening-link" onClick={() => goTo("email")} style={linkBtn}>{c.openingChangeEmail}</button>
               </div>
             </form>
           ) : (
             <form onSubmit={submitEmail} noValidate style={{ display: "flex", flexDirection: "column", gap: k.gap, flex: 1 }}>
               {backButton("welcome")}
-              <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{f.title}</h1>
-              <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f" }}>{f.body}</p>
+              <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{c.openingEmailTitle}</h1>
+              <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f" }}>{c.openingEmailBody}</p>
               <label style={labelStyle}>
                 <span>{c.openingEmailLabel}</span>
                 <input name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); setFailure(null); }} aria-invalid={!!failure} style={inputStyle} />
