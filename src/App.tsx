@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
+import { TodayPage } from "./pages/TodayPage";
 import { ChildrenPage } from "./pages/ChildrenPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { ActivityDetailPage } from "./pages/ActivityDetailPage";
@@ -99,8 +100,8 @@ function reloadIntoSpace() {
 
 export default function App() {
   const [afterSwitch] = useState(readAfterSwitch);
-  const [screen, setScreen] = useState<Screen>(afterSwitch?.screen ?? "children");
-  const [previous, setPrevious] = useState<Screen>("children");
+  const [screen, setScreen] = useState<Screen>(afterSwitch?.screen ?? "today");
+  const [previous, setPrevious] = useState<Screen>("today");
   const [modal, setModal] = useState<ModalKind>(null);
   const [selectedChild, setSelectedChild] = useState("emma");
   const [selectedActivity, setSelectedActivity] = useState("water-pouring");
@@ -108,8 +109,8 @@ export default function App() {
   // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
   // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal,
-  // "activity" = the activity page a memory was added from after marking it as tried).
-  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity">("moments");
+  // "activity" = the activity page a memory was added from after marking it as tried, "today" = Looking Back).
+  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today">("moments");
   // Child preselected for a new entry.
   const [editorChild, setEditorChild] = useState<string | undefined>();
   // Editable starting title/date for a new entry (the activity just marked as tried).
@@ -280,10 +281,11 @@ export default function App() {
     setScreen(s);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const topLevel = ["children", "discover", "observations", "profile"].includes(screen);
+  // Moments is no longer a tab, but keeps the bottom bar (it opens after saving a memory from Quick Add).
+  const topLevel = ["today", "children", "discover", "observations", "profile"].includes(screen);
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
-  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? "activity" : "observations";
-  const openEntry = (id: string, origin: "moments" | "child") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
+  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? "activity" : entryOrigin === "today" ? "today" : "observations";
+  const openEntry = (id: string, origin: "moments" | "child" | "today") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
     if (!childrenData.length) { setModal("addChild"); return; }
     setSelectedEntry(undefined);
@@ -335,6 +337,19 @@ export default function App() {
   };
 
   const content = () => {
+    if (screen === "today") {
+      return (
+        <TodayPage
+          entries={entries}
+          records={records}
+          childrenData={childrenData}
+          lang={lang}
+          openActivity={id => { setSelectedActivity(id); go("activity"); }}
+          openEntry={id => openEntry(id, "today")}
+          t={t}
+        />
+      );
+    }
     if (screen === "children") {
       return (
         <ChildrenPage
@@ -356,7 +371,7 @@ export default function App() {
           activity={activity}
           saved={saved.includes(activity.id)}
           toggleSaved={() => setSaved(saved.includes(activity.id) ? saved.filter(x => x !== activity.id) : [...saved, activity.id])}
-          back={() => go(previous === "week" ? "week" : "discover")}
+          back={() => go(previous === "week" || previous === "today" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
           t={t}
@@ -380,7 +395,7 @@ export default function App() {
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} cloud={cloud} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
-      return <GuestImportPage userId={syncUser} back={() => go(previous === "account" ? "account" : "children")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
+      return <GuestImportPage userId={syncUser} back={() => go(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
     }
     if (screen === "child") {
       return (

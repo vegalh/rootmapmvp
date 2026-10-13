@@ -24,6 +24,8 @@ for (let round = 1; round <= 3; round++) {
     const blobIds = new Set(dump.photoBlobs.map(p => p.id));
     for (const e of dump.entries) for (const ref of e.photos) assert.ok(blobIds.has(ref), `entry ${e.id} photo resolves`);
     for (const p of [a, b]) {
+      await p.eval(`__t.click("Kids", ".bottom-nav button")`);
+      await sleep(300);
       assert.ok(await p.eval(`__t.imagesLoaded(".child-select-photo img").every(i => i.ok)`), "both tabs show photos");
       assert.ok((await p.eval("__t.text()")).includes("小明"));
       assert.deepEqual(p.errors, []);

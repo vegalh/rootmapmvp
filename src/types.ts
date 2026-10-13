@@ -168,6 +168,7 @@ export type Goal = SyncMeta & {
 export type Lang = "en" | "zh";
 
 export type Screen =
+  | "today"
   | "children"
   | "child"
   | "record"

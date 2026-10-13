@@ -25,7 +25,15 @@ async function start(profile, port) {
 const appReady = () => page.waitFor(`document.querySelector(".app-shell")`, 15000, "app rendered");
 const nav = async label => {
   if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
-  await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
+  if (label === "Moments") {
+    // Moments is no longer a tab; cancelling Quick Add → Add Moment returns to the Moments timeline.
+    await page.eval(`document.querySelector(".nav-add").click()`);
+    await page.waitFor(`document.querySelector(".quick-actions")`);
+    await page.eval(`__t.click("Add Moment", ".quick-actions button")`);
+    await page.waitFor(`document.querySelector(".journal-editor-bar")`);
+    await page.eval(`document.querySelector(".journal-editor-bar button").click()`);
+    await page.waitFor(`document.querySelector(".moments-page")`);
+  } else await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
   await sleep(150);
 };
 const seedAt = async (url, fixture = FIXTURE) => {
@@ -42,6 +50,7 @@ await step("No IndexedDB at all: app runs on localStorage exactly as before, wri
   const { identifier } = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `Object.defineProperty(window, "indexedDB", { value: undefined, configurable: true });` });
   await page.nav(`${DEV}/`);
   await appReady();
+  await nav("Kids");
   const text = await page.eval("__t.text()");
   assert.ok(text.includes("小明") && text.includes("Maya"));
   await page.waitFor(`__t.imagesLoaded(".child-select-photo img").every(i => i.ok)`);

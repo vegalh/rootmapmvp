@@ -324,3 +324,47 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .opening-screen > div { width: min(100%, 430px); height: 100dvh; }
 .sync-summary { margin: 4px 0 8px; padding: 10px 14px; border-radius: 13px; background: var(--lavender); }.sync-summary p { margin: 2px 0; color: var(--primary); font-size: 14px; font-weight: 600; }.sync-summary:empty { display: none; }
 .stage-choices.two { grid-template-columns: 1fr 1fr; }.import-summary { margin: 10px 0; padding: 10px 14px; border-radius: 13px; background: var(--lavender); }.import-summary p { margin: 2px 0; color: var(--primary); font-size: 15px; }.import-question { margin: 16px 0 4px; text-align: left; }.import-question legend { font-weight: 700; font-size: 16px; margin-bottom: 4px; }.import-question p { margin: 0 0 10px; }
+
+/* Today (home): one featured activity, one resurfaced memory, one reflection; each with its own treatment. */
+.today-page .hero-title { padding-bottom: 6px; }
+.today-page .hero-title .today-date { margin: 0 0 2px; font-size: 14px; font-weight: 700; color: var(--primary); }
+.today-section { margin-top: 26px; }
+.today-eyebrow { margin: 0 0 12px 2px; font: 800 12.5px var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.today-link { display: inline-flex; align-items: center; gap: 2px; color: var(--primary); font-size: 15px; font-weight: 700; }
+.today-feature, .today-memory { width: 100%; display: block; padding: 0; border: 0; color: inherit; text-align: left; transition: transform .15s ease; }
+.today-feature:active, .today-memory:active { transform: scale(.985); }
+.today-feature { overflow: hidden; border: 1px solid var(--border); border-radius: 26px; background: var(--card); box-shadow: var(--shadow); }
+.today-feature-image { position: relative; display: block; aspect-ratio: 4 / 3.3; background: var(--elevated); }
+.today-feature-image img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.today-feature-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 64px 18px 16px; display: flex; flex-direction: column; gap: 2px; color: #fff; background: linear-gradient(to top, rgba(28, 22, 14, .72), rgba(28, 22, 14, 0)); }
+.today-feature-caption small { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .92; }
+.today-feature-caption strong { font: 700 36px/1.05 var(--font-heading); text-shadow: 0 1px 8px rgba(0, 0, 0, .25); overflow-wrap: anywhere; }
+.today-feature-body { display: block; padding: 14px 18px 18px; }
+.today-feature-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 14px; }
+.today-feature-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.today-feature-body p { margin: 8px 0 12px; font-size: 16px; line-height: 1.55; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* Looking Back: a keepsake print on a warm card, unlike the full-bleed feature above. */
+.today-memory { padding: 18px 18px 20px; border-radius: 24px; background: var(--apricot); }
+.today-memory-photo { position: relative; display: block; margin: 4px 6px 18px; transform: rotate(-1.5deg); }
+.today-memory-photo img { position: relative; width: 100%; aspect-ratio: 4 / 3; display: block; object-fit: cover; border: 7px solid var(--card); border-radius: 6px; background: var(--elevated); box-shadow: 0 8px 22px rgba(59, 42, 26, .16); }
+.today-memory-photo.stack::before { content: ""; position: absolute; inset: 0; border-radius: 6px; background: var(--card); box-shadow: var(--shadow); transform: rotate(3.5deg); }
+.today-memory-quote { display: block; margin: 2px 0 14px; padding-left: 14px; border-left: 3px solid var(--orange); font-size: 17px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.today-memory-caption { display: block; }
+.today-memory-caption strong { display: block; font: 700 30px/1.15 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
+.today-memory-caption time { display: block; margin-top: 3px; font-size: 14.5px; color: var(--muted); }
+.today-memory > .today-link { margin-top: 12px; }
+.today-memory.tried { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; padding: 14px; background: var(--lavender); }
+.today-memory.tried img { width: 96px; height: 96px; display: block; object-fit: cover; border-radius: 18px; background: var(--elevated); }
+.today-memory.tried > span { display: block; min-width: 0; }
+.today-memory.tried small { display: block; font-size: 14px; font-weight: 700; color: var(--primary); }
+.today-memory.tried strong { display: block; margin: 2px 0; font: 700 26px/1.1 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
+.today-memory.tried em { display: block; font-style: normal; font-size: 14px; color: var(--muted); }
+.today-memory.tried .today-link { margin-top: 8px; }
+/* A Thought for Parents: quiet, text only. */
+.today-thought { margin-top: 36px; padding: 26px 8px 4px; border-top: 1px solid var(--border); text-align: center; }
+.today-thought .today-eyebrow { margin-left: 0; }
+.today-thought blockquote { max-width: 30ch; margin: 0 auto; text-wrap: balance; font: 600 28px/1.3 var(--font-heading); color: var(--dark-purple); }
+.today-thought blockquote::before { content: "\201C"; display: block; height: 26px; font-size: 52px; line-height: 1; color: var(--orange); }
+.today-eyebrow:lang(zh), .today-feature-caption small:lang(zh) { letter-spacing: .04em; font-size: 13.5px; }
+.today-feature-caption strong:lang(zh), .today-memory-caption strong:lang(zh), .today-memory.tried strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 22px; font-weight: 500; line-height: 1.35; }
+.today-thought blockquote:lang(zh) { font-family: var(--font-heading-zh); font-size: 19px; font-weight: 500; line-height: 1.75; }

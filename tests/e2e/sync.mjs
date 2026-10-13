@@ -83,7 +83,7 @@ try {
     await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.getCollection("children").some(c => c.id === "c-ada"))`, 30000, "child arrived");
     await waitStatus(two, `s.allBackedUp`, "device 2 backed up");
     assert.deepEqual(await store(two, `return S.pendingOutbox();`), []);
-    await two.eval(`[...document.querySelectorAll(".bottom-nav button")][0].click()`);
+    await two.eval(`[...document.querySelectorAll(".bottom-nav button")][3].click()`);
     await two.waitFor(`document.body.innerText.includes("Ada")`, 5000, "shown on My Children");
   });
 
@@ -168,7 +168,12 @@ try {
     await syncNow(two);
     await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.hasPhotoBytes(${JSON.stringify(photo)}))`, 30000, "downloaded on device 2");
     // Shown on device 2's Moments, from its own verified copy.
-    await two.eval(`[...document.querySelectorAll(".bottom-nav button")][3].click()`);
+    // Moments is no longer a tab; cancelling Quick Add → Add Moment returns to the Moments timeline.
+    await two.eval(`document.querySelector(".nav-add").click()`);
+    await two.waitFor(`document.querySelector(".quick-actions")`);
+    await two.eval(`[...document.querySelectorAll(".quick-actions button")][1].click()`);
+    await two.waitFor(`document.querySelector(".journal-editor-bar")`, 5000, "editor");
+    await two.eval(`document.querySelector(".journal-editor-bar button").click()`);
     await two.waitFor(`[...document.querySelectorAll("img")].some(i => i.src.startsWith("blob:") && i.complete && i.naturalWidth > 0)`, 10000, "photo displayed");
   }, /ERR_BLOCKED_BY_CLIENT|Failed to fetch/);
   await two.close();

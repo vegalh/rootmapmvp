@@ -16,10 +16,10 @@ export function PageHeader({ title, subtitle, back, action }: { title: string; s
 
 export function BottomNav({ active, go, openQuick, t }: { active: Screen; go: (s: Screen) => void; openQuick: () => void; t: Copy }) {
   const items: [Screen, string, string][] = [
-    ["children", "home", t.myChildren],
-    ["discover", "compass", t.discover],
-    ["observations", "note", t.momentsNav],
-    ["profile", "user", t.profile],
+    ["today", "sun", t.navToday],
+    ["discover", "compass", t.navDiscover],
+    ["children", "users", t.navKids],
+    ["profile", "user", t.navProfile],
   ];
   return (
     <nav className="bottom-nav">

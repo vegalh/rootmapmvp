@@ -20,6 +20,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `children.ts` - The list of children/students. **Add a child or change a photo here.**
   - `progress.ts` - Lesson records, observations, and the lesson options offered per learning area.
   - `activities.ts` - Discover page activities/lessons and category list. **Add a new lesson/activity here.**
+  - `thoughts.ts` - The "A Thought for Parents" reflections (English + Chinese) shown on Today, one per day.
 - `src/lib/` - Small framework-agnostic helpers:
   - `i18n.ts` - English/Chinese translation strings (`copy`) and the `Copy` type.
   - `data/` - The data access layer. All persistent data goes through it (never call localStorage/IndexedDB from screens). See [docs/data-architecture.md](docs/data-architecture.md).
@@ -43,7 +44,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
   - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
-  - `ChildrenPage.tsx`, `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
+  - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx`, `ActivityDetailPage.tsx`, `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts

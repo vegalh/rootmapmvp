@@ -45,6 +45,7 @@ await appReady();
 const firstLoad = await loads();
 
 await step("A child added outside any screen appears on My Children without a reload, and is stored", async () => {
+  await nav("Kids");
   await page.waitFor(`document.body.innerText.includes("Maya")`);
   assert.ok(!(await page.eval(`document.body.innerText.includes("Ext")`)));
   assert.equal(await withStore(`return S.write({ collections: { children: [${JSON.stringify(child)}] } });`), null);
@@ -65,7 +66,7 @@ await step("An outside edit and an outside soft delete update the screen too", a
 
 await step("An outside setting change (language) updates every screen", async () => {
   await withStore(`return S.write({ settings: [["rootmap-language", "zh"]] });`);
-  await page.waitFor(`document.querySelector(".bottom-nav").innerText.includes("个人中心")`, 5000, "Chinese navigation");
+  await page.waitFor(`document.querySelector(".bottom-nav").innerText.includes("我的")`, 5000, "Chinese navigation");
   await withStore(`return S.write({ settings: [["rootmap-language", "en"]] });`);
   await page.waitFor(`document.querySelector(".bottom-nav").innerText.includes("Profile")`, 5000, "English again");
   assert.equal(await loads(), firstLoad);

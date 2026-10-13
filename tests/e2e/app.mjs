@@ -32,10 +32,18 @@ async function start() {
 const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, .page-content, main")`, 15000, "app rendered");
 const dump = () => page.eval("__t.dump()");
 const ls = () => page.eval("__t.ls()");
-// Bottom navigation only exists on top-level screens; a reload returns to My Children like a fresh visit.
+// Bottom navigation only exists on top-level screens; a reload returns to Today like a fresh visit.
 const nav = async label => {
   if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
-  await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
+  if (label === "Moments") {
+    // Moments is no longer a tab; cancelling Quick Add → Add Moment returns to the Moments timeline.
+    await page.eval(`document.querySelector(".nav-add").click()`);
+    await page.waitFor(`document.querySelector(".quick-actions")`);
+    await page.eval(`__t.click("Add Moment", ".quick-actions button")`);
+    await page.waitFor(`document.querySelector(".journal-editor-bar")`);
+    await page.eval(`document.querySelector(".journal-editor-bar button").click()`);
+    await page.waitFor(`document.querySelector(".moments-page")`);
+  } else await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
   await sleep(150);
 };
 
@@ -124,6 +132,7 @@ await step("Original localStorage is untouched by the migration", async () => {
 });
 
 await step("Migrated data displays: children, photos (blob URLs), Moments, profile", async () => {
+  await nav("Kids");
   const text = await page.eval("__t.text()");
   for (const s of ["Maya", "Leo", "小明"]) assert.ok(text.includes(s), `children page shows ${s}`);
   assert.ok(!text.includes("Zoë"), "deleted child hidden");
@@ -177,6 +186,7 @@ await step("14. Failed migration keeps the app on the original data (and retries
   page.warnings.length = 0;
   await page.nav(`${BASE}/`);
   await appReady();
+  await nav("Kids");
   const text = await page.eval("__t.text()");
   assert.ok(text.includes("小明") && text.includes("Maya"), "original data shown");
   assert.equal(await page.eval(`__t.all("meta").then(m => (m || []).length)`), 0, "not marked migrated");
@@ -297,7 +307,7 @@ await step("18. Mark as Tried still works (stored with uuid id and timestamps)",
 });
 
 await step("19. Delete a child (soft delete, one write) and restore it (same id, data comes back)", async () => {
-  await nav("My Children");
+  await nav("Kids");
   await page.eval(`__t.click("小明", ".child-select-card")`);
   await page.waitFor(`document.querySelector(".profile-hero")`);
   await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
@@ -398,10 +408,10 @@ await step("20. English and Chinese still work (and the choice persists)", async
   await page.eval(`__t.click("简体中文")`);
   await page.waitFor(`document.documentElement.lang === "zh-CN" && document.body.innerText.includes("语言")`);
   await page.reload(); await appReady();
-  assert.ok((await page.eval(`document.querySelector(".bottom-nav").innerText`)).includes("我的孩子们"));
+  assert.ok((await page.eval(`document.querySelector(".bottom-nav").innerText`)).includes("孩子"));
   assert.equal(await page.eval(`document.documentElement.lang`), "zh-CN");
   assert.equal(lsBefore["rootmap-language"], JSON.stringify("en"));
-  await nav("个人中心");
+  await nav("我的");
   await page.eval(`__t.click("语言")`);
   await page.eval(`__t.click("English")`);
   await page.waitFor(`document.documentElement.lang === "en" && document.body.innerText.includes("Language")`);
