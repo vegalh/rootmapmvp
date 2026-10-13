@@ -124,23 +124,25 @@ export type Activity = {
 // Age bands shared by the Discover filters. A book or music activity can belong to several.
 export type AgeRange = "0–2" | "2–3" | "3–4" | "4–6" | "6+";
 
-// A book in the curated Discover > Books collection (src/data/books.ts). `*Zh` fields are optional Chinese
-// variants; the English fields are always present.
+// A book in the curated Discover > Books collection (src/data/books.ts). One record per book: its English and
+// Chinese editions share the id (what the Family Bookshelf stores). `*Zh` fields are the Chinese edition's text.
 export type Book = {
   id: string;
   title: string;
   titleZh?: string;
   author: string;
   authorZh?: string;
-  ageRanges: AgeRange[];
-  // Imported image (portrait, about 3:4). Without one, a soft placeholder cover with the title is drawn.
-  cover?: string;
+  // RootMap's recommended reading age in years, e.g. 2–5 → { from: 2, to: 5 }; `plus` for "4–6+". The book is
+  // listed under every age filter this overlaps (lib/catalog.ts `bookAgeRanges`).
+  readingAge: { from: number; to: number; plus?: boolean };
+  // Each edition's own cover (imported images; portraits of any proportion). Never swapped for the other
+  // language: without the edition's cover, a placeholder with the title in that language is drawn.
+  coverEn?: string;
+  coverZh?: string;
   description: string;
   descriptionZh?: string;
   whyWeRecommend: string;
   whyWeRecommendZh?: string;
-  // Placeholder content, labelled "Sample" in the app until replaced by a verified book.
-  sample?: boolean;
 };
 
 // Where a book sits on the Family Bookshelf: owned ("My Books") or wanted ("Wishlist").

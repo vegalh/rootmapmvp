@@ -33,7 +33,23 @@ export const matchesQuery = (q: string, fields: (string | undefined)[]) => {
 // The cover to show for a music activity (its own image, or the default illustration).
 export const musicCover = (m: MusicActivity) => m.coverImage || defaultMusicCover;
 
-// Display text in the current language; each Chinese field falls back to English when absent.
+// Age filters a book's recommended reading age overlaps (2–6 → 2–3, 3–4 and 4–6; 4–6+ → 4–6 and 6+).
+export function bookAgeRanges(b: Book): AgeRange[] {
+  const to = b.readingAge.plus ? Infinity : b.readingAge.to;
+  return AGE_RANGES.filter(r => {
+    const [low, high] = r === "6+" ? [6, Infinity] : r.split("–").map(Number);
+    return b.readingAge.from < high && to > low;
+  });
+}
+
+// "2–5 years" / "2–5岁", "4–6+ years" / "4–6+岁".
+export function readingAgeLabel(b: Book, lang: Lang): string {
+  const span = `${b.readingAge.from}–${b.readingAge.to}${b.readingAge.plus ? "+" : ""}`;
+  return lang === "zh" ? `${span}岁` : `${span} years`;
+}
+
+// Display text and cover in the current language. Text falls back to English when a Chinese field is absent; the
+// cover never does (each edition has its own design), so `cover` is undefined when that edition's is missing.
 export function localizeBook(b: Book, t: Copy) {
   const zh = t.code === "zh";
   return {
@@ -41,7 +57,8 @@ export function localizeBook(b: Book, t: Copy) {
     author: (zh && b.authorZh) || b.author,
     description: (zh && b.descriptionZh) || b.description,
     whyWeRecommend: (zh && b.whyWeRecommendZh) || b.whyWeRecommend,
-    ages: agesLabel(b.ageRanges, zh ? "zh" : "en"),
+    ages: readingAgeLabel(b, zh ? "zh" : "en"),
+    cover: zh ? b.coverZh : b.coverEn,
   };
 }
 

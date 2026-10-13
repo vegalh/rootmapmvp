@@ -400,7 +400,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .book-tile small { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .book-cover { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 5px 12px 12px 5px; background: var(--elevated); box-shadow: var(--shadow); }
 .book-cover::before { content: ""; position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 6px; background: rgba(59, 42, 26, .07); }
-.book-cover img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.book-cover img { width: 100%; height: 100%; display: block; object-fit: contain; }
 .book-cover.placeholder { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding: 16px 14px 16px 18px; }
 .book-cover.placeholder strong { font: 700 22px/1.1 var(--font-heading); color: inherit; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .book-cover.tone-0 { background: var(--lavender); color: var(--primary); }

@@ -20,7 +20,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `children.ts` - The list of children/students. **Add a child or change a photo here.**
   - `progress.ts` - Lesson records, observations, and the lesson options offered per learning area.
   - `activities.ts` - Discover page activities/lessons and category list. **Add a new lesson/activity here.**
-  - `books.ts` - Discover > Books, the curated book collection (currently clearly labelled samples). **Add a book here.**
+  - `books.ts` - Discover > Books, the curated picture-book collection. One record per book; the English and Chinese editions share its id and each has its own cover (`coverEn` / `coverZh`). **Add a book here.**
   - `music.ts` - Discover > Music, interactive music activities and their recordings. **Add a music activity or connect a recording here.**
   - `thoughts.ts` - The "A Thought for Parents" reflections (English + Chinese) shown on Today, one per day.
 - `src/lib/` - Small framework-agnostic helpers:
@@ -49,7 +49,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `ModalOverlay.tsx` - Central modal dispatcher (quick-add, filters, add child, plan, week-add).
   - `ActivityPicker.tsx` - Add Activity's search-first picker over the shared catalog (search, category chips, Recently Used, Other / Custom Activity).
   - `EntryTimeline.tsx` - Month-grouped entry list plus the shared add/search controls used by Moments and Journal.
-  - `BooksBrowser.tsx`, `MusicBrowser.tsx` - The Books and Music tabs of Discover. `BookCover.tsx` - book cover (or drawn placeholder) and grid tile. `AudioPlayer.tsx` - play/pause/seek player for music recordings; shows "Recording coming soon" without a playable file.
+  - `BooksBrowser.tsx`, `MusicBrowser.tsx` - The Books and Music tabs of Discover. `BookCover.tsx` - the current language edition's cover (or a placeholder titled in that language) and grid tile. `AudioPlayer.tsx` - play/pause/seek player for music recordings; shows "Recording coming soon" without a playable file.
 - `src/pages/` - One file per screen, rendered by `App.tsx`:
   - `TodayPage.tsx` (home: Today's Inspiration, Looking Back, A Thought for Parents; read-only), `ChildrenPage.tsx` (Kids tab), `DiscoverPage.tsx` (Activities | Books | Music), `ActivityDetailPage.tsx`, `BookDetailPage.tsx`, `MusicDetailPage.tsx`, `BookshelfPage.tsx` (Family Bookshelf, from Profile), `MomentsPage.tsx`, `ChildProfilePage.tsx` (Journal | Activities), `EntryEditorPage.tsx` (the one editor for every memory), `EntryDetailPage.tsx`, `ProfilePage.tsx`, `AccountPage.tsx` (signed-in email, backup status, earlier memories, Sign out), `GuestImportPage.tsx` (the "Bring your memories into your account?" question), `MyWeekPage.tsx`, `GoalsPage.tsx`, `SettingsPage.tsx`, `NotificationsPage.tsx`, `RecordFormPage.tsx` (Add Activity: picker, then the record form; activity records only).
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
@@ -65,7 +65,7 @@ This is the canonical project structure. Start with task-relevant files below. O
 ## Making common changes
 
 - **Add a new lesson/activity**: append an entry to the `activities` array in [src/data/activities.ts](src/data/activities.ts). It appears in Discover and in Kids › Add Activity automatically (no other list to update). Optional Chinese search words go in `zh.keywords`. A new `area` shows up as a category everywhere; add it to `categories` to set its order and icon, and to `discoverCategoryLabel` for its Chinese name.
-- **Add a book**: append an entry to `books` in [src/data/books.ts](src/data/books.ts) (cover image in `src/assets/books/`, imported).
+- **Add a book**: append an entry to `books` in [src/data/books.ts](src/data/books.ts). Covers are per edition: `src/assets/books/<id>-en.jpg` and `<id>-zh.jpg`, imported and set as `coverEn` / `coverZh` (only images you're allowed to use). A missing edition cover shows a placeholder in that language; the other language's cover is never substituted.
 - **Add a music activity / connect a recording**: edit [src/data/music.ts](src/data/music.ts); put the MP3/M4A in `src/assets/music/`, import it and set `audioSrc`.
 - **Add or edit a child / change a photo**: edit [src/data/children.ts](src/data/children.ts).
 - **Add a new page/screen**: create a file in `src/pages/`, add its name to the `Screen` union in [src/types.ts](src/types.ts), and wire it into the `content()` switch in [src/App.tsx](src/App.tsx).

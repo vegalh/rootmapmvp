@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { booksOn, placeBook, shelfOf } from "../../src/lib/bookshelf.ts";
-import { agesLabel, findActivity, isMusicId, matchesAge, matchesQuery, musicAsActivity } from "../../src/lib/catalog.ts";
+import { booksOn, placeBook, shelfOf, validItems } from "../../src/lib/bookshelf.ts";
+import { agesLabel, bookAgeRanges, findActivity, localizeBook, readingAgeLabel, isMusicId, matchesAge, matchesQuery, musicAsActivity } from "../../src/lib/catalog.ts";
 import { activities } from "../../src/data/activities.ts";
 import { books } from "../../src/data/books.ts";
 import { musicActivities } from "../../src/data/music.ts";
 import { settingShape } from "../../src/lib/data/schema.ts";
+import { copy } from "../../src/lib/i18n.ts";
 import type { ShelfItem } from "../../src/types.ts";
 
 const t0 = "2026-10-01T10:00:00.000Z", t1 = "2026-10-02T10:00:00.000Z", t2 = "2026-10-03T10:00:00.000Z";
@@ -102,11 +103,55 @@ test("catalog: book and music data are complete", () => {
   assert.equal(new Set(bookIds).size, bookIds.length, "book ids are unique");
   for (const b of books) {
     assert.ok(b.title && b.author && b.description && b.whyWeRecommend, `${b.id} has its text`);
-    assert.ok(b.ageRanges.length, `${b.id} has an age range`);
+    assert.ok(bookAgeRanges(b).length, `${b.id} has an age range`);
   }
   for (const m of musicActivities) {
     assert.ok(m.title && m.description && m.howToPlay.length && m.whatChildrenExplore.length, `${m.id} has its text`);
     assert.ok(m.ageRanges.length && m.duration > 0, `${m.id} has ages and a duration`);
     assert.deepEqual(musicAsActivity(m).steps, m.howToPlay);
   }
+});
+
+test("books: the eight curated books, one record per book with both editions' titles", () => {
+  assert.deepEqual(books.map(b => [b.id, b.title, b.titleZh, b.author]), [
+    ["guess-how-much-i-love-you", "Guess How Much I Love You", "猜猜我有多爱你", "Sam McBratney"],
+    ["the-carrot-seed", "The Carrot Seed", "胡萝卜种子", "Ruth Krauss"],
+    ["a-pocketful-of-kisses", "A Pocketful of Kisses", "一口袋的吻", "Angela McAllister"],
+    ["something-from-nothing", "Something from Nothing", "爷爷一定有办法", "Phoebe Gilman"],
+    ["the-runaway-bunny", "The Runaway Bunny", "逃家小兔", "Margaret Wise Brown"],
+    ["the-giving-tree", "The Giving Tree", "爱心树", "Shel Silverstein"],
+    ["charlie-needs-a-cloak", "Charlie Needs a Cloak", "阿利的红斗篷", "Tomie dePaola"],
+    ["a-squash-and-a-squeeze", "A Squash and a Squeeze", "小房子变大房子", "Julia Donaldson"],
+  ]);
+  assert.ok(!books.some(b => b.id.startsWith("sample-")), "no sample books left");
+  for (const b of books) assert.ok(b.authorZh && b.descriptionZh && b.whyWeRecommendZh, `${b.id} has Chinese text`);
+});
+
+test("books: listed under every age filter the reading age overlaps", () => {
+  const ranges = (id: string) => bookAgeRanges(books.find(b => b.id === id)!);
+  assert.deepEqual(ranges("guess-how-much-i-love-you"), ["2–3", "3–4", "4–6"]);
+  assert.deepEqual(ranges("the-carrot-seed"), ["2–3", "3–4", "4–6"]);
+  assert.deepEqual(ranges("a-squash-and-a-squeeze"), ["3–4", "4–6"]);
+  assert.deepEqual(ranges("the-giving-tree"), ["4–6", "6+"]);
+  const carrot = books.find(b => b.id === "the-carrot-seed")!;
+  assert.equal(readingAgeLabel(carrot, "en"), "2–5 years");
+  assert.equal(readingAgeLabel(books.find(b => b.id === "the-giving-tree")!, "zh"), "4–6+岁");
+});
+
+test("books: each language shows its own edition's cover, never the other one's", () => {
+  const b = { ...books[1], coverEn: "/en.jpg", coverZh: "/zh.jpg" };
+  assert.equal(localizeBook(b, copy.en).cover, "/en.jpg");
+  assert.equal(localizeBook(b, copy.zh).cover, "/zh.jpg");
+  assert.equal(localizeBook({ ...b, coverZh: undefined }, copy.zh).cover, undefined, "no English cover in Chinese");
+  assert.equal(localizeBook({ ...b, coverEn: undefined }, copy.en).cover, undefined, "no Chinese cover in English");
+  assert.equal(localizeBook(b, copy.zh).title, "胡萝卜种子");
+  assert.equal(localizeBook(b, copy.en).title, "The Carrot Seed");
+});
+
+test("bookshelf: a removed sample book stays stored but is not a catalog book", () => {
+  const stored = [{ bookId: "sample-book-1", shelf: "owned", addedAt: t0 }, { bookId: "the-carrot-seed", shelf: "wishlist", addedAt: t1 }];
+  assert.deepEqual(validItems(stored), stored, "kept as stored");
+  const items = placeBook(stored as never, "the-giving-tree", "owned", t2);
+  assert.ok(items.some(i => i.bookId === "sample-book-1"), "untouched by other changes");
+  assert.deepEqual(booksOn(items, "owned").filter(id => books.some(b => b.id === id)), ["the-giving-tree"]);
 });

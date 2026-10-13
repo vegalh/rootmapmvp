@@ -304,6 +304,75 @@ await step("Existing plans and saved activities are unchanged; Saved Activities 
   await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on Kids");
 });
 
+const BOOKS_EN = ["Guess How Much I Love You", "The Carrot Seed", "A Pocketful of Kisses", "Something from Nothing", "The Runaway Bunny", "The Giving Tree", "Charlie Needs a Cloak", "A Squash and a Squeeze"];
+const BOOKS_ZH = ["猜猜我有多爱你", "胡萝卜种子", "一口袋的吻", "爷爷一定有办法", "逃家小兔", "爱心树", "阿利的红斗篷", "小房子变大房子"];
+const setLanguage = async (from, to, check) => {
+  await nav(NAV.profile);
+  await page.eval(`__t.click(${q(from)}, ".menu-section button")`);
+  await page.eval(`__t.click(${q(to)})`);
+  await page.waitFor(check, 3000, to);
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+};
+// Each cover shows the current language's edition: its image, or a placeholder with the title in that language.
+const covers = sel => page.eval(`[...document.querySelectorAll(${q(sel)})].map(t => ({ title: t.querySelector(":scope > strong").textContent, cover: t.querySelector(".book-cover strong")?.textContent ?? null, img: t.querySelector(".book-cover img")?.getAttribute("src") ?? null, broken: [...t.querySelectorAll("img")].some(i => i.complete && !i.naturalWidth), badge: t.querySelector(".book-cover em")?.textContent ?? null }))`);
+const checkCovers = (list, titles, badge) => {
+  for (const c of list) {
+    assert.ok(titles.includes(c.title), `${c.title} in this language`);
+    assert.ok(!c.broken, `${c.title}: no broken image`);
+    if (!c.img) {
+      assert.equal(c.cover, c.title, `${c.title}: placeholder in the same language`);
+      assert.equal(c.badge, badge, `${c.title}: marked as a placeholder`);
+    }
+  }
+};
+
+await step("Books: the eight curated books, covers and titles follow the language without a refresh; the bookshelf never doubles", async () => {
+  await nav(NAV.discover);
+  await tab("Books");
+  const en = await covers(".book-grid .book-tile");
+  assert.deepEqual(en.map(c => c.title), BOOKS_EN);
+  checkCovers(en, BOOKS_EN, "Cover coming soon");
+  const stored = await shelf();
+  await setLanguage("Language", "简体中文", `document.documentElement.lang === "zh-CN"`);
+  await nav(NAV.discover);
+  await tab("绘本");
+  const zh = await covers(".book-grid .book-tile");
+  assert.deepEqual(zh.map(c => c.title), BOOKS_ZH);
+  checkCovers(zh, BOOKS_ZH, "封面即将上线");
+  for (const [text, expect] of [["胡萝卜", "胡萝卜种子"], ["Carrot", "胡萝卜种子"], ["Krauss", "胡萝卜种子"], ["唐纳森", "小房子变大房子"]]) {
+    await search(text);
+    assert.deepEqual((await covers(".book-grid .book-tile")).map(c => c.title), [expect], `search ${text}`);
+  }
+  await search("");
+  await page.eval(`__t.click("胡萝卜种子", ".book-tile")`);
+  await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book");
+  assert.equal(await page.eval(`document.querySelector(".book-detail h1").textContent`), "胡萝卜种子");
+  assert.equal(await page.eval(`document.querySelector(".book-detail-cover .book-cover strong")?.textContent`), "胡萝卜种子", "Chinese cover placeholder");
+  assert.ok(await page.eval(`document.querySelector(".book-detail .description").textContent.startsWith("一个小男孩")`));
+  assert.ok(await page.eval(`document.querySelector(".book-ages").textContent.includes("2–5岁")`));
+  await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
+  // The Family Bookshelf in Chinese: the same entries, shown as the Chinese editions.
+  await nav(NAV.profile);
+  await page.eval(`__t.click("家庭书架", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf");
+  for (const [label, kind] of [["我的藏书", "owned"], ["心愿书单", "wishlist"]]) {
+    await page.eval(`__t.click(${q(label)}, ".bookshelf-page .segmented button")`); await sleep(150);
+    const list = await covers(".bookshelf-page .book-tile");
+    assert.equal(list.length, stored.filter(i => i.shelf === kind).length, `${label}: same entries`);
+    checkCovers(list, BOOKS_ZH, "封面即将上线");
+  }
+  assert.deepEqual(await shelf(), stored, "switching language changes nothing stored");
+  await noOverflow("Family Bookshelf (zh)");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+  await setLanguage("语言", "English", `document.documentElement.lang === "en"`);
+  await nav(NAV.profile);
+  await page.eval(`__t.click("Family Bookshelf", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf");
+  checkCovers(await covers(".bookshelf-page .book-tile"), BOOKS_EN, "Cover coming soon");
+  assert.deepEqual(await shelf(), stored);
+  await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
+});
+
 await step("Chinese: tabs, Books search in Chinese, Music labels; then back to English", async () => {
   await nav(NAV.profile);
   await page.eval(`__t.click("Language", ".menu-section button")`);

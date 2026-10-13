@@ -3,7 +3,7 @@ import { Icon } from "./Icon";
 import { Empty, FilterPill } from "./ui";
 import { BookTile } from "./BookCover";
 import { books } from "../data/books";
-import { AGE_RANGES, matchesAge, matchesQuery } from "../lib/catalog";
+import { AGE_RANGES, bookAgeRanges, matchesAge, matchesQuery } from "../lib/catalog";
 import { ageOptionLabel, type Copy } from "../lib/i18n";
 
 // Discover > Books: the curated collection, searchable by title and author (English or Chinese) and by age.
@@ -11,7 +11,7 @@ export default function BooksBrowser({ openBook, t }: { openBook: (id: string) =
   const [q, setQ] = useState("");
   const [age, setAge] = useState("All Ages");
   const [ageOpen, setAgeOpen] = useState(false);
-  const result = books.filter(b => matchesQuery(q, [b.title, b.titleZh, b.author, b.authorZh]) && matchesAge(b.ageRanges, age));
+  const result = books.filter(b => matchesQuery(q, [b.title, b.titleZh, b.author, b.authorZh]) && matchesAge(bookAgeRanges(b), age));
   return (
     <>
       <label className="search discover-search"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t.searchBooks} /></label>
