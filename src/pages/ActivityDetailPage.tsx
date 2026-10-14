@@ -47,12 +47,6 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
             <span key={d}><i><Icon name={i === 0 ? "user" : i === 1 ? "compass" : i === 2 ? "heart" : "globe"} size={18} /></i>{d}</span>
           ))}
         </div>
-        {a.safety && (
-          <aside className="safety-note" aria-label={t.safetyTitle}>
-            <Icon name="shield" size={20} />
-            <div><strong>{t.safetyTitle}</strong><p>{a.safety}</p></div>
-          </aside>
-        )}
         <h2>{t.materials}</h2>
         <div className="material-list">
           {a.materials.map((m, i) => (
@@ -63,6 +57,12 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
         </div>
         <h2>{t.how}</h2>
         <ol>{a.steps.map(s => <li key={s}>{s}</li>)}</ol>
+        {a.safety && (
+          <aside className="safety-note" aria-label={t.safetyTitle}>
+            <Icon name="shield" size={20} />
+            <div><strong>{t.safetyTitle}</strong><p>{a.safety}</p></div>
+          </aside>
+        )}
       </div>
       <div className="sticky-action two">
         <button className="secondary" onClick={openTried}><Icon name="check" size={19} />{t.markAsTried}</button>
