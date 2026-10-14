@@ -50,7 +50,7 @@ import { defaultChildId, isActiveChild } from "./lib/children";
 import { localIsoToday } from "./lib/dates";
 import { shelfOf, useBookshelf } from "./lib/bookshelf";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { DeletedChild, Entry, Lang, LessonRecord, ModalKind, Plan, ProfileInfo, Screen, Shelf } from "./types";
+import type { DeletedChild, Entry, Lang, LessonRecord, ModalKind, Plan, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -130,7 +130,6 @@ export default function App() {
   const [selectedActivity, setSelectedActivity] = useState(start.activity ?? "water-pouring");
   const [selectedBook, setSelectedBook] = useState(start.book ?? books[0]?.id ?? "");
   const [discoverTab, setDiscoverTab] = useState<DiscoverTab>(start.discoverTab ?? "activities");
-  const [bookshelfTab, setBookshelfTab] = useState<Shelf>("owned");
   const [childTab, setChildTab] = useState<string>(start.childTab ?? "Journal");
   // Where Add Activity was opened: a child's Activities tab (child already known) or Quick Add (child chosen in the form).
   const [recordFrom, setRecordFrom] = useState<"child" | "quick">(start.screen === "record" && start.child ? "child" : "quick");
@@ -183,7 +182,7 @@ export default function App() {
   const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
   const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
-  // The Family Bookshelf belongs to the family, not to a child (lib/bookshelf.ts).
+  // The book Wishlist belongs to the family, not to a child (lib/bookshelf.ts).
   const bookshelf = useBookshelf();
 
   // Sign-in state (always "off" on the public website). New devices see the Welcome screen until the parent signs in
@@ -597,8 +596,6 @@ export default function App() {
       return (
         <BookshelfPage
           items={bookshelf.items}
-          tab={bookshelfTab}
-          setTab={setBookshelfTab}
           openBook={id => { setSelectedBook(id); go("book"); }}
           explore={() => { setDiscoverTab("books"); go("discover"); }}
           back={() => goBack("profile")}

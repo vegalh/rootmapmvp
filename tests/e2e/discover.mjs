@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
 import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
-// Discover > Activities | Books | Music, the Family Bookshelf, and music activities in the My Week workflow.
+// Discover > Activities | Books | Music, the book Wishlist, and music activities in the My Week workflow.
 // Checks are written against whatever books and music the data files hold, so they keep passing as the sample
 // entries are replaced with real ones.
 
@@ -121,7 +121,7 @@ await step("Books: search by title and author, and filter by age (a book may be 
   await noOverflow("Books");
 });
 
-await step("Book details: cover, title, author, ages, description, why we recommend it, Add to Family Bookshelf", async () => {
+await step("Book details: cover, title, author, ages, description, why we recommend it, Add to Wishlist", async () => {
   await page.eval(`__t.clickSel(".book-tile")`);
   await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book detail");
   assert.equal(await page.eval(`document.querySelector(".book-detail h1").textContent`), bookTitle);
@@ -129,86 +129,78 @@ await step("Book details: cover, title, author, ages, description, why we recomm
     assert.ok(await page.eval(`!!document.querySelector(${q(sel)})?.textContent.trim() || !!document.querySelector(${q(sel)} + " img")`), sel);
   }
   assert.ok(await page.eval(`document.body.innerText.includes("Why We Recommend It")`));
-  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "Add to Family Bookshelf");
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "Add to Wishlist");
   await noOverflow("Book details");
 });
 
 const shelf = async () => (await setting("rootmap-bookshelf")) ?? [];
-const openShelfSheet = async () => {
-  await page.eval(`__t.clickSel(".sticky-action button")`);
-  await page.waitFor(`document.querySelector(".overlay .shelf-choices")`, 3000, "bookshelf sheet");
-};
+const shelfButton = () => page.eval(`document.querySelector(".sticky-action button").textContent.trim()`);
+const toggleWishlist = async () => { await page.eval(`__t.clickSel(".sticky-action button")`); await sleep(200); };
 
 let bookId;
-await step("Books go to My Books, move to Wishlist and back, and are removed, without duplicates", async () => {
-  await openShelfSheet();
-  await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`);
-  await page.waitFor(`!document.querySelector(".overlay")`, 3000, "sheet closed");
-  await page.waitFor(`document.querySelector(".toast")?.textContent === "Added to My Books"`, 3000, "toast");
+await step("One tap saves a book to the Wishlist, another removes it; no shelf to choose, no duplicates", async () => {
+  await toggleWishlist();
+  assert.ok(!(await page.eval(`!!document.querySelector(".overlay")`)), "no shelf sheet");
+  await page.waitFor(`document.querySelector(".toast")?.textContent === "Added to Wishlist"`, 3000, "toast");
   await page.waitFor(`__t.all("settings").then(s => s.find(x => x.key === "rootmap-bookshelf")?.value?.length === 1)`, 3000, "stored");
   let items = await shelf();
-  assert.equal(items[0].shelf, "owned");
+  assert.equal(items[0].shelf, "wishlist");
   bookId = items[0].bookId;
-  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "In My Books");
+  assert.equal(await shelfButton(), "On Wishlist");
+  assert.equal(await page.eval(`document.querySelector(".sticky-action button").getAttribute("aria-pressed")`), "true");
 
-  await openShelfSheet();
-  await page.eval(`__t.click("Wishlist", ".overlay .shelf-choices button")`);
-  await page.waitFor(`document.querySelector(".toast")?.textContent === "Moved to Wishlist"`, 3000, "moved toast");
-  await sleep(200);
-  items = await shelf();
-  assert.deepEqual(items.map(i => [i.bookId, i.shelf]), [[bookId, "wishlist"]], "moved, not copied");
-
-  await openShelfSheet();
-  await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`); await sleep(200);
-  await openShelfSheet();
-  await page.eval(`__t.clickSel(".overlay .shelf-remove")`);
-  await page.waitFor(`document.querySelector(".toast")?.textContent === "Removed from Family Bookshelf"`, 3000, "removed toast");
+  await toggleWishlist();
+  await page.waitFor(`document.querySelector(".toast")?.textContent === "Removed from Wishlist"`, 3000, "removed toast");
   await sleep(200);
   assert.deepEqual(await shelf(), []);
-  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "Add to Family Bookshelf");
+  assert.equal(await shelfButton(), "Add to Wishlist");
 
-  // Two books: one owned, one wished for.
-  await openShelfSheet();
-  await page.eval(`__t.click("Wishlist", ".overlay .shelf-choices button")`); await sleep(200);
+  // Two books on the Wishlist.
+  await toggleWishlist();
   await page.eval(`__t.clickSel(".detail-actions button")`);
   await page.waitFor(`document.querySelector(".book-tile")`, 3000, "back on Books");
   assert.equal(await activeTab(), "Books", "back returns to the Books tab");
   if (bookCount > 1) {
     await page.eval(`__t.clickSel(".book-tile", 1)`);
     await page.waitFor(`document.querySelector(".book-detail")`, 3000, "second book");
-    await openShelfSheet();
-    await page.eval(`__t.click("My Books", ".overlay .shelf-choices button")`); await sleep(200);
+    await toggleWishlist();
   }
   const final = await shelf();
   assert.equal(new Set(final.map(i => i.bookId)).size, final.length, "each book once");
+  assert.ok(final.every(i => i.shelf === "wishlist"));
 });
 
-await step("Family Bookshelf (Profile) persists after a refresh and is shared, with My Books and Wishlist", async () => {
+await step("Wishlist (Profile) persists after a refresh; books saved earlier to My Books are on it too", async () => {
+  // A book saved under the former "My Books" shelf (stored shelf "owned") stays stored as it is and is listed.
+  const ids = await page.eval(`import("/src/data/books.ts").then(m => m.books.map(b => b.id))`);
+  const current = await shelf();
+  const legacy = ids.find(id => !current.some(i => i.bookId === id));
+  assert.ok(legacy, "a book not saved yet");
+  await page.eval(`import("/src/lib/data/hooks.ts").then(m => m.saveSetting("rootmap-bookshelf", [...${q(current)}, { bookId: ${q(legacy)}, shelf: "owned", addedAt: "2026-01-01T00:00:00.000Z" }]))`);
   await page.reload();
   await appReady();
   await nav(NAV.profile);
-  const row = await page.eval(`[...document.querySelectorAll(".menu-section button")].find(b => b.textContent.includes("Family Bookshelf"))?.textContent`);
-  assert.ok(row, "Profile has Family Bookshelf");
+  const row = await page.eval(`[...document.querySelectorAll(".menu-section button")].find(b => b.textContent.includes("Wishlist"))?.textContent`);
+  assert.ok(row, "Profile has Wishlist");
+  assert.ok(!(await page.eval(`document.body.innerText.includes("Family Bookshelf")`)));
   const expected = (await shelf()).length;
   assert.ok(row.includes(String(expected)), `count ${expected} shown: ${row}`);
-  await page.eval(`__t.click("Family Bookshelf", ".menu-section button")`);
-  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf page");
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".bookshelf-page .segmented button")].map(b => b.textContent)`), ["My Books", "Wishlist"]);
-  const items = await shelf();
-  assert.equal(await count(".bookshelf-page .book-tile"), items.filter(i => i.shelf === "owned").length);
-  await page.eval(`__t.click("Wishlist", ".bookshelf-page .segmented button")`); await sleep(150);
-  assert.equal(await count(".bookshelf-page .book-tile"), items.filter(i => i.shelf === "wishlist").length);
-  await noOverflow("Family Bookshelf");
+  await page.eval(`__t.click("Wishlist", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "wishlist page");
+  assert.ok(!(await page.eval(`!!document.querySelector(".bookshelf-page .segmented")`)), "one list, no tabs");
+  assert.equal(await count(".bookshelf-page .book-tile"), expected, "every saved book, including the earlier My Books one");
+  assert.ok((await shelf()).some(i => i.bookId === legacy && i.shelf === "owned"), "stored value unchanged");
+  await noOverflow("Wishlist");
 
-  // Opening a book from the shelf and coming back lands on the shelf, on the same tab.
-  await page.eval(`__t.clickSel(".bookshelf-page .book-tile")`);
-  await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book from shelf");
-  assert.equal(await page.eval(`document.querySelector(".sticky-action button").textContent.trim()`), "On Wishlist");
-  await openShelfSheet();
-  await page.eval(`__t.clickSel(".overlay .shelf-remove")`); await sleep(200);
-  await page.eval(`__t.clickSel(".detail-actions button")`);
-  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "back on the shelf");
-  assert.equal(await page.eval(`document.querySelector(".bookshelf-page .segmented button.active").textContent`), "Wishlist");
+  // Opening a book from the Wishlist, removing it, and coming back lands on the Wishlist.
+  for (let i = 0; i < expected; i++) {
+    await page.eval(`__t.clickSel(".bookshelf-page .book-tile")`);
+    await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book from wishlist");
+    assert.equal(await shelfButton(), "On Wishlist");
+    await toggleWishlist();
+    await page.eval(`__t.clickSel(".detail-actions button")`);
+    await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "back on the wishlist");
+  }
   assert.ok(await page.eval(`!!document.querySelector(".shelf-empty")`), "empty wishlist invites exploring");
   await page.eval(`__t.click("Explore Books", ".shelf-empty button")`);
   await page.waitFor(`document.querySelector(".discover-tabs")`, 3000, "Discover");
@@ -385,22 +377,20 @@ await step("Books: the ten curated books, covers and titles follow the language 
   assert.ok(await page.eval(`document.querySelector(".book-detail .description").textContent.startsWith("一个小男孩")`));
   assert.ok(await page.eval(`document.querySelector(".book-ages").textContent.includes("2–5岁")`));
   await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
-  // The Family Bookshelf in Chinese: the same entries, shown as the Chinese editions.
+  // The Wishlist in Chinese: the same entries, shown as the Chinese editions.
   await nav(NAV.profile);
-  await page.eval(`__t.click("家庭书架", ".menu-section button")`);
-  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf");
-  for (const [label, kind] of [["我的藏书", "owned"], ["心愿书单", "wishlist"]]) {
-    await page.eval(`__t.click(${q(label)}, ".bookshelf-page .segmented button")`); await sleep(150);
-    const list = await covers(".bookshelf-page .book-tile");
-    assert.equal(list.length, stored.filter(i => i.shelf === kind).length, `${label}: same entries`);
-    checkCovers(list, BOOKS_ZH, "封面即将上线");
-  }
+  await page.eval(`__t.click("心愿书单", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "wishlist");
+  assert.ok(await page.eval(`document.querySelector(".bookshelf-page h1").textContent === "心愿书单"`));
+  const list = await covers(".bookshelf-page .book-tile");
+  assert.equal(list.length, stored.length, "same entries");
+  checkCovers(list, BOOKS_ZH, "封面即将上线");
   assert.deepEqual(await shelf(), stored, "switching language changes nothing stored");
-  await noOverflow("Family Bookshelf (zh)");
+  await noOverflow("Wishlist (zh)");
   await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
   await setLanguage("语言", "English", `document.documentElement.lang === "en"`);
   await nav(NAV.profile);
-  await page.eval(`__t.click("Family Bookshelf", ".menu-section button")`);
+  await page.eval(`__t.click("Wishlist", ".menu-section button")`);
   await page.waitFor(`document.querySelector(".bookshelf-page")`, 3000, "bookshelf");
   checkCovers(await covers(".bookshelf-page .book-tile"), BOOKS_EN, "Cover coming soon");
   assert.deepEqual(await shelf(), stored);
@@ -413,7 +403,7 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.eval(`__t.click("简体中文")`);
   await page.waitFor(`document.documentElement.lang === "zh-CN"`, 3000, "Chinese");
   await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
-  assert.ok(await page.eval(`document.body.innerText.includes("家庭书架")`), "Profile row");
+  assert.ok(await page.eval(`document.body.innerText.includes("心愿书单")`), "Profile row");
   await nav(NAV.discover);
   assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本", "音乐"]);
   await tab("绘本");
@@ -423,7 +413,7 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await search("");
   await page.eval(`__t.clickSel(".book-tile")`);
   await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book");
-  assert.ok(await page.eval(`document.body.innerText.includes("推荐理由") && document.body.innerText.includes("加入家庭书架")`));
+  assert.ok(await page.eval(`document.body.innerText.includes("推荐理由") && document.body.innerText.includes("加入心愿书单")`));
   await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
   await tab("音乐");
   await page.eval(`__t.clickSel(".music-card .activity-image")`);

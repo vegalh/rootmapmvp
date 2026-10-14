@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { booksOn, placeBook, shelfOf, validItems } from "../../src/lib/bookshelf.ts";
+import { booksOn, placeBook, savedBooks, shelfOf, validItems } from "../../src/lib/bookshelf.ts";
 import { agesLabel, bookAgeRanges, findActivity, localizeBook, readingAgeLabel, isMusicId, matchesAge, matchesQuery, musicAsActivity } from "../../src/lib/catalog.ts";
 import { activities } from "../../src/data/activities.ts";
 import { books } from "../../src/data/books.ts";
@@ -167,4 +167,12 @@ test("bookshelf: a removed sample book stays stored but is not a catalog book", 
   const items = placeBook(stored as never, "the-giving-tree", "owned", t2);
   assert.ok(items.some(i => i.bookId === "sample-book-1"), "untouched by other changes");
   assert.deepEqual(booksOn(items, "owned").filter(id => books.some(b => b.id === id)), ["the-giving-tree"]);
+});
+
+test("wishlist: one list of every saved book, newest first, including books saved to My Books before", () => {
+  const stored = [{ bookId: "b-old", shelf: "owned" as const, addedAt: t0 }, { bookId: "b-new", shelf: "wishlist" as const, addedAt: t1 }];
+  assert.deepEqual(savedBooks(validItems(stored)), ["b-new", "b-old"]);
+  // Saving a book now puts it on the Wishlist; earlier entries keep their stored shelf.
+  const next = placeBook(stored, "b-3", "wishlist", "2026-12-01T00:00:00.000Z");
+  assert.deepEqual(next.map(i => [i.bookId, i.shelf]), [["b-3", "wishlist"], ["b-old", "owned"], ["b-new", "wishlist"]]);
 });

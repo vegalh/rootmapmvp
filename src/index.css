@@ -426,13 +426,6 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .book-ages b { color: var(--orange); }
 .book-why { margin: 0; font-size: 16px; line-height: 1.6; }
 
-.shelf-choices button { min-height: 64px; }
-.shelf-choices button > span { flex: 1; min-width: 0; }
-.shelf-choices strong, .shelf-choices small { display: block; }
-.shelf-choices small { margin-top: 2px; color: var(--muted); font-size: 14px; font-weight: 400; }
-.shelf-choices button.active { border-color: var(--primary); background: var(--lavender); }
-.shelf-choices button > svg:last-child { color: var(--primary); }
-.shelf-remove { width: 100%; min-height: 46px; margin-top: 10px; border: 0; background: transparent; color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 700; }
 .shelf-empty { display: flex; flex-direction: column; align-items: center; }
 .shelf-empty p { max-width: 30ch; line-height: 1.5; }
 .shelf-empty .small-primary { margin-top: 14px; height: 40px; padding: 0 16px; }

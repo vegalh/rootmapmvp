@@ -12,7 +12,7 @@ export function ProfilePage({ go, lang, appearance, profile, deletedCount, books
       : cloud.status === "signed-out" ? [["signIn", "user", t.accountSignIn]]
         : [];
   const groups: [string, [string, string, string, string?][]][] = [
-    [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["bookshelf", "book", t.familyBookshelf, bookshelfCount ? String(bookshelfCount) : undefined], ["goals", "target", t.myGoals]]],
+    [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["bookshelf", "heart", t.wishlist, bookshelfCount ? String(bookshelfCount) : undefined], ["goals", "target", t.myGoals]]],
     [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications, t.comingSoon]]],
     [t.account, [...accountRow, ["personal", "user", t.personal], ["deletedChildren", "clock", t.recentlyDeleted, deletedCount ? String(deletedCount) : undefined], ["privacy", "shield", t.privacy], ["help", "help", t.help]]],
   ];

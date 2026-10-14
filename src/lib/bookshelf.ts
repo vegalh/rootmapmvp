@@ -2,9 +2,11 @@ import { useCallback, useMemo } from "react";
 import { useSetting } from "./data/hooks";
 import type { Shelf, ShelfItem } from "../types";
 
-// The Family Bookshelf: books the family owns ("My Books") and wants ("Wishlist"). It belongs to the family,
-// not to a child, and is stored as one setting in the data layer (see lib/data/schema.ts, SETTING_SHAPES).
-// A book is listed at most once: moving it between shelves changes its `shelf`, never adds a second item.
+// The family's book Wishlist (心愿书单): books saved from Discover › Books to read or get next. It belongs to the
+// family, not to a child, and is stored as one setting in the data layer (see lib/data/schema.ts, SETTING_SHAPES).
+// It used to have two shelves, "My Books" and "Wishlist"; new books are saved with shelf "wishlist", and books saved
+// to "My Books" earlier keep their stored value and are listed on the Wishlist too, so nothing disappears.
+// A book is listed at most once.
 export const BOOKSHELF_KEY = "rootmap-bookshelf";
 
 // Puts `bookId` on `shelf` (moving it if it's on the other one), or removes it when `shelf` is null. Pure.
@@ -31,6 +33,10 @@ export const shelfOf = (items: ShelfItem[], bookId: string): Shelf | null => ite
 // Books on one shelf, most recently added or moved first.
 export const booksOn = (items: ShelfItem[], shelf: Shelf) =>
   items.filter(i => i.shelf === shelf).sort((a, b) => b.addedAt.localeCompare(a.addedAt)).map(i => i.bookId);
+
+// Every saved book (either stored shelf), most recently saved first: what the Wishlist shows.
+export const savedBooks = (items: ShelfItem[]) =>
+  [...items].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).map(i => i.bookId);
 
 export function useBookshelf() {
   const [stored, setStored] = useSetting<ShelfItem[]>(BOOKSHELF_KEY, []);
