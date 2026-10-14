@@ -1,10 +1,10 @@
 import { Icon } from "./Icon";
+import { ChildPhoto } from "./ui";
 import { entryText, groupByMonth } from "../lib/entries";
 import { fmtMonthDay, fmtMonthYear } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
-import { childPhotoSrc } from "../lib/children";
 
 // The add action shared by Moments and Journal: offers to continue an unfinished draft when one exists.
 export function WriteButton({ label, draft, write, lang, t }: { label: string; draft?: EntryDraft; write: () => void; lang: Lang; t: Copy }) {
@@ -48,7 +48,7 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
               <button className="journal-card" onClick={() => open(e.id)} key={e.id}>
                 {c ? (
                   <span className="entry-child">
-                    <img src={childPhotoSrc(c)} alt="" />
+                    <ChildPhoto child={c} />
                     <span><strong>{c.first} {c.last}</strong><time>{fmtMonthDay(e.date, lang)}</time></span>
                   </span>
                 ) : (

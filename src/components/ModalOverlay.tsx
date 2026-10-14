@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
-import { Modal, Field } from "./ui";
+import { Modal, Field, ChildPhoto } from "./ui";
 import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
 import { newRecordId } from "../lib/data/schema";
 import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
 import { discoverCategoryLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
-import { childOptionLabel, childPhotoSrc, childShortName, defaultChildId, isActiveChild } from "../lib/children";
+import { childOptionLabel, childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
 export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
   modal: ModalKind;
@@ -182,7 +182,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
           <div className="child-checks">
             {childrenData.map(c => (
               <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
-                <img src={childPhotoSrc(c)} alt="" />{childShortName(c, childrenData)}
+                <ChildPhoto child={c} />{childShortName(c, childrenData)}
               </button>
             ))}
           </div>

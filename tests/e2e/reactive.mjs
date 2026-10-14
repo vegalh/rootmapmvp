@@ -119,6 +119,63 @@ await step("Repeat in My Week makes a new plan with a p-<uuid> id; an outside pl
   assert.equal(await loads(), weekLoad, "no reload happened");
 });
 
+await step("A change arriving while a confirmation is open is kept: confirming acts on the data as it is then", async () => {
+  await page.eval(`location.hash = "#/child/emma/activities"`);
+  await page.waitFor(`document.querySelector(".lesson-list > button")`, 5000, "Maya's records");
+  await page.eval(`document.querySelector(".lesson-list > button").click()`);
+  await page.waitFor(`document.querySelector(".overlay .record-detail")`, 3000, "record sheet");
+  await page.eval(`document.querySelector(".overlay .danger").click()`);
+  await page.waitFor(`document.querySelector(".confirm-dialog")`, 3000, "question");
+  const before = (await page.eval(`__t.all("records")`)).filter(r => !r.deletedAt);
+  // Arrives while the question is open: a new record for Maya, and Leo renamed.
+  const stamp = new Date().toISOString();
+  const added = { ...before.find(r => r.childId === "emma"), id: "r-external-1", createdAt: stamp, updatedAt: stamp, deletedAt: null };
+  const leo = (await page.eval(`__t.all("children")`)).find(c => c.id === "noah");
+  await withStore(`return S.write({ collections: { records: [${JSON.stringify(added)}], children: [${JSON.stringify({ ...leo, first: "Leon", updatedAt: stamp })}] } });`);
+  await page.waitFor(`document.querySelectorAll(".lesson-list > button").length === ${before.filter(r => r.childId === "emma").length + 1}`, 5000, "new record shown");
+  await page.confirmDialog();
+  await page.waitFor(`!document.querySelector(".overlay")`, 3000, "sheet closed");
+  const after = await page.eval(`__t.all("records")`);
+  assert.equal(after.filter(r => !r.deletedAt).length, before.length, "one deleted, one added");
+  assert.ok(after.find(r => r.id === "r-external-1" && !r.deletedAt), "the record that arrived is kept");
+  assert.equal(after.filter(r => r.deletedAt && before.some(b => b.id === r.id)).length, 1, "exactly the chosen record is deleted");
+  assert.equal((await page.eval(`__t.all("children")`)).find(c => c.id === "noah").first, "Leon", "the rename that arrived is kept");
+});
+
+await step("A question closes unanswered when its page is left (Back) or its child goes away (sync); Cancel returns focus", async () => {
+  const trash = `document.querySelector(".child-header-actions button:last-child")`;
+  const ask = async () => {
+    await page.waitFor(`document.querySelector(".child-profile")`, 5000, "child page");
+    await page.eval(`${trash}.focus(); ${trash}.click()`);
+    await page.waitFor(`document.querySelector(".confirm-dialog [data-cancel]") === document.activeElement`, 3000, "focus on Cancel");
+  };
+  await page.eval(`location.hash = "#/kids"`); await sleep(200);
+  await page.eval(`location.hash = "#/child/noah"`);
+  await ask();
+  await page.eval(`document.querySelector(".confirm-dialog [data-cancel]").click()`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog") && document.activeElement === ${trash}`, 3000, "focus back on the delete button");
+  await ask();
+  await page.eval(`history.back()`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog") && !document.querySelector(".child-profile")`, 3000, "Back closes the question");
+  assert.ok(!(await page.eval(`__t.all("children")`)).find(c => c.id === "noah").deletedAt, "Back deletes nothing");
+  await page.eval(`history.forward()`);
+  await ask();
+  const leo = (await page.eval(`__t.all("children")`)).find(c => c.id === "noah");
+  await withStore(`return S.write({ collections: { children: [${JSON.stringify({ ...leo, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })}] } });`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog") && !document.querySelector(".child-profile")`, 3000, "question closes with the child");
+  await withStore(`return S.write({ collections: { children: [${JSON.stringify({ ...leo, updatedAt: new Date().toISOString() })}] } });`);
+});
+
+await step("A child photo that can't be loaded falls back to the initials avatar", async () => {
+  const maya = (await page.eval(`__t.all("children")`)).find(c => c.id === "emma");
+  await withStore(`return S.write({ collections: { children: [${JSON.stringify({ ...maya, photo: "data:image/jpeg;base64,AAAA", updatedAt: new Date().toISOString() })}] } });`);
+  await page.eval(`location.hash = "#/kids"`);
+  await page.waitFor(`[...document.querySelectorAll(".child-select-photo img")].length && [...document.querySelectorAll(".child-select-photo img")].every(i => i.complete && i.naturalWidth > 0)`, 5000, "every avatar shows");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".child-select-photo img")].some(i => i.getAttribute("src").startsWith("data:image/svg+xml"))`), "initials shown");
+  assert.equal((await page.eval(`__t.all("children")`)).find(c => c.id === "emma").photo, "data:image/jpeg;base64,AAAA", "the stored photo is left as it is");
+  await withStore(`return S.write({ collections: { children: [${JSON.stringify({ ...maya, updatedAt: new Date().toISOString() })}] } });`);
+});
+
 await page.close();
 const failedSteps = results.filter(r => r[0] === "FAIL");
 console.log(`\n${results.length - failedSteps.length}/${results.length} passed`);

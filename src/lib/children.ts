@@ -44,7 +44,11 @@ const AVATAR_COLORS: [string, string][] = [["#e7efe4", "#3f6b54"], ["#f6e5cf", "
 // (a stock photo of a real child that new profiles used to get) is never shown; the stored value is left as it is.
 export function childPhotoSrc(c: Pick<Child, "id" | "first" | "last" | "photo">): string {
   const own = c.photo && c.photo !== DEFAULT_CHILD_PHOTO ? photoUrl(c.photo) : "";
-  if (own) return own;
+  return own || childInitialsSrc(c);
+}
+
+// The initials avatar alone: also shown when the child's own photo can't be loaded (ChildPhoto in components/ui.tsx).
+export function childInitialsSrc(c: Pick<Child, "id" | "first" | "last">): string {
   let hash = 0;
   for (const ch of c.id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   const [bg, fg] = AVATAR_COLORS[hash % AVATAR_COLORS.length];

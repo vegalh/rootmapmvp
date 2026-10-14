@@ -1,10 +1,11 @@
 import { Icon } from "../components/Icon";
+import { ChildPhoto } from "../components/ui";
 import { TreeLogo } from "../components/TreeLogo";
 import { fmt } from "../lib/dates";
 import { entryText, newestFirst } from "../lib/entries";
 import type { Child, Entry } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
-import { childOptionLabel, childPhotoSrc, childShortName } from "../lib/children";
+import { childOptionLabel, childShortName } from "../lib/children";
 
 export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAddChild, openMoments, t }: {
   childrenData: Child[];
@@ -38,7 +39,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAd
               const interests = c.interests?.length ? c.interests.join("、") : t.notAddedYet;
               return (
                 <button className="child-select-card" onClick={() => goChild(c.id)} key={c.id} aria-label={childOptionLabel(c, childrenData, t)}>
-                  <div className="child-select-photo"><img src={childPhotoSrc(c)} alt="" /></div>
+                  <div className="child-select-photo"><ChildPhoto child={c} /></div>
                   <div className="child-select-info">
                     <strong>{childShortName(c, childrenData)}</strong>
                     <span className="child-select-age">{childAge(c, t)}</span>
@@ -62,7 +63,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAd
                 if (!c) return null;
                 return (
                   <button onClick={() => openEntry(o.id)} key={o.id}>
-                    <img src={childPhotoSrc(c)} alt="" />
+                    <ChildPhoto child={c} />
                     <span><strong>{childOptionLabel(c, childrenData, t)}</strong><small>{o.title || t.independentObservation} · {fmt(o.date, lang)}</small><p>{entryText(o, lang)}</p></span>
                     <Icon name="chevron" size={16} />
                   </button>

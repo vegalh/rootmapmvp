@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
-import { PageHeader, Field } from "../components/ui";
+import { PageHeader, Field, ChildPhoto } from "../components/ui";
 import ActivityPicker from "../components/ActivityPicker";
 import { catalogCategories, findActivity } from "../lib/catalog";
 import type { RecordInput } from "../lib/activityRecords";
 import { localIsoToday } from "../lib/dates";
 import type { Child, LessonRecord } from "../types";
 import { childAge, discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
-import { childOptionLabel, childPhotoSrc, isActiveChild } from "../lib/children";
+import { childOptionLabel, isActiveChild } from "../lib/children";
 
 // The activity being recorded: one from the catalog, or the parent's own.
 type Choice = { activityId: string } | { custom: true };
@@ -103,7 +103,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
       <PageHeader title={t.addActivity} back={change} />
       {child && validChild ? (
         <section className="form-child">
-          <img src={childPhotoSrc(child)} alt="" />
+          <ChildPhoto child={child} />
           <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>
         </section>
       ) : null}

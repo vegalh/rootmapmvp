@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { useSetting } from "../lib/data/hooks";
-import type { Screen } from "../types";
+import type { Child, Screen } from "../types";
+import { childInitialsSrc, childPhotoSrc } from "../lib/children";
 import { copy, type Copy } from "../lib/i18n";
 
 // The current language's strings, for shared controls' accessible names (Back, Close). Provided by App.
@@ -191,21 +192,33 @@ export type ConfirmRequest = {
 // as it is then (a sync may have arrived while the question was open), not as it was when the dialog opened.
 export function useLatest<T>(value: T) {
   const ref = useRef(value);
-  ref.current = value;
+  useLayoutEffect(() => { ref.current = value; });
   return ref;
 }
 
-const ConfirmContext = createContext<(request: ConfirmRequest) => void>(() => {});
-export const useConfirm = () => useContext(ConfirmContext);
+type OwnedRequest = ConfirmRequest & { owner: symbol };
+const ConfirmContext = createContext<{ ask: (request: OwnedRequest) => void; dismiss: (owner: symbol) => void }>({ ask: () => {}, dismiss: () => {} });
+
+// A question belongs to the screen or sheet that asked it: when that goes away (browser Back, or a sync removing
+// the child it was about) the question closes unanswered instead of acting on a page that is no longer there.
+export function useConfirm() {
+  const { ask, dismiss } = useContext(ConfirmContext);
+  const [owner] = useState(() => Symbol("confirm"));
+  useEffect(() => () => dismiss(owner), [dismiss, owner]);
+  return useCallback((request: ConfirmRequest) => ask({ ...request, owner }), [ask, owner]);
+}
 
 export function ConfirmProvider({ children: content }: { children: React.ReactNode }) {
-  const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  const [request, setRequest] = useState<OwnedRequest | null>(null);
   // While one question is open, another can't replace it.
-  const ask = useCallback((next: ConfirmRequest) => setRequest(current => current ?? next), []);
+  const ask = useCallback((next: OwnedRequest) => setRequest(current => current ?? next), []);
+  const dismiss = useCallback((owner: symbol) => setRequest(current => (current?.owner === owner ? null : current)), []);
+  const value = useMemo(() => ({ ask, dismiss }), [ask, dismiss]);
   return (
-    <ConfirmContext.Provider value={ask}>
+    <ConfirmContext.Provider value={value}>
       {content}
-      {request && <ConfirmDialog request={request} close={() => setRequest(null)} />}
+      {/* Closing clears only this question, never one asked after it. */}
+      {request && <ConfirmDialog request={request} close={() => setRequest(current => (current === request ? null : current))} />}
     </ConfirmContext.Provider>
   );
 }
@@ -260,6 +273,14 @@ function ConfirmDialog({ request, close }: { request: ConfirmRequest; close: () 
       </section>
     </div>
   );
+}
+
+// A child's avatar: their photo, or their initials when there is none or it can't be loaded (an unreadable file, or
+// an old photo address that no longer works).
+export function ChildPhoto({ child }: { child: Pick<Child, "id" | "first" | "last" | "photo"> }) {
+  const src = childPhotoSrc(child);
+  const [failed, setFailed] = useState("");
+  return <img src={failed === src ? childInitialsSrc(child) : src} alt="" onError={() => setFailed(src)} />;
 }
 
 export function Empty({ text }: { text: string }) {

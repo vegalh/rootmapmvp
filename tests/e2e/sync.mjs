@@ -165,16 +165,14 @@ try {
     await u1.click("RootMap Account");
     await one.waitFor(`document.querySelector(".sync-summary")?.innerText.includes("All backed up")`, 5000, "status shown");
     page = two;
+    // Device 2 is already on Moments (reached by its address; it is no longer a tab) when the entry and then its
+    // photo arrive: the picture appears there, from device 2's own verified copy, without leaving the screen.
+    await two.eval(`location.hash = "#/moments"`);
+    await two.waitFor(`document.querySelector(".page-content")`, 5000, "Moments");
     await syncNow(two);
     await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.hasPhotoBytes(${JSON.stringify(photo)}))`, 30000, "downloaded on device 2");
-    // Shown on device 2's Moments, from its own verified copy.
-    // Moments is no longer a tab; cancelling Quick Add → Add Moment returns to the Moments timeline.
-    await two.eval(`document.querySelector(".nav-add").click()`);
-    await two.waitFor(`document.querySelector(".quick-actions")`);
-    await two.eval(`[...document.querySelectorAll(".quick-actions button")][1].click()`);
-    await two.waitFor(`document.querySelector(".journal-editor-bar")`, 5000, "editor");
-    await two.eval(`document.querySelector(".journal-editor-bar button").click()`);
-    await two.waitFor(`[...document.querySelectorAll("img")].some(i => i.src.startsWith("blob:") && i.complete && i.naturalWidth > 0)`, 10000, "photo displayed");
+    await two.waitFor(`document.body.innerText.includes("Painting")`, 5000, "entry on Moments");
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => [...document.querySelectorAll("img")].some(i => i.getAttribute("src") === S.photoUrl(${JSON.stringify(photo)}) && i.complete && i.naturalWidth > 0))`, 10000, "photo displayed");
   }, /ERR_BLOCKED_BY_CLIENT|Failed to fetch/);
   await two.close();
   two = undefined;

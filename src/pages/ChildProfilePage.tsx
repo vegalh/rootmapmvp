@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
-import { Modal, useConfirm, useLatest } from "../components/ui";
+import { Modal, useConfirm, useLatest, ChildPhoto } from "../components/ui";
 import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
@@ -12,7 +12,6 @@ import { childAge, childTabLabel, localizeActivity, noteText, skillLabel, type C
 import { childOptionLabel } from "../lib/children";
 import { localIsoToday } from "../lib/dates";
 import { Field } from "../components/ui";
-import { childPhotoSrc } from "../lib/children";
 
 export function ChildProfilePage({ child, childrenData, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, editRecord, deleteRecord, t }: {
   child: Child;
@@ -72,7 +71,7 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
         </div>
       </header>
       <section className="profile-hero">
-        <img src={childPhotoSrc(child)} alt="" />
+        <ChildPhoto child={child} />
         <h1>{child.first} {child.last}</h1>
         <p>{childAge(child, t)}</p>
       </section>

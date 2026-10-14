@@ -200,7 +200,11 @@ try {
     const before = await guestDump();
     await u.click("Continue as Guest");
     await u.appReady();
-    assert.ok(await u.has("Maya"));
+    // A new device starts as an empty family (no demo children): Today greets the parent with its first step.
+    await page.waitFor(`document.querySelector(".today-welcome")`, 5000, "welcome card");
+    assert.ok(!(await u.has("Maya")) && !(await u.has("Leo")), "no demo children");
+    const guest = await u.dump("rootmap");
+    for (const store of ["children", "records", "entries", "plans"]) assert.equal(guest[store].filter(r => !r.deletedAt).length, 0, store);
     assert.equal(await welcomeSetting(), "done");
     assert.deepEqual(page.requests, []);
     assert.deepEqual(await u.sessionKeys(), []);

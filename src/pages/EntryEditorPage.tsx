@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { ChildPhoto } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { draftKey, flushDraft, readDraft, writeDraft } from "../lib/journalDrafts";
 import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
-import { childOptionLabel, childPhotoSrc } from "../lib/children";
+import { childOptionLabel } from "../lib/children";
 
 type Fields = Required<Omit<EntryDraft, "savedAt">>;
 type DraftStatus = "idle" | "saving" | "saved" | "failed";
@@ -157,12 +158,12 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
 
       {lockChild ? (
         <div className="entry-child-pick">
-          {child && <img src={childPhotoSrc(child)} alt="" />}
+          {child && <ChildPhoto child={child} />}
           <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>
         </div>
       ) : (
         <label className="entry-child-pick">
-          {child && <img src={childPhotoSrc(child)} alt="" />}
+          {child && <ChildPhoto child={child} />}
           <span><small>{t.childLabel}</small><strong>{child ? childOptionLabel(child, childrenData, t) : t.selectChild}</strong></span>
           <Icon name="down" size={16} />
           <select value={child ? fields.childId : ""} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
