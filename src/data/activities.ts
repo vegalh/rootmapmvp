@@ -33,8 +33,8 @@ import flowerArranging from "../assets/activities/flower-arranging.jpg";
 import peacefulSpot from "../assets/activities/peaceful-spot.jpg";
 
 // To add a new lesson/activity, append an object here with a unique `id`.
-// `area` groups it under a Discover category; `ageKey` must match one of the
-// age filter options ("0–2", "2–3", "3–4", "4–6", "6+").
+// `area` groups it under a Discover category. `age` ("2–4 years") is the span it suits: the Discover age filter
+// lists it under every filter that span overlaps (lib/catalog.ts). `ageKey` (one filter value) is kept for older code.
 export const activities: Activity[] = [
   {
     id: "mopping",
@@ -50,6 +50,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Gross Motor Coordination", "Concentration", "Independence"],
     materials: ["Child-sized mop", "Designated floor area"],
     steps: ["Invite your child to try mopping, and name the materials together.", "Show how to hold the mop with both hands.", "Demonstrate slow, deliberate back-and-forth strokes across the floor.", "Let your child try, starting from one side of the area.", "Give your child space to repeat the motion as many times as they like."],
+    safety: "Dry the floor afterwards: a wet floor is slippery.",
     keywords: "mopping cleaning floor care of environment practical life",
     zh: {
       title: "拖地",
@@ -59,6 +60,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "大肌肉协调", "专注力", "独立性"],
       materials: ["儿童专用拖把", "指定的地面区域"],
       steps: ["邀请孩子一起试试拖地，并说出材料的名称。", "示范如何用双手握住拖把。", "展示缓慢而从容地来回拖地的动作。", "让孩子从区域的一侧开始尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "拖完地后请把地面擦干，湿地面容易滑倒。",
     },
   },
   {
@@ -75,6 +77,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Sequencing", "Concentration", "Independence"],
     materials: ["Small basin of water", "Sponge", "Soap", "Drying cloth"],
     steps: ["Invite your child to try washing the table, and name the materials together.", "Show how to wet the sponge and wring out excess water.", "Demonstrate wiping the table surface in a circular motion.", "Dry the table together with the cloth.", "Let your child try, and repeat as many times as they'd like."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "washing table cleaning care of environment practical life",
     zh: {
       title: "洗桌子",
@@ -84,6 +87,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "顺序感", "专注力", "独立性"],
       materials: ["小盆水", "海绵", "肥皂", "擦干布"],
       steps: ["邀请孩子一起试试洗桌子，并说出材料的名称。", "示范如何浸湿海绵并拧出多余的水分。", "展示以画圈的方式擦拭桌面。", "一起用布把桌子擦干。", "让孩子尝试，并按自己的节奏重复练习。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -100,6 +104,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Small watering can", "Potted plant"],
     steps: ["Invite your child to try watering the plant, and name the materials together.", "Show how to fill the watering can with a small amount of water.", "Demonstrate pouring water slowly and carefully around the base of the plant.", "Let your child try.", "Give your child space to repeat as many times as they like."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "watering plant care of environment practical life nature",
     zh: {
       title: "浇花",
@@ -109,6 +114,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "精细动作协调", "专注力", "独立性"],
       materials: ["小浇水壶", "盆栽植物"],
       steps: ["邀请孩子一起试试给植物浇水，并说出材料的名称。", "示范在浇水壶中装入少量的水。", "展示缓慢而小心地在植物根部周围浇水。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -150,6 +156,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Sequencing", "Concentration", "Independence"],
     materials: ["Spray bottle with water", "Small cloth"],
     steps: ["Invite your child to try cleaning the mirror, and name the materials together.", "Show how to spray the mirror lightly.", "Demonstrate wiping the mirror in circular motions from top to bottom.", "Let your child try.", "Give your child space to repeat as many times as they like."],
+    safety: "Put only plain water in the spray bottle, never glass cleaner.",
     keywords: "cleaning mirror care of environment practical life",
     zh: {
       title: "擦镜子",
@@ -159,6 +166,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "顺序感", "专注力", "独立性"],
       materials: ["喷水瓶", "小布巾"],
       steps: ["邀请孩子一起试试擦镜子，并说出材料的名称。", "示范轻轻喷洒镜子。", "展示从上到下以画圈的方式擦拭镜子。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "喷壶里只装清水，不要使用玻璃清洁剂。",
     },
   },
   {
@@ -175,6 +183,7 @@ export const activities: Activity[] = [
     domains: ["Care of Self", "Sequencing", "Independence"],
     materials: ["Small basin of water", "Soap", "Hand towel"],
     steps: ["Invite your child to try washing their hands, and name the materials together.", "Show how to wet hands, apply soap, and rub them together.", "Rinse the hands in the basin together.", "Dry hands with the towel.", "Let your child try the full sequence on their own."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "hand washing care of self practical life hygiene",
     zh: {
       title: "洗手",
@@ -184,6 +193,7 @@ export const activities: Activity[] = [
       domains: ["自我照顾", "顺序感", "独立性"],
       materials: ["小盆水", "肥皂", "毛巾"],
       steps: ["邀请孩子一起试试洗手，并说出材料的名称。", "示范弄湿双手、抹上肥皂并搓洗。", "一起在水盆中冲洗双手。", "用毛巾擦干双手。", "让孩子独立尝试完整的流程。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -250,6 +260,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Coordination", "Concentration", "Independence"],
     materials: ["Water dispenser", "Small bucket"],
     steps: ["Invite your child to try filling the bucket, and name the materials together.", "Show how to hold the bucket steady under the dispenser.", "Demonstrate pressing the dispenser slowly to fill the bucket.", "Let your child try.", "Give your child space to repeat as many times as they like."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "water pouring dispenser bucket practical life care of environment",
     zh: {
       title: "接水练习",
@@ -259,6 +270,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "协调能力", "专注力", "独立性"],
       materials: ["饮水机", "小水桶"],
       steps: ["邀请孩子一起试试接水练习，并说出材料的名称。", "示范将水桶稳稳地放在饮水机出水口下方。", "展示缓慢按压饮水机为水桶接水。", "让孩子尝试。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -275,6 +287,7 @@ export const activities: Activity[] = [
     domains: ["Food Preparation", "Fine Motor Coordination", "Independence"],
     materials: ["Orange halves", "Child-sized juicer", "Small cup"],
     steps: ["Invite your child to try juicing, and name the materials together.", "Show how to place an orange half on the juicer.", "Demonstrate pressing and twisting to extract the juice.", "Pour the juice into the cup together.", "Let your child try the remaining halves."],
+    safety: "Check the juice for seeds before your child drinks it.",
     keywords: "orange juicing food preparation practical life independence",
     zh: {
       title: "榨橙汁",
@@ -284,6 +297,7 @@ export const activities: Activity[] = [
       domains: ["食物准备", "精细动作协调", "独立性"],
       materials: ["半个橙子", "儿童专用榨汁器", "小杯子"],
       steps: ["邀请孩子一起试试榨橙汁，并说出材料的名称。", "示范将半个橙子放在榨汁器上。", "展示按压和旋转以榨出果汁。", "一起将果汁倒入杯中。", "让孩子尝试剩余的橙子。"],
+      safety: "孩子喝之前，请检查果汁里有没有籽。",
     },
   },
   {
@@ -325,6 +339,7 @@ export const activities: Activity[] = [
     domains: ["Food Preparation", "Fine Motor Coordination", "Independence"],
     materials: ["Hard-boiled egg", "Small bowl for shells", "Child-safe egg cutter"],
     steps: ["Invite your child to try this activity, and name the materials together.", "Show how to peel the shell piece by piece into the bowl.", "Place the peeled egg into the cutter and press down together.", "Arrange the egg slices on a plate.", "Let your child try the full sequence."],
+    safety: "Keep fingers away from the cutter's wires, and check the egg for bits of shell before eating.",
     keywords: "egg peeling cutting food preparation practical life",
     zh: {
       title: "剥蛋切蛋",
@@ -334,6 +349,7 @@ export const activities: Activity[] = [
       domains: ["食物准备", "精细动作协调", "独立性"],
       materials: ["煮熟的鸡蛋", "装蛋壳的小碗", "儿童安全切蛋器"],
       steps: ["邀请孩子一起试试剥蛋切蛋，并说出材料的名称。", "示范一片一片地将蛋壳剥入碗中。", "一起将剥好的鸡蛋放入切蛋器中按压。", "将蛋片摆放在盘子上。", "让孩子尝试完整的流程。"],
+      safety: "手指不要靠近切蛋器的钢丝；吃之前检查蛋上有没有残留的蛋壳。",
     },
   },
   {
@@ -400,6 +416,7 @@ export const activities: Activity[] = [
     domains: ["Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Bowl of rice", "Wooden spoon", "Jar marked with a fill line"],
     steps: ["Invite your child to try this activity, and name the materials together.", "Show how to scoop a spoonful of rice from the bowl.", "Pour the rice carefully into the jar together.", "Repeat until the rice reaches the marked line.", "Let your child try, then pour the rice back for more practice."],
+    safety: "Dry rice is small enough to choke on. Stay with your child, and put the rice away when you finish.",
     keywords: "spooning rice transfer fine motor practical life",
     zh: {
       title: "舀米练习",
@@ -409,6 +426,7 @@ export const activities: Activity[] = [
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗米", "木勺", "带标记线的罐子"],
       steps: ["邀请孩子一起试试舀米练习，并说出材料的名称。", "示范从碗中舀出一勺米。", "一起小心地将米倒入罐中。", "重复操作直到米达到标记线。", "让孩子尝试，然后将米倒回碗中以便重复练习。"],
+      safety: "生米颗粒小，可能引起窒息。请陪在孩子身边，结束后把米收好。",
     },
   },
   {
@@ -425,6 +443,7 @@ export const activities: Activity[] = [
     domains: ["Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Bowl of dry pasta", "Spoon", "Empty bowl"],
     steps: ["Invite your child to try this activity, and name the materials together.", "Show how to scoop a spoonful of pasta from the full bowl.", "Pour the pasta carefully into the empty bowl together.", "Repeat until all the pasta is transferred.", "Let your child try, then transfer the pasta back for more practice."],
+    safety: "Dry pasta pieces are small and hard enough to choke on. Stay with your child, and put the pasta away when you finish.",
     keywords: "spooning pasta transfer fine motor practical life",
     zh: {
       title: "舀意面练习",
@@ -434,6 +453,7 @@ export const activities: Activity[] = [
       domains: ["精细动作协调", "专注力", "独立性"],
       materials: ["一碗干意面", "勺子", "空碗"],
       steps: ["邀请孩子一起试试舀意面练习，并说出材料的名称。", "示范从装满的碗中舀出一勺意面。", "一起小心地将意面倒入空碗中。", "重复操作直到所有意面都转移完毕。", "让孩子尝试，然后将意面倒回原碗以便重复练习。"],
+      safety: "干意面小而硬，可能引起窒息。请陪在孩子身边，结束后把意面收好。",
     },
   },
   {
@@ -450,6 +470,7 @@ export const activities: Activity[] = [
     domains: ["Food Preparation", "Fine Motor Coordination", "Concentration", "Independence"],
     materials: ["Celery stalks", "Crinkle cutter"],
     steps: ["Invite your child to try cutting celery, and name the materials together.", "Show how to hold the celery steady on the cutting board.", "Demonstrate pressing the crinkle cutter down firmly to cut a piece.", "Let your child try cutting a stalk.", "Give your child space to repeat until all the celery is cut."],
+    safety: "The crinkle cutter has a blade: show your child how to keep both hands on the handle, and stay beside them. Raw celery is hard and stringy, so cut it into small pieces before eating.",
     keywords: "cutting celery food preparation practical life fine motor",
     zh: {
       title: "切芹菜",
@@ -459,6 +480,7 @@ export const activities: Activity[] = [
       domains: ["食物准备", "精细动作协调", "专注力", "独立性"],
       materials: ["芹菜", "波浪刀"],
       steps: ["邀请孩子一起试试切芹菜，并说出材料的名称。", "示范如何将芹菜稳稳地放在砧板上。", "展示用力按压波浪刀切下一段。", "让孩子尝试切一段芹菜。", "给孩子空间，重复练习直到所有芹菜都切完。"],
+      safety: "波浪刀有刀刃，请教孩子双手握住把手，并陪在旁边。生芹菜硬且有筋，吃之前请切成小块。",
     },
   },
   {
@@ -500,6 +522,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Coordination", "Concentration", "Independence"],
     materials: ["Small pitcher", "Three different cups", "Tray"],
     steps: ["Invite your child to try pouring, and name the materials together.", "Show how to hold the pitcher with both hands.", "Demonstrate pouring slowly into the first cup, then the next.", "Let your child try pouring into all three cups.", "Give your child space to repeat as many times as they like."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "pouring cups water practical life coordination",
     zh: {
       title: "倒水到三个杯子",
@@ -509,6 +532,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "协调能力", "专注力", "独立性"],
       materials: ["小水壶", "三个不同的杯子", "托盘"],
       steps: ["邀请孩子一起试试倒水练习，并说出材料的名称。", "示范如何用双手握住水壶。", "展示缓慢地倒入第一个杯子，再倒入下一个。", "让孩子尝试倒入这三个杯子。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -525,6 +549,7 @@ export const activities: Activity[] = [
     domains: ["Gross Motor Coordination", "Sensorial Exploration", "Independence"],
     materials: ["A pile of fallen leaves"],
     steps: ["Invite your child to explore the leaves, and name what you see together.", "Let your child reach out and touch the leaves with their hands.", "Encourage your child to lie down and roll through the pile at their own pace.", "Join in and describe the sounds and textures you both notice.", "Give your child space to keep playing and repeating as they like."],
+    safety: "Check the pile for sticks, stones and anything sharp first, and skip leaves that are wet or moldy.",
     keywords: "rolling leaves nature seasons gross motor movement outdoor",
     zh: {
       title: "在落叶中打滚",
@@ -534,6 +559,7 @@ export const activities: Activity[] = [
       domains: ["大肌肉协调", "感官探索", "独立性"],
       materials: ["一堆落叶"],
       steps: ["邀请孩子一起探索落叶，并说出你们看到的东西。", "让孩子伸手用手触摸落叶。", "鼓励孩子按自己的节奏躺下并在叶堆中打滚。", "一起加入，描述你们注意到的声音和质地。", "给孩子空间，让他们按喜欢的方式继续玩耍和重复。"],
+      safety: "先检查落叶堆里有没有树枝、石头或尖锐物品；潮湿或发霉的落叶不要玩。",
     },
   },
   {
@@ -575,6 +601,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Coordination", "Concentration"],
     materials: ["Small paper stars", "Two cups", "Tray"],
     steps: ["Invite your child to try pouring, and name the materials together.", "Show how to hold the cup steady with both hands.", "Demonstrate pouring the paper stars slowly into the other cup.", "Let your child try pouring at their own pace.", "Give your child space to repeat as many times as they like."],
+    safety: "Small paper stars can end up in mouths. Stay close, and gather them up when you finish.",
     keywords: "pouring stars paper practical life coordination",
     zh: {
       title: "倒星星纸片",
@@ -584,6 +611,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "协调能力", "专注力"],
       materials: ["小纸星", "两个杯子", "托盘"],
       steps: ["邀请孩子一起试试倒星星练习，并说出材料的名称。", "示范如何用双手稳稳握住杯子。", "展示缓慢地将纸星倒入另一个杯子。", "让孩子按自己的节奏尝试倒星星。", "给孩子空间，让他们按自己的节奏重复练习。"],
+      safety: "小纸星星容易被放进嘴里。请陪在孩子身边，结束后把星星收好。",
     },
   },
   {
@@ -600,6 +628,7 @@ export const activities: Activity[] = [
     domains: ["Fine Motor Skills", "Color Recognition", "Concentration", "Independence"],
     materials: ["Clear tubes filled with colored felt", "Matching colored caps", "Jar for the caps", "Tray"],
     steps: ["Invite your child to try matching caps, and name the colors together.", "Take one cap from the jar and look for the tube of the same color.", "Show how to place the cap on the tube and twist it slowly until it is closed.", "Let your child match and twist on the rest of the caps.", "Twist the caps off, return them to the jar, and let your child repeat as many times as they like."],
+    safety: "Small caps are a choking hazard for young children. Stay with your child, and count the caps back into the jar when you finish.",
     keywords: "matching color caps tubes twisting colors fine motor practical life",
     zh: {
       title: "颜色瓶盖配对",
@@ -610,6 +639,7 @@ export const activities: Activity[] = [
       domains: ["精细动作", "颜色认知", "专注力", "独立性"],
       materials: ["装有彩色毛毡的透明管", "相配的彩色瓶盖", "装瓶盖的罐子", "托盘"],
       steps: ["邀请孩子一起试试瓶盖配对，并一起说出颜色的名称。", "从罐子里拿出一个瓶盖，找到同样颜色的管子。", "示范如何把瓶盖放在管口，慢慢拧紧。", "让孩子为其余的管子配对并拧上瓶盖。", "把瓶盖拧下放回罐子，让孩子按自己的节奏重复练习。"],
+      safety: "小瓶盖对幼儿有窒息风险。请陪在孩子身边，结束后数一数，把瓶盖全部放回罐子。",
     },
   },
   {
@@ -618,7 +648,7 @@ export const activities: Activity[] = [
     age: "2–3 years",
     ageKey: "2–3",
     area: "Art",
-    topic: "Creative Expression",
+    topic: "Creativity",
     minutes: 15,
     materialsLabel: "3 materials",
     image: threadingPaperFish,
@@ -626,6 +656,7 @@ export const activities: Activity[] = [
     domains: ["Fine Motor Skills", "Hand-Eye Coordination", "Creativity", "Concentration"],
     materials: ["Card with a fish head and tail drawn on it", "Pipe cleaner", "Colored paper squares with a hole in the middle"],
     steps: ["Invite your child to make a paper fish, and name the materials together.", "Show how to hold the pipe cleaner in one hand and a paper square in the other.", "Demonstrate pushing the pipe cleaner slowly through the hole in the square.", "Let your child choose colors and thread the squares one by one.", "Lay the finished fish body between the head and tail, and admire the fish together."],
+    safety: "Pipe cleaners have wire inside: fold the ends over, and stay close while your child threads.",
     keywords: "threading paper fish pipe cleaner art fine motor craft",
     zh: {
       title: "穿纸片小鱼",
@@ -636,6 +667,7 @@ export const activities: Activity[] = [
       domains: ["精细动作", "手眼协调", "创造力", "专注力"],
       materials: ["画有鱼头和鱼尾的卡纸", "扭扭棒", "中间打孔的彩色纸片"],
       steps: ["邀请孩子一起做纸片小鱼，并说出材料的名称。", "示范一只手拿扭扭棒、另一只手拿纸片。", "展示慢慢把扭扭棒穿过纸片中间的小孔。", "让孩子自己挑选颜色，一片一片地穿上去。", "把穿好的鱼身放在鱼头和鱼尾之间，一起欣赏完成的小鱼。"],
+      safety: "扭扭棒里有铁丝，请把两端折起来，并在孩子穿的时候陪在旁边。",
     },
   },
   {
@@ -648,20 +680,22 @@ export const activities: Activity[] = [
     minutes: 10,
     materialsLabel: "2 materials",
     image: oliveFingers,
-    description: "Children slip pitted olives onto their fingertips and eat them one by one, a playful snack that builds fine motor skills and independence.",
+    description: "Children slip pitted olives onto their fingertips, then enjoy them cut into small pieces, a playful snack that builds fine motor skills and independence.",
     domains: ["Food Preparation", "Fine Motor Skills", "Independence", "Sensory Exploration"],
     materials: ["Bowl of pitted black olives", "Picture card of a hand with olives on each fingertip"],
-    steps: ["Invite your child to wash their hands, then look at the picture card together.", "Show how to pick up one olive and slide it onto a fingertip.", "Let your child put an olive on each finger, matching the picture.", "Count the olives together, then eat them one finger at a time.", "Let your child help wipe the table when snack time is finished."],
+    steps: ["Invite your child to wash their hands, then look at the picture card together.", "Show how to pick up one olive and slide it onto a fingertip.", "Let your child put an olive on each finger, matching the picture.", "Count the olives together, then slide them off and cut them into small pieces to eat.", "Let your child help wipe the table when snack time is finished."],
+    safety: "Cut the olives into small, age-appropriate pieces before your child eats them; whole olives are a choking hazard for toddlers. Have your child sit down to eat, and stay with them while they eat.",
     keywords: "olive fingers snack food preparation practical life fine motor",
     zh: {
       title: "橄榄手指",
       keywords: "橄榄 手指 点心 零食 食物准备",
       age: "2–3岁",
       materialsLabel: "2种材料",
-      description: "孩子们把去核橄榄套在指尖上，再一个一个吃掉，这个有趣的点心时间能培养精细动作和独立性。",
+      description: "孩子们把去核橄榄套在指尖上，再把橄榄切成小块吃掉，这个有趣的点心时间能培养精细动作和独立性。",
       domains: ["食物准备", "精细动作", "独立性", "感官探索"],
       materials: ["一碗去核黑橄榄", "指尖套着橄榄的手掌图卡"],
-      steps: ["邀请孩子先洗手，再一起看看图卡。", "示范如何拿起一颗橄榄，套在指尖上。", "让孩子照着图卡，在每根手指上都套一颗橄榄。", "一起数一数橄榄，再一根手指一根手指地吃掉。", "点心时间结束后，让孩子帮忙擦桌子。"],
+      steps: ["邀请孩子先洗手，再一起看看图卡。", "示范如何拿起一颗橄榄，套在指尖上。", "让孩子照着图卡，在每根手指上都套一颗橄榄。", "一起数一数橄榄，再把橄榄取下来，切成小块后吃。", "点心时间结束后，让孩子帮忙擦桌子。"],
+      safety: "孩子吃之前，请把橄榄切成适合年龄的小块；整颗橄榄对幼儿有窒息风险。请让孩子坐着吃，并在孩子进食时始终陪在身边。",
     },
   },
   {
@@ -678,6 +712,7 @@ export const activities: Activity[] = [
     domains: ["Food Preparation", "Sequencing", "Fine Motor Skills", "Independence"],
     materials: ["Small electric egg cooker", "Eggs", "Bowl and small whisk", "Tray", "Oven mitt", "Sponge for cleaning up"],
     steps: ["Invite your child to wash their hands, and name the materials together.", "Show how to crack an egg into the bowl and whisk it gently.", "With an adult close by, pour the egg into the cooker and close the lid.", "Use the oven mitt to open the cooker when the egg is ready; the surface stays hot, so an adult always supervises.", "Let your child serve the egg, then wipe the table with the sponge together."],
+    safety: "The cooker and its steam get very hot. An adult stays with the child the whole time and handles the lid and the plug. Cook the eggs until firm, and wash hands after handling raw egg.",
     keywords: "cooking eggs whisk egg cooker food preparation practical life kitchen",
     zh: {
       title: "煮鸡蛋",
@@ -688,6 +723,7 @@ export const activities: Activity[] = [
       domains: ["食物准备", "顺序感", "精细动作", "独立性"],
       materials: ["小型电煮蛋器", "鸡蛋", "碗和小打蛋器", "托盘", "隔热手套", "清洁用海绵"],
       steps: ["邀请孩子先洗手，并说出材料的名称。", "示范如何把鸡蛋磕进碗里，再轻轻搅拌。", "在大人身边，把蛋液倒进煮蛋器并盖上盖子。", "鸡蛋煮好后戴上隔热手套打开；表面很烫，全程需要大人看护。", "让孩子把鸡蛋装盘，再一起用海绵擦干净桌子。"],
+      safety: "煮蛋器和蒸汽温度很高。全程需要大人陪同，由大人打开盖子、插拔电源。鸡蛋要煮至凝固，接触生鸡蛋后请洗手。",
     },
   },
   {
@@ -704,6 +740,7 @@ export const activities: Activity[] = [
     domains: ["Food Preparation", "Hand Strength", "Sensory Exploration", "Concentration"],
     materials: ["Mortar and pestle", "Small bowl of whole spices", "Container with a lid", "Tray"],
     steps: ["Invite your child to try grinding spices, and smell the whole spices together.", "Show how to put a small spoonful of spices into the mortar.", "Demonstrate pressing and turning the pestle slowly to crush the spices.", "Let your child grind until the spices become powder, then smell them again.", "Tip the ground spices into the container, close the lid, and let your child repeat as they like."],
+    safety: "Whole spices are small and hard, so stay close and keep them out of mouths. Choose mild spices (not chili or pepper), and wash hands afterwards so nothing stings the eyes.",
     keywords: "grinding spices mortar pestle food preparation sensory practical life",
     zh: {
       title: "研磨香料",
@@ -714,6 +751,7 @@ export const activities: Activity[] = [
       domains: ["食物准备", "手部力量", "感官探索", "专注力"],
       materials: ["研钵和研杵", "一小碗整粒香料", "带盖的容器", "托盘"],
       steps: ["邀请孩子一起试试研磨香料，先一起闻一闻整粒香料。", "示范如何把一小勺香料放进研钵里。", "展示慢慢按压并转动研杵，把香料捣碎。", "让孩子一直研磨到香料变成粉末，再闻一闻有什么不同。", "把磨好的香料倒进容器盖好盖子，让孩子按自己的节奏重复练习。"],
+      safety: "整粒香料小而硬，请陪在旁边，别让孩子放进嘴里。选择温和的香料（不要用辣椒或胡椒），结束后洗手，以免刺激眼睛。",
     },
   },
   {
@@ -730,6 +768,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Coordination", "Concentration", "Independence"],
     materials: ["Child-sized ironing board", "Small iron", "Small cloth squares", "Tray"],
     steps: ["Invite your child to try ironing, and name the materials together.", "Show how to lay a cloth flat on the ironing board and smooth it with your hands.", "Demonstrate moving the iron slowly from one side of the cloth to the other.", "Let your child iron the cloth, then fold it in half and in half again.", "Stack the folded cloths on the tray; if you use a real iron, keep it on low heat and supervise closely."],
+    safety: "Use a toy iron or one that is unplugged and cool. If you use a real iron, keep it on low heat, stay right beside your child, and keep the cord out of reach.",
     keywords: "ironing cloths ironing board folding care of environment practical life",
     zh: {
       title: "熨布巾",
@@ -740,6 +779,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "协调能力", "专注力", "独立性"],
       materials: ["儿童熨衣板", "小熨斗", "小方布巾", "托盘"],
       steps: ["邀请孩子一起试试熨布巾，并说出材料的名称。", "示范如何把布巾平铺在熨衣板上，用手抚平。", "展示把熨斗从布巾一边慢慢移到另一边。", "让孩子熨好布巾，再对折、再对折。", "把叠好的布巾放回托盘；如果使用真熨斗，请调到低温并全程看护。"],
+      safety: "请使用玩具熨斗，或未通电、已冷却的熨斗。如使用真熨斗，请调到低温，始终守在孩子身边，并把电线放在孩子够不到的地方。",
     },
   },
   {
@@ -782,6 +822,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Sequencing", "Gross Motor Coordination", "Concentration"],
     materials: ["Pumpkin", "Basin", "Spray bottle of water", "Scrub brush", "Drying cloth"],
     steps: ["Invite your child to wash the pumpkin, and name the materials together.", "Show how to spray water all over the pumpkin.", "Demonstrate scrubbing gently with the brush, turning the pumpkin as you go.", "Dry the pumpkin together with the cloth.", "Let your child try, and repeat as many times as they'd like."],
+    safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "washing pumpkin scrubbing fall care of environment practical life",
     zh: {
       title: "洗南瓜",
@@ -792,6 +833,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "顺序感", "大肌肉协调", "专注力"],
       materials: ["南瓜", "盆", "装水的喷壶", "刷子", "擦干布"],
       steps: ["邀请孩子一起洗南瓜，并说出材料的名称。", "示范如何把水喷遍整个南瓜。", "展示用刷子轻轻刷洗，一边刷一边转动南瓜。", "一起用布把南瓜擦干。", "让孩子尝试，并按自己的节奏重复练习。"],
+      safety: "只要有水，即使是一小盆，也请始终陪在孩子身边，并及时擦干洒出的水，以免地面湿滑。",
     },
   },
   {
@@ -808,6 +850,7 @@ export const activities: Activity[] = [
     domains: ["Care of Environment", "Fine Motor Skills", "Sequencing", "Aesthetic Sense"],
     materials: ["Small vase", "Funnel", "Small pitcher of water", "Child-safe scissors", "Fresh flowers", "Sponge"],
     steps: ["Invite your child to arrange flowers, and name the materials together.", "Show how to place the funnel in the vase and pour water in slowly from the pitcher.", "Demonstrate trimming the end of a flower stem with the scissors, with an adult close by.", "Let your child put the flower in the vase and choose a spot for it in the room.", "Wipe up any spills with the sponge, and put the trimmings in the bin."],
+    safety: "Use child-safe scissors with an adult beside your child, and a vase that won't shatter. Keep flowers away from mouths: some garden flowers are poisonous.",
     keywords: "flower arranging vase pouring funnel scissors care of environment practical life",
     zh: {
       title: "插花",
@@ -818,6 +861,7 @@ export const activities: Activity[] = [
       domains: ["照顾环境", "精细动作", "顺序感", "审美能力"],
       materials: ["小花瓶", "漏斗", "装水的小水壶", "儿童安全剪刀", "鲜花", "海绵"],
       steps: ["邀请孩子一起插花，并说出材料的名称。", "示范把漏斗放进花瓶，用小水壶慢慢倒水。", "在大人身边，展示用剪刀修剪花茎的末端。", "让孩子把花插进花瓶，再为它在房间里选一个位置。", "用海绵擦干洒出的水，把剪下的枝叶扔进垃圾桶。"],
+      safety: "请在大人陪同下使用儿童安全剪刀，并选用不易碎的花瓶。别让孩子把花放进嘴里，有些花园植物有毒。",
     },
   },
   {

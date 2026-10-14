@@ -24,7 +24,7 @@ async function start(profile, port) {
 }
 const appReady = () => page.waitFor(`document.querySelector(".app-shell")`, 15000, "app rendered");
 const nav = async label => {
-  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
   if (label === "Moments") {
     // Moments is no longer a tab; Kids → All Moments opens the timeline.
     await page.eval(`__t.click("Kids", ".bottom-nav button")`);
@@ -83,6 +83,7 @@ await step("Data exists in IndexedDB but the browser won't open it: short biling
   await page.eval(`__t.click("Try Again")`).catch(() => {});
   await sleep(300);
   await appReady();
+  await nav("Kids");
   assert.ok((await page.eval("__t.text()")).includes("小明"));
 });
 

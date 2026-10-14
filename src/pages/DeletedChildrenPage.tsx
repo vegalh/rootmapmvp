@@ -1,8 +1,8 @@
 import { Empty, PageHeader } from "../components/ui";
 import { fmtLong } from "../lib/dates";
-import { photoUrl } from "../lib/photos";
 import type { Child, DeletedChild, Entry, Lang, LessonRecord } from "../types";
 import type { Copy } from "../lib/i18n";
+import { childPhotoSrc } from "../lib/children";
 
 // Profiles removed from My Children, newest first. Nothing here is ever deleted for good; restoring puts the
 // profile back with its original id, so its journal entries and activity records reappear with it.
@@ -30,7 +30,7 @@ export function DeletedChildrenPage({ deleted, childrenData, entries, records, r
             const recordCount = records.filter(r => r.childId === c.id).length;
             return (
               <div className="deleted-row" key={`${c.id}:${c.deletedAt}`}>
-                <img src={photoUrl(c.photo)} alt="" />
+                <img src={childPhotoSrc(c)} alt="" />
                 <span>
                   <strong>{c.first} {c.last}</strong>
                   <small>{c.deletedAt ? t.deletedOn.replace("{date}", fmtLong(c.deletedAt.slice(0, 10), lang)) : ""}</small>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
-import { BASE, IMG, tempProfile } from "./env.mjs";
+import { BASE, IMG, tempProfile, openDemoEraDevice } from "./env.mjs";
 
 // Cancel, ×, Back and Save on the add forms. Closing a sheet with × used to hand the click event to the app as a
 // "destination", which fell through to Help & Support. Cancelling must return to where the form was opened and
@@ -26,9 +26,10 @@ async function step(name, fn) {
   }
 }
 
-const appReady = () => page.waitFor(`document.querySelector(".bottom-nav")`, 15000, "app rendered");
+// Ready on whatever page the URL names (a refresh stays on the current page).
+const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, main")`, 15000, "app rendered");
 const nav = async label => {
-  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
   await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`); await sleep(150);
 };
 const activeTab = () => page.eval(`document.querySelector(".bottom-nav button.active")?.textContent.trim() || null`);
@@ -38,7 +39,7 @@ const openQuick = async () => { await page.eval(`__t.clickSel(".nav-add")`); awa
 const closeX = async () => { await page.eval(`__t.clickSel(".overlay header button")`); await noModal(); };
 const count = async store => (await page.eval(`__t.all(${JSON.stringify(store)})`)).filter(r => !r.deletedAt).length;
 
-await page.nav(`${BASE}/`);
+await openDemoEraDevice(page, `${BASE}/`);
 await appReady();
 await page.waitFor(`__t.dbExists()`, 10000, "data stored");
 
@@ -55,7 +56,7 @@ await step("× on Quick Add stays on the tab it was opened from", async () => {
 await step("× on Add Child (typed in) closes the sheet, stays on Kids and adds no child", async () => {
   await nav("Kids");
   const before = await count("children");
-  await page.eval(`__t.clickSel(".add-child-card")`);
+  await page.eval(`__t.clickSel(".header-add-child")`);
   await page.waitFor(`document.querySelector(".overlay")`, 3000, "Add Child open");
   await page.eval(`__t.type(".overlay input", "Cancelled Child")`);
   await closeX();
@@ -166,6 +167,9 @@ await step("Save still works: a Moment from Quick Add is stored and opens Moment
   await page.eval(`__t.click("Add Moment", ".overlay button")`);
   await page.waitFor(`document.querySelector(".journal-editor")`, 3000, "editor open");
   await page.eval(`__t.type(".journal-editor textarea", "Saved from navigation test")`);
+  // Two children and none chosen yet: the Moment can't be saved until the parent picks one.
+  assert.ok(await page.eval(`document.querySelector(".journal-save").disabled`), "no child chosen yet");
+  await page.eval(`__t.type(".entry-child-pick select", "emma")`);
   await page.waitFor(`!document.querySelector(".journal-save").disabled`, 3000, "save enabled");
   await page.eval(`__t.clickSel(".journal-save")`);
   await page.waitFor(`document.body.innerText.includes("Saved from navigation test") && !document.querySelector(".journal-editor")`, 5000, "moment shown");
@@ -173,9 +177,15 @@ await step("Save still works: a Moment from Quick Add is stored and opens Moment
 
   const children = await count("children");
   await nav("Kids");
-  await page.eval(`__t.clickSel(".add-child-card")`);
+  await page.eval(`__t.clickSel(".header-add-child")`);
   await page.waitFor(`document.querySelector(".overlay")`, 3000, "Add Child open");
   await page.eval(`__t.type(".overlay input", "Navi")`);
+  // A birthday is needed (age comes from it), and it can't be in the future.
+  await page.eval(`__t.clickSel(".overlay .modal-primary")`);
+  await page.waitFor(`document.querySelector(".overlay [role=alert]")`, 3000, "birthday required");
+  await page.eval(`__t.type(".overlay input[type=date]", "2099-01-01")`);
+  await page.waitFor(`document.querySelector(".overlay [role=alert]")?.textContent.includes("future")`, 3000, "future birthday refused");
+  await page.eval(`__t.type(".overlay input[type=date]", "2023-05-01")`);
   await page.eval(`__t.clickSel(".overlay .modal-primary")`);
   await noModal();
   await page.waitFor(`document.body.innerText.includes("Navi")`, 3000, "child shown");
@@ -197,7 +207,7 @@ const openEdit = async () => {
   await page.waitFor(`document.querySelector(".overlay .sheet-fields")`, 3000, "Edit Child open");
 };
 
-await step("Edit Child: prefilled; name, birthday, photo and group saved to the same record; Moments stay attached", async () => {
+await step("Edit Child: prefilled; name, birthday and photo saved to the same record (group kept); Moments stay attached", async () => {
   const before = await maya();
   const mine = (await page.eval(`__t.all("entries")`)).filter(e => e.childId === "emma" && !e.deletedAt).length;
   const total = await count("children");
@@ -207,7 +217,8 @@ await step("Edit Child: prefilled; name, birthday, photo and group saved to the 
   assert.equal(await page.eval(`document.querySelector(".sheet-fields input[type=date]").value`), before.dob);
   await page.eval(`__t.type(".sheet-fields input", "Maya Rose Hao")`);
   await page.eval(`__t.type(".sheet-fields input[type=date]", "2023-03-04")`);
-  await page.eval(`__t.type(".sheet-fields select", "Toddler")`);
+  // Group and notes are no longer on the form; whatever was saved before is kept.
+  assert.ok(!(await page.eval(`!!document.querySelector(".sheet-fields select, .sheet-fields textarea")`)), "no group or notes fields");
   const oldPreview = await page.eval(`document.querySelector(".child-photo-row-preview")?.src || ""`);
   await page.setFiles(".child-photo-field input[type=file]", [path.join(IMG, "portrait.png")]);
   await page.waitFor(`(document.querySelector(".child-photo-row-preview")?.src || "") !== ${JSON.stringify(oldPreview)}`, 15000, "new photo shown");
@@ -217,7 +228,7 @@ await step("Edit Child: prefilled; name, birthday, photo and group saved to the 
   const after = await maya();
   assert.equal(after.id, "emma");
   assert.equal(after.first, "Maya"); assert.equal(after.last, "Rose Hao");
-  assert.equal(after.dob, "2023-03-04"); assert.equal(after.group, "Toddler");
+  assert.equal(after.dob, "2023-03-04"); assert.equal(after.group, before.group);
   assert.match(after.photo, /^photo-/); assert.notEqual(after.photo, before.photo);
   assert.equal(await count("children"), total, "no duplicate child");
   assert.equal((await page.eval(`__t.all("entries")`)).filter(e => e.childId === "emma" && !e.deletedAt).length, mine);
@@ -244,7 +255,7 @@ await step("Edit Child: × discards the edits, and reopening shows the saved val
   await closeX();
   // Add Child afterwards starts empty, not with the edited child's details.
   await nav("Kids");
-  await page.eval(`__t.clickSel(".add-child-card")`);
+  await page.eval(`__t.clickSel(".header-add-child")`);
   await page.waitFor(`document.querySelector(".overlay .sheet-fields")`, 3000, "Add Child open");
   assert.equal(await page.eval(`document.querySelector(".sheet-fields input").value`), "");
   await closeX();

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { Modal, Field } from "./ui";
-import { fmtLong, isoToday, localIsoToday } from "../lib/dates";
+import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
-import { saveSetting } from "../lib/data/hooks";
-import { readSetting } from "../lib/data/store";
 import { newRecordId } from "../lib/data/schema";
 import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
 import { discoverCategoryLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
+import { childOptionLabel, childPhotoSrc, childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
 export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, t }: {
   modal: ModalKind;
@@ -30,18 +29,27 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   t: Copy;
 }) {
   const [name, setName] = useState("");
-  const [dob, setDob] = useState("2023-01-01");
-  const [group, setGroup] = useState("Primary");
-  const [notes, setNotes] = useState("");
+  const [dob, setDob] = useState("");
   const [photo, setPhoto] = useState("");
-  const [date, setDate] = useState(isoToday());
-  const [chosen, setChosen] = useState<string[]>(selectedChild ? [selectedChild] : []);
+  const [childError, setChildError] = useState("");
+  // Guards against a double tap adding the same child twice before the sheet closes.
+  const savingChild = useRef(false);
+  const [date, setDate] = useState(localIsoToday());
+  const [chosen, setChosen] = useState<string[]>([]);
   const [planNote, setPlanNote] = useState("");
+  const savingPlan = useRef(false);
 
   const editing = modal === "editChild" ? childrenData.find(c => c.id === selectedChild) : undefined;
 
+  // A plan starts with today's date and the child already chosen (or the only child); never a removed child.
   useEffect(() => {
-    if (modal === "plan") setChosen(selectedChild ? [selectedChild] : []);
+    if (modal !== "plan") return;
+    const preset = defaultChildId(childrenData, selectedChild);
+    setChosen(preset ? [preset] : []);
+    setDate(localIsoToday());
+    setPlanNote("");
+    savingPlan.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal, selectedChild]);
 
   // Add Child starts empty and Edit Child starts from the saved profile, so closing either one discards what was typed.
@@ -49,10 +57,10 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   useEffect(() => {
     if (modal !== "addChild" && modal !== "editChild") return;
     setName(editing ? `${editing.first} ${editing.last}`.trim() : "");
-    setDob(editing?.dob || "2023-01-01");
-    setGroup(editing?.group || "Primary");
-    setNotes(editing?.notes || "");
+    setDob(editing?.dob || "");
     setPhoto(editing?.photo || "");
+    setChildError("");
+    savingChild.current = false;
   }, [modal, editing?.id]);
 
   if (!modal || (modal === "editChild" && !editing)) return null;
@@ -63,31 +71,37 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
     addPhoto(file, 640, 0.85).then(onLoad, (e: Error) => window.alert(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
   };
 
+  const childProblem = childFormProblem(name, dob, t);
   const addChild = async () => {
+    if (savingChild.current) return;
+    if (childProblem) { setChildError(childProblem); return; }
     const [first, ...last] = name.trim().split(/\s+/);
-    if (!first) return;
+    savingChild.current = true;
+    let ok: boolean;
     if (editing) {
       // The same record (same id, photos, moments and records stay attached); only the fields on this form change.
-      const fields = { first, last: last.join(" "), dob, group, notes, photo: photo || editing.photo };
-      if (await setChildrenData(childrenData.map(c => (c.id === editing.id ? { ...c, ...fields } : c)))) close();
-      return;
+      // Group and notes are no longer asked for; values saved earlier are kept as they are.
+      const fields = { first, last: last.join(" "), dob, photo: photo || editing.photo };
+      ok = await setChildrenData(childrenData.map(c => (c.id === editing.id ? { ...c, ...fields } : c)));
+    } else {
+      ok = await setChildrenData([...childrenData, {
+        id: newRecordId("c"),
+        first,
+        last: last.join(" "),
+        dob,
+        enrolled: "",
+        lessons: 0,
+        group: "",
+        // No picture chosen: an avatar with the child's initials is shown (lib/children.ts).
+        photo,
+      }]);
     }
-    const added = await setChildrenData([...childrenData, {
-      id: newRecordId("c"),
-      first,
-      last: last.join(" "),
-      dob,
-      enrolled: "October 2026",
-      lessons: 0,
-      group,
-      notes,
-      photo: photo || DEFAULT_CHILD_PHOTO,
-    }]);
-    if (added) close();
+    if (ok) close();
+    else savingChild.current = false;
   };
 
   if (modal === "tried") {
-    return <TriedSheet activity={selectedActivity} childrenData={childrenData} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
+    return <TriedSheet activity={selectedActivity} childrenData={childrenData} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
   }
 
   if (modal === "quick") {
@@ -107,12 +121,6 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
       <Modal title={t.add} close={close}>
         <div className="quick-actions">
           <button onClick={() => close("discover")}><Icon name="compass" />{t.addActivityFromDiscover}</button>
-          <button onClick={() => {
-            const title = window.prompt(t.customActivityNamePrompt);
-            if (!title) return;
-            const existing = readSetting("rootmap-personal-notes", "");
-            void saveSetting("rootmap-personal-notes", `${existing}${existing ? "\n\n" : ""}${t.customActivityLabel}: ${title}\n${t.materialsLabelShort}:\n${t.planLabel}:`).then(ok => ok && close("notes"));
-          }}><Icon name="plus" />{t.createCustomActivity}</button>
           <button onClick={() => close("notes")}><Icon name="note" />{t.addPlanningNote}</button>
         </div>
       </Modal>
@@ -140,21 +148,20 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
     return (
       <Modal title={editing ? t.editChild : t.addChild} close={close}>
         <div className="sheet-fields">
-          <Field label={t.childFullName}><input value={name} onChange={e => setName(e.target.value)} /></Field>
-          <Field label={t.dateOfBirth}><input type="date" value={dob} onChange={e => setDob(e.target.value)} /></Field>
+          <Field label={t.childFullName}><input value={name} onChange={e => { setName(e.target.value); setChildError(""); }} maxLength={80} autoComplete="off" aria-invalid={!!childError && !name.trim()} /></Field>
+          <Field label={t.dateOfBirth}><input type="date" value={dob} max={localIsoToday()} onChange={e => { setDob(e.target.value); setChildError(""); }} aria-invalid={!!childError && !!name.trim()} /></Field>
           <div className="field child-photo-field">
             <span>{t.childPhotoLabel}</span>
             <div className="child-photo-row">
-              {photo ? <img src={photoUrl(photo)} alt="" className="child-photo-row-preview" /> : <i className="child-photo-row-placeholder"><Icon name="user" size={20} /></i>}
+              {photo && photo !== DEFAULT_CHILD_PHOTO ? <img src={photoUrl(photo)} alt="" className="child-photo-row-preview" /> : <i className="child-photo-row-placeholder"><Icon name="user" size={20} /></i>}
               <label className="wide-primary photo-upload-button">
                 {t.uploadPhoto}
                 <input type="file" accept="image/*" hidden onChange={e => pickPhoto(e.target.files?.[0], setPhoto)} />
               </label>
             </div>
           </div>
-          <Field label={t.classroomGroupLabel}><select value={group} onChange={e => setGroup(e.target.value)}><option value="Toddler">{t.toddler}</option><option value="Primary">{t.primaryGroup}</option><option value="Other">{t.otherGroup}</option></select></Field>
-          <Field label={t.notesOptional}><textarea value={notes} onChange={e => setNotes(e.target.value)} /></Field>
         </div>
+        {(childError || (dob > localIsoToday() ? t.childDobFuture : "")) && <p className="journal-status error" role="alert">{childError || t.childDobFuture}</p>}
         <button className="modal-primary" onClick={addChild}>{editing ? t.save : t.addChild}</button>
       </Modal>
     );
@@ -162,6 +169,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
 
   // modal === "plan"
   const planActivity = localizeActivity(selectedActivity, t);
+  const validChosen = chosen.filter(id => isActiveChild(childrenData, id));
   return (
     <Modal title={t.addWeek} close={close}>
       <div className="sheet-fields">
@@ -171,22 +179,30 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
           <legend>{t.selectChildren}</legend>
           <div className="child-checks">
             {childrenData.map(c => (
-              <button className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
-                <img src={photoUrl(c.photo)} alt="" />{c.first}
+              <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
+                <img src={childPhotoSrc(c)} alt="" />{childShortName(c, childrenData)}
               </button>
             ))}
           </div>
+          {!validChosen.length && <p className="field-hint">{t.chooseChildForPlan}</p>}
         </fieldset>
         <Field label={t.planningNote}><textarea value={planNote} onChange={e => setPlanNote(e.target.value)} /></Field>
       </div>
-      <button className="modal-primary" onClick={async () => { if (await setPlans([...plans, { id: newRecordId("p"), activityId: selectedActivity.id, date, childIds: chosen, note: planNote }])) close("week"); }}>{t.addWeek}</button>
+      <button className="modal-primary" disabled={!validChosen.length} onClick={async () => {
+        if (savingPlan.current || !validChosen.length) return;
+        savingPlan.current = true;
+        if (await setPlans([...plans, { id: newRecordId("p"), activityId: selectedActivity.id, date, childIds: validChosen, note: planNote }])) close("week");
+        else savingPlan.current = false;
+      }}>{t.addWeek}</button>
     </Modal>
   );
 }
 
 // "Mark as Tried": a few-second record that a child tried this activity. Mounted fresh on every open.
-function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: {
+function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemory, close, t }: {
   activity: Activity;
+  // The child the parent was last looking at; preselected only while still in the list.
+  preferredChild: string;
   childrenData: Child[];
   saveTried: (childId: string, date: string, notes: string) => Promise<string | null>;
   addMemory: (childId: string, date: string) => void;
@@ -194,7 +210,8 @@ function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: 
   t: Copy;
 }) {
   const a = localizeActivity(activity, t);
-  const [childId, setChildId] = useState(childrenData.length === 1 ? childrenData[0].id : "");
+  const [childId, setChildId] = useState(defaultChildId(childrenData, preferredChild));
+  const valid = isActiveChild(childrenData, childId);
   const [date, setDate] = useState(localIsoToday());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
@@ -204,7 +221,7 @@ function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: 
 
   const save = async () => {
     if (saving.current) return;
-    if (!childId) { setError(t.chooseChildFirst); return; }
+    if (!valid) { setError(t.chooseChildFirst); return; }
     saving.current = true;
     const failure = await saveTried(childId, date, notes.trim());
     if (failure) { setError(failure); saving.current = false; return; }
@@ -232,17 +249,31 @@ function TriedSheet({ activity, childrenData, saveTried, addMemory, close, t }: 
         <Field label={t.childLabel}>
           <select value={childId} onChange={e => { setChildId(e.target.value); setError(""); }}>
             <option value="" disabled>{t.selectChild}</option>
-            {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}
+            {childrenData.map(c => <option value={c.id} key={c.id}>{childOptionLabel(c, childrenData, t)}</option>)}
           </select>
         </Field>
         <Field label={t.date}><input type="date" value={date} max={localIsoToday()} onChange={e => e.target.value && setDate(e.target.value)} /></Field>
-        <Field label={t.notesOptional}><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.addNotePlaceholder} rows={2} /></Field>
+        {a.domains.length ? (
+          <fieldset>
+            <legend>{t.activitySkills}</legend>
+            <div className="skill-tags activity-skills">{a.domains.map(x => <span key={x}>{x}</span>)}</div>
+          </fieldset>
+        ) : null}
+        <Field label={`${t.notesLabel}${t.optionalSuffix}`}><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.addNotePlaceholder} rows={2} /></Field>
       </div>
       {error && <p className="journal-status error" role="alert">{error}</p>}
       <div className="sheet-buttons">
         <button onClick={close}>{t.cancel}</button>
-        <button onClick={save} disabled={!childId}>{t.save}</button>
+        <button onClick={save} disabled={!valid}>{t.save}</button>
       </div>
     </Modal>
   );
+}
+
+// Why the Add/Edit Child form can't be saved yet, or "" when it can.
+export function childFormProblem(name: string, dob: string, t: Copy): string {
+  if (!name.trim()) return t.childNameRequired;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return t.childDobRequired;
+  if (dob > localIsoToday()) return t.childDobFuture;
+  return "";
 }

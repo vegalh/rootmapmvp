@@ -33,13 +33,43 @@ export const matchesQuery = (q: string, fields: (string | undefined)[]) => {
 // The cover to show for a music activity (its own image, or the default illustration).
 export const musicCover = (m: MusicActivity) => m.coverImage || defaultMusicCover;
 
-// Age filters a book's recommended reading age overlaps (2–6 → 2–3, 3–4 and 4–6; 4–6+ → 4–6 and 6+).
-export function bookAgeRanges(b: Book): AgeRange[] {
-  const to = b.readingAge.plus ? Infinity : b.readingAge.to;
+// Age filters an age span overlaps: 1–3 → 0–2 and 2–3; 2–6 → 2–3, 3–4 and 4–6; 4+ → 4–6 and 6+. Spans and filters
+// are read the same way, so an activity for ages 1–3 is listed under 0–2 as well as 2–3.
+export function spanAgeRanges(from: number, to: number): AgeRange[] {
   return AGE_RANGES.filter(r => {
     const [low, high] = r === "6+" ? [6, Infinity] : r.split("–").map(Number);
-    return b.readingAge.from < high && to > low;
+    return from < high && to > low;
   });
+}
+
+// Age filters a book's recommended reading age overlaps (2–6 → 2–3, 3–4 and 4–6; 4–6+ → 4–6 and 6+).
+export function bookAgeRanges(b: Book): AgeRange[] {
+  return spanAgeRanges(b.readingAge.from, b.readingAge.plus ? Infinity : b.readingAge.to);
+}
+
+// The ages an activity suits, from its age text ("1–3 years", "4+ years"); its `ageKey` when the text has no span.
+export function activityAgeSpan(a: Pick<Activity, "age" | "ageKey">): [number, number] {
+  const span = a.age.match(/(\d+)\s*[–-]\s*(\d+)/);
+  if (span) return [Number(span[1]), Number(span[2])];
+  const plus = a.age.match(/(\d+)\s*\+/) || a.ageKey.match(/(\d+)\s*\+/);
+  if (plus) return [Number(plus[1]), Infinity];
+  const key = a.ageKey.match(/(\d+)\s*[–-]\s*(\d+)/);
+  return key ? [Number(key[1]), Number(key[2])] : [0, Infinity];
+}
+
+// Age filters an activity is listed under (overlapping, see spanAgeRanges).
+export function activityAgeRanges(a: Pick<Activity, "age" | "ageKey">): AgeRange[] {
+  return spanAgeRanges(...activityAgeSpan(a));
+}
+
+// The age filter that holds a child's current age (in years, fractional).
+export function ageRangeForYears(years: number): AgeRange {
+  return years < 2 ? "0–2" : years < 3 ? "2–3" : years < 4 ? "3–4" : years < 6 ? "4–6" : "6+";
+}
+
+// Only the age filters that have something to show, in their usual order ("All Ages" first).
+export function ageOptionsFor(rangesOfEach: AgeRange[][]): string[] {
+  return ["All Ages", ...AGE_RANGES.filter(r => rangesOfEach.some(x => x.includes(r)))];
 }
 
 // "2–5 years" / "2–5岁", "4–6+ years" / "4–6+岁".

@@ -1,13 +1,17 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { Icon } from "./Icon";
 import { useSetting } from "../lib/data/hooks";
 import type { Screen } from "../types";
-import type { Copy } from "../lib/i18n";
+import { copy, type Copy } from "../lib/i18n";
+
+// The current language's strings, for shared controls' accessible names (Back, Close). Provided by App.
+export const CopyContext = createContext<Copy>(copy.en);
 
 export function PageHeader({ title, subtitle, back, action }: { title: string; subtitle?: string; back?: () => void; action?: React.ReactNode }) {
+  const t = useContext(CopyContext);
   return (
     <header className={`page-header ${back ? "with-back" : ""}`}>
-      {back && <button className="icon-button" onClick={back}><Icon name="back" /></button>}
+      {back && <button className="icon-button" onClick={back} aria-label={t.back}><Icon name="back" /></button>}
       <div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
       {action && <div className="header-action">{action}</div>}
     </header>
@@ -22,13 +26,13 @@ export function BottomNav({ active, go, openQuick, t }: { active: Screen; go: (s
     ["profile", "user", t.navProfile],
   ];
   return (
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" aria-label={t.mainNavigation}>
       {items.slice(0, 2).map(([s, i, l]) => (
-        <button className={active === s ? "active" : ""} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
+        <button className={active === s ? "active" : ""} aria-current={active === s ? "page" : undefined} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
       ))}
-      <button className="nav-add" onClick={openQuick}><i><Icon name="plus" size={25} /></i></button>
+      <button className="nav-add" onClick={openQuick} aria-label={t.quickAdd}><i><Icon name="plus" size={25} /></i></button>
       {items.slice(2).map(([s, i, l]) => (
-        <button className={active === s ? "active" : ""} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
+        <button className={active === s ? "active" : ""} aria-current={active === s ? "page" : undefined} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
       ))}
     </nav>
   );
@@ -154,11 +158,18 @@ export function Field({ label, children: content }: { label: string; children: R
 }
 
 export function Modal({ title, close, children: content }: { title: string; close: () => void; children: React.ReactNode }) {
+  const t = useContext(CopyContext);
+  // Escape closes the sheet, like tapping outside it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
   return (
     <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}>
-      <section className="bottom-sheet">
+      <section className="bottom-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <i />
-        <header><h2>{title}</h2><button onClick={() => close()}>×</button></header>
+        <header><h2>{title}</h2><button onClick={() => close()} aria-label={t.close}>×</button></header>
         {content}
       </section>
     </div>

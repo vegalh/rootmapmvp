@@ -17,17 +17,24 @@
   --border: #eee1d0;
   --shadow: 0 6px 20px rgba(59, 42, 26, .08);
   --safe-top: max(48px, env(safe-area-inset-top));
+  /* Around the app frame on wide screens, and behind the safe areas. */
+  --backdrop: #efe7d6;
   color: var(--text);
-  background: #efe7d6;
+  background: var(--backdrop);
+  color-scheme: light;
   font-synthesis: none;
 }
 :root[data-theme="dark"] {
   --bg: #141a16; --card: #1e2620; --elevated: #26302a; --primary: #8fcf9a;
   --dark-purple: #f3f7f0; --lavender: #26302a; --silver: #3a443c; --text: #f3f7f0;
   --muted: #b9c2b4; --border: #3a443c; --apricot: #3a2c22; --shadow: 0 8px 24px rgba(0,0,0,.3);
+  --backdrop: #0d110e;
+  /* Native controls (date pickers, selects, scrollbars) follow the theme too. */
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #efe7d6; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--backdrop); }
+@media (max-width: 559px) { body { background: var(--bg); } }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
@@ -54,7 +61,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .search input { border: 0; outline: 0; background: transparent; width: 100%; font-size: 16px; }
 .square-primary, .small-primary, .wide-primary, .modal-primary { border: 0; color: white; background: var(--primary); border-radius: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
 :root[data-theme="dark"] .square-primary, :root[data-theme="dark"] .small-primary, :root[data-theme="dark"] .wide-primary, :root[data-theme="dark"] .modal-primary { color: #17131e; background: var(--primary); }
-.children-carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 2px 2px 14px; margin: 0 -20px; padding-left: 20px; padding-right: 20px; scrollbar-width: none; }
+.children-carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 2px 2px 14px; margin: 0 -20px; padding-left: 20px; padding-right: 20px; scroll-padding-inline: 20px; scrollbar-width: none; }
 .children-carousel::-webkit-scrollbar { display: none; }
 .child-select-card { flex: 0 0 63%; scroll-snap-align: start; border: 1px solid var(--border); border-radius: 22px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; text-align: left; }
 .child-select-photo { width: 100%; aspect-ratio: 1 / 1.05; background: var(--elevated); }
@@ -64,9 +71,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .child-select-age { font-size: 14px; color: var(--muted); margin-bottom: 4px; }
 .child-select-info p { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .child-select-info p em { font-style: normal; color: var(--primary); font-weight: 600; }
-.add-child-card { flex-basis: 40%; align-items: center; justify-content: center; gap: 10px; border: 1.5px dashed var(--primary); background: var(--lavender); color: var(--primary); min-height: 220px; }
-.add-child-plus { width: 46px; height: 46px; border-radius: 50%; background: var(--card); display: grid; place-items: center; box-shadow: var(--shadow); }
-.add-child-card strong { font: 600 20px var(--font-heading); }
 .recent-title { margin-top: 10px; }.recent-activity { display: flex; flex-direction: column; gap: 8px; }.recent-activity > button { width: 100%; min-height: 67px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); display: grid; grid-template-columns: 42px 1fr 16px; gap: 10px; align-items: center; text-align: left; }.recent-activity img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }.recent-activity span { min-width: 0; }.recent-activity strong,.recent-activity small,.recent-activity p { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.recent-activity strong { font-size: 15px; }.recent-activity small { color: var(--primary); font-size: 14px; margin-top: 2px; }.recent-activity p { color: var(--muted); font-size: 15px; margin: 4px 0 0; }
 .bottom-nav { height: 88px; padding: 7px max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; background: color-mix(in srgb,var(--card) 96%,transparent); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(5,1fr); box-shadow: 0 -6px 20px rgba(59,42,26,.06); backdrop-filter: blur(14px); -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; }
 .bottom-nav button { border: 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 15px; padding: 0 2px; }
@@ -79,20 +83,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .reset-link,.text-action { border: 0; background: transparent; color: var(--primary); font-size: 15px; padding: 8px 2px; }
 
 .filter-pill-wrap { position: relative; }
-.filter-pill { display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px; border: 1px solid #EDE6DD; border-radius: 12px; background: #FFFDF9; color: #38332F; font-family: var(--font-body); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.filter-pill { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); font-family: var(--font-body); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .filter-pill svg { opacity: .7; transition: transform .15s; }
 .filter-pill[aria-expanded="true"] svg { transform: rotate(180deg); }
-.filter-pill.active { background: #E8EFE6; border-color: #5E8F72; color: #426B50; }
+.filter-pill.active { background: var(--lavender); border-color: var(--primary); color: var(--primary); }
 .filter-pill.active svg { opacity: 1; }
 
-.filter-popover { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: max-content; min-width: 170px; max-width: calc(100vw - 32px); background: #FFFDF9; border: 1px solid #EDE6DD; border-radius: 18px; box-shadow: 0 8px 28px rgba(56, 51, 47, 0.12); padding: 12px; }
+.filter-popover { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: max-content; min-width: 170px; max-width: calc(100vw - 32px); background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 8px 28px rgba(56, 51, 47, 0.12); padding: 12px; }
 .filter-pill-align-right .filter-popover { left: auto; right: 0; }
 .filter-popover-options { display: grid; grid-template-columns: 1fr; gap: 4px; }
 .filter-popover-options.cols-2 { grid-template-columns: repeat(2, minmax(110px, 140px)); }
-.filter-popover-option { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: #38332F; font-family: var(--font-body); font-size: 13.5px; text-align: left; white-space: normal; line-height: 1.2; overflow-wrap: break-word; }
+.filter-popover-option { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font-family: var(--font-body); font-size: 13.5px; text-align: left; white-space: normal; line-height: 1.2; overflow-wrap: break-word; }
 .filter-popover-option:hover { background: rgba(94, 143, 114, 0.1); }
-.filter-popover-option.selected { background: #E8EFE6; color: #426B50; font-weight: 700; }
-.filter-popover-option svg { flex: 0 0 auto; color: #426B50; }
+.filter-popover-option.selected { background: var(--lavender); color: var(--primary); font-weight: 700; }
+.filter-popover-option svg { flex: 0 0 auto; color: var(--primary); }
 
 .section-title { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 12px; }
 .section-title h2, .detail-content h2 { margin: 0; font: 600 24px var(--font-heading); color: var(--dark-purple); }
@@ -101,7 +105,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .activity-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--card); box-shadow: var(--shadow); }
 .activity-image { display: block; width: 100%; height: 116px; border: 0; padding: 0; position: relative; background: var(--elevated); }
 .activity-image img { width: 100%; height: 100%; object-fit: cover; }
-.activity-image span { position: absolute; left: 7px; bottom: 7px; padding: 4px 7px; border-radius: 10px; background: rgba(255,255,255,.9); color: var(--primary); font-size: 14px; font-weight: 700; }
+.activity-image span { position: absolute; left: 7px; bottom: 7px; padding: 4px 7px; border-radius: 10px; background: color-mix(in srgb, var(--card) 90%, transparent); color: var(--primary); font-size: 14px; font-weight: 700; }
 .activity-card > div { padding: 9px 9px 10px; position: relative; }
 .activity-name { max-width: calc(100% - 25px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border: 0; padding: 0; background: transparent; font: 600 20px var(--font-heading); text-align: left; }
 .heart { position: absolute; top: 7px; right: 7px; padding: 2px; border: 0; background: transparent; color: var(--muted); }.heart.saved { color: var(--orange); }
@@ -315,13 +319,18 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
   .journal-editor, .journal-entry { padding-left: 15px; padding-right: 15px; }
 }
 
+/* Wider screens: the app is a centered phone-width frame. It reaches the bottom of the window, and the bottom bars and
+   sheets are fixed to the window inside that frame, so they stay in view however long the page is. */
 @media (min-width: 560px) {
-  .app-shell { width: 402px; min-height: 874px; margin: 18px auto; border-radius: 34px; overflow: hidden; box-shadow: 0 20px 70px rgba(59,42,26,.22); position: relative; }
-  .screen { min-height: 874px; }.bottom-nav,.sticky-action,.form-bottom { position: absolute; }.overlay { position: absolute; border-radius: 34px; overflow: hidden; }
+  :root { --frame-w: 402px; --frame-top: 18px; }
+  .app-shell { width: var(--frame-w); min-height: calc(100vh - var(--frame-top)); margin: var(--frame-top) auto 0; border-radius: 34px 34px 0 0; overflow: clip; box-shadow: 0 20px 70px rgba(59,42,26,.22); position: relative; }
+  .screen { min-height: calc(100vh - var(--frame-top)); }
+  .bottom-nav,.sticky-action,.form-bottom { position: fixed; left: 50%; right: auto; width: var(--frame-w); margin-left: calc(var(--frame-w) / -2); }
+  .overlay { position: fixed; left: 50%; right: auto; width: var(--frame-w); margin-left: calc(var(--frame-w) / -2); top: var(--frame-top); bottom: 0; border-radius: 34px 34px 0 0; overflow: hidden; }
 }
 /* Larger desktop viewports: keep the phone mockup at its true phone size instead of zooming it up. */
 @media (min-width: 900px) {
-  .app-shell { margin-top: 3vh; }
+  :root { --frame-top: 3vh; }
 }
 @media (max-width: 359px) {
   .page-content,.week-page,.simple-page,.form-page { padding-left: 15px; padding-right: 15px; }
@@ -429,7 +438,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .shelf-empty .small-primary { margin-top: 14px; height: 40px; padding: 0 16px; }
 
 .music-card .activity-image { height: 116px; }
-.music-play { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--primary); background: rgba(255, 255, 255, .92); box-shadow: 0 3px 10px rgba(59, 42, 26, .14); font-style: normal; }
+.music-play { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--primary); background: color-mix(in srgb, var(--card) 92%, transparent); box-shadow: 0 3px 10px rgba(59, 42, 26, .14); font-style: normal; }
 
 .audio-player { margin: 0 0 16px; padding: 12px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }
 .audio-toggle { width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; color: white; background: var(--primary); box-shadow: 0 6px 16px rgba(75, 124, 99, .28); }
@@ -453,3 +462,44 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 
 .book-tile strong:lang(zh), .book-cover.placeholder strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 17px; font-weight: 500; line-height: 1.35; }
 .book-detail-cover .book-cover.placeholder strong:lang(zh) { font-size: 20px; }
+
+/* Kids header: Add child is always one tap away, however many children there are. */
+.header-add-child { min-height: 44px; padding: 0 14px; border: 1.5px solid var(--primary); border-radius: 22px; background: var(--card); color: var(--primary); display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; }
+/* Discover: one chip per child, setting the age filter to that child's age. */
+.age-suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.age-suggestions span { font-size: 14px; color: var(--muted); }
+.age-suggestions button { min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); color: var(--text); font-size: 14px; }
+.age-suggestions button.active { border-color: var(--primary); background: var(--primary); color: var(--card); font-weight: 700; }
+.field-hint { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.record-edit-title { margin: 0 0 4px; font-size: 16px; }
+.modal-primary:disabled, .form-bottom button:disabled, .sheet-buttons button:disabled { opacity: .45; cursor: default; }
+.safety-note { margin: 18px 0 4px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--orange) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent); display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; }
+.safety-note strong { display: block; font-size: 15px; margin-bottom: 3px; }
+.safety-note p { margin: 0; font-size: 15px; line-height: 1.5; }
+.safety-note svg { color: var(--orange); margin-top: 1px; }
+.profile-photo-empty { width: 57px; height: 57px; flex: 0 0 auto; border-radius: 50%; border: 3px solid var(--card); background: var(--card); color: var(--primary); display: grid; place-items: center; }
+.info-card .profile-photo-empty { width: 76px; height: 76px; margin: 0 auto 12px; border-color: var(--lavender); }
+/* Today, before any child is added: a warm first step instead of an empty family. */
+.today-welcome { margin: 4px 0 26px; padding: 20px; border-radius: 20px; background: var(--lavender); border: 1px solid var(--border); }
+.today-welcome h2 { margin: 0 0 6px; font: 600 24px var(--font-heading); color: var(--dark-purple); }
+.today-welcome p { margin: 0 0 16px; font-size: 16px; line-height: 1.55; color: var(--text); }
+.today-welcome .wide-primary { width: 100%; min-height: 48px; font-size: 16px; }
+
+/* Touch targets: every control can be tapped across at least 44×44 px. Small controls keep their look; a transparent
+   hit area (::after) extends them where enlarging would crowd the layout. */
+.icon-button, .detail-actions button, .bottom-sheet header button { width: 44px; height: 44px; }
+.page-header.with-back { padding-left: 48px; }
+.page-header > .icon-button { left: -6px; bottom: 14px; }
+.round-add { width: 44px; height: 44px; }
+.search-clear, .filter-pill, .age-suggestions button, .material-list button { position: relative; }
+.heart::after, .search-clear::after, .age-suggestions button::after { content: ""; position: absolute; inset: -8px; }
+.filter-pill::after { content: ""; position: absolute; inset: -4px 0; }
+.material-list button { min-height: 44px; }
+.plan-actions { gap: 4px; }
+.plan-actions button { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; }
+.activity-row button { min-width: 44px; min-height: 44px; }
+.child-header > button, .child-header-actions button, .journal-editor-bar button, .text-action, .reset-link { min-height: 44px; }
+.child-header-actions button { min-width: 44px; justify-content: center; }
+.segmented button, .child-checks button { min-height: 44px; }
+.bottom-nav button { min-height: 44px; }
+.children-empty { margin: 4px 0 0; padding: 20px; border: 1.5px dashed var(--border); border-radius: 18px; color: var(--muted); font-size: 16px; line-height: 1.55; text-align: center; }

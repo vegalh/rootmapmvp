@@ -75,6 +75,9 @@ export type LessonRecord = SyncMeta & {
   nextSteps?: string;
   skills?: string[];
   notesZh?: string;
+  // My Week: the plan this record completed. Kept on this device to avoid recording one completion twice; not part
+  // of the synced columns, so another device sees an ordinary "tried" record.
+  planId?: string;
 };
 
 export type Observation = SyncMeta & {
@@ -106,6 +109,8 @@ export type Activity = {
   materials: string[];
   steps: string[];
   keywords: string;
+  // A short safety note for activities with water, small objects, food that can be choked on, blades or heat.
+  safety?: string;
   // Chinese translations of the display fields above; English fields remain the stored source of truth. Search
   // (lib/catalog.ts) matches both languages.
   zh?: {
@@ -118,6 +123,7 @@ export type Activity = {
     domains?: string[];
     materials?: string[];
     steps?: string[];
+    safety?: string;
   };
 };
 

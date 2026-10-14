@@ -21,7 +21,7 @@ export default function MusicDetailPage({ music, saved, toggleSaved, back, openP
       <div className="detail-actions">
         <button onClick={back} aria-label={t.back}><Icon name="back" /></button>
         <div>
-          <button className={saved ? "saved" : ""} onClick={toggleSaved} aria-label={t.saved}><Icon name="heart" filled={saved} /></button>
+          <button className={saved ? "saved" : ""} onClick={toggleSaved} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", m.title)}><Icon name="heart" filled={saved} /></button>
         </div>
       </div>
       <img className="detail-hero" src={musicCover(music)} alt="" />

@@ -1,11 +1,11 @@
 import { Icon } from "../components/Icon";
 import { TreeLogo } from "../components/TreeLogo";
-import { fmtLong, localIsoToday } from "../lib/dates";
+import { ageFromDob, fmtLong, localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 import { activities } from "../data/activities";
-import { findActivity } from "../lib/catalog";
+import { activityAgeRanges, ageRangeForYears, findActivity } from "../lib/catalog";
 import { initialObservations } from "../data/progress";
 import { thoughts } from "../data/thoughts";
 import type { Activity, Child, Entry, Lang, LessonRecord } from "../types";
@@ -69,17 +69,23 @@ function relativeDay(date: string, today: string, lang: Lang) {
 }
 
 // The home screen: one featured activity, one resurfaced memory and one short reflection, all read-only.
-export function TodayPage({ entries, records, childrenData, lang, openActivity, openEntry, t }: {
+export function TodayPage({ entries, records, childrenData, lang, openActivity, openEntry, openAddChild, t }: {
   entries: Entry[];
   records: LessonRecord[];
   childrenData: Child[];
   lang: Lang;
   openActivity: (id: string) => void;
   openEntry: (id: string) => void;
+  // A new family's first step.
+  openAddChild: () => void;
   t: Copy;
 }) {
   const today = localIsoToday();
-  const featured = localizeActivity(activities[dayHash(today, "activity") % activities.length], t);
+  // Today's activity suits one of the children's ages when there is one that does (any activity otherwise).
+  const ranges = childrenData.filter(c => c.dob).map(c => ageRangeForYears(ageFromDob(c.dob).totalYears));
+  const suited = activities.filter(a => activityAgeRanges(a).some(r => ranges.includes(r)));
+  const pool = suited.length ? suited : activities;
+  const featured = localizeActivity(pool[dayHash(today, "activity") % pool.length], t);
   const memory = pickMemory(entries, records, childrenData, today);
   const thought = thoughts[dayHash(today, "thought") % thoughts.length];
   const childOf = (id: string) => childrenData.find(c => c.id === id);
@@ -90,6 +96,14 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
       <header className="brand-header"><TreeLogo /></header>
       <main className="page-content today-page">
         <div className="hero-title"><p className="today-date">{dateLine}</p><h1>{t.todayTitle}</h1></div>
+
+        {!childrenData.length && (
+          <section className="today-welcome" aria-labelledby="today-welcome">
+            <h2 id="today-welcome">{t.welcomeFamilyTitle}</h2>
+            <p>{t.welcomeFamilyText}</p>
+            <button className="wide-primary" onClick={openAddChild}><Icon name="plus" size={18} />{t.addFirstChild}</button>
+          </section>
+        )}
 
         <section className="today-section" aria-labelledby="today-inspiration">
           <h2 className="today-eyebrow" id="today-inspiration">{t.todayInspiration}</h2>

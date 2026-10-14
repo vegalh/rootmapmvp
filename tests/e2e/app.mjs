@@ -32,9 +32,9 @@ async function start() {
 const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, .page-content, main")`, 15000, "app rendered");
 const dump = () => page.eval("__t.dump()");
 const ls = () => page.eval("__t.ls()");
-// Bottom navigation only exists on top-level screens; a reload returns to Today like a fresh visit.
+// Bottom navigation only exists on top-level screens; a fresh visit to the app address opens Today.
 const nav = async label => {
-  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
   if (label === "Moments") {
     // Moments is no longer a tab; Kids → All Moments opens the timeline.
     await page.eval(`__t.click("Kids", ".bottom-nav button")`);
@@ -405,7 +405,11 @@ await step("20. English and Chinese still work (and the choice persists)", async
   await page.eval(`__t.click("Language")`);
   await page.eval(`__t.click("简体中文")`);
   await page.waitFor(`document.documentElement.lang === "zh-CN" && document.body.innerText.includes("语言")`);
+  // A refresh stays on the Language page, still in Chinese.
   await page.reload(); await appReady();
+  assert.equal(await page.eval(`location.hash`), "#/language");
+  assert.ok((await page.eval(`document.body.innerText`)).includes("语言"));
+  await page.home(); await appReady();
   assert.ok((await page.eval(`document.querySelector(".bottom-nav").innerText`)).includes("孩子"));
   assert.equal(await page.eval(`document.documentElement.lang`), "zh-CN");
   assert.equal(lsBefore["rootmap-language"], JSON.stringify("en"));
@@ -442,6 +446,7 @@ await step("Profile photo upload and child photo upload store photos by id", asy
   await page.eval(`__t.click("Add Child")`);
   await page.waitFor(`document.querySelector(".child-photo-field input[type=file]")`);
   await page.eval(`__t.type(".sheet-fields input", "Ōtsuka Hana 花")`);
+  await page.eval(`__t.type(".sheet-fields input[type=date]", "2022-11-30")`);
   await page.setFiles(".child-photo-field input[type=file]", [path.join(IMG, "noise.png")]);
   await page.waitFor(`document.querySelector(".child-photo-row-preview")?.complete && document.querySelector(".child-photo-row-preview").naturalWidth > 0`);
   await page.eval(`document.querySelector(".modal-primary").click()`);

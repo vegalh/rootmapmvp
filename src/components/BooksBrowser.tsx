@@ -3,7 +3,7 @@ import { Icon } from "./Icon";
 import { Empty, FilterPill } from "./ui";
 import { BookTile } from "./BookCover";
 import { books } from "../data/books";
-import { AGE_RANGES, bookAgeRanges, matchesAge, matchesQuery } from "../lib/catalog";
+import { ageOptionsFor, bookAgeRanges, matchesAge, matchesQuery } from "../lib/catalog";
 import { ageOptionLabel, type Copy } from "../lib/i18n";
 
 // Discover > Books: the curated collection, searchable by title and author (English or Chinese) and by age.
@@ -18,7 +18,7 @@ export default function BooksBrowser({ openBook, t }: { openBook: (id: string) =
       <div className="filter-row">
         <FilterPill
           label={t.age} value={age} defaultValue="All Ages" onChange={setAge}
-          options={["All Ages", ...AGE_RANGES]} renderLabel={v => ageOptionLabel(v, t)}
+          options={ageOptionsFor(books.map(bookAgeRanges))} renderLabel={v => ageOptionLabel(v, t)}
           columns={1} isOpen={ageOpen} onOpenChange={setAgeOpen}
         />
       </div>

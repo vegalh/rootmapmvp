@@ -5,6 +5,7 @@ import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
+import { childOptionLabel, childPhotoSrc } from "../lib/children";
 
 type Fields = Required<Omit<EntryDraft, "savedAt">>;
 type DraftStatus = "idle" | "saving" | "saved" | "failed";
@@ -123,7 +124,9 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
     setAdding(false);
   };
 
-  const canSave = hasContent(fields) && !adding && !saving;
+  const child = childrenData.find(c => c.id === fields.childId);
+  // Never saved for a removed child or without one: with several children the parent picks one first.
+  const canSave = hasContent(fields) && !!child && !adding && !saving;
   const submit = async () => {
     if (!canSave) return;
     done.current = true;
@@ -145,8 +148,6 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
     setFields(base);
   };
 
-  const child = childrenData.find(c => c.id === fields.childId);
-
   return (
     <main className="journal-editor">
       <header className="journal-editor-bar">
@@ -156,16 +157,17 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
 
       {lockChild ? (
         <div className="entry-child-pick">
-          {child && <img src={photoUrl(child.photo)} alt="" />}
+          {child && <img src={childPhotoSrc(child)} alt="" />}
           <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>
         </div>
       ) : (
         <label className="entry-child-pick">
-          {child && <img src={photoUrl(child.photo)} alt="" />}
-          <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>
+          {child && <img src={childPhotoSrc(child)} alt="" />}
+          <span><small>{t.childLabel}</small><strong>{child ? childOptionLabel(child, childrenData, t) : t.selectChild}</strong></span>
           <Icon name="down" size={16} />
-          <select value={fields.childId} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
-            {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}
+          <select value={child ? fields.childId : ""} onChange={e => chooseChild(e.target.value)} aria-label={t.childLabel}>
+            {!child && <option value="" disabled>{t.selectChild}</option>}
+            {childrenData.map(c => <option value={c.id} key={c.id}>{childOptionLabel(c, childrenData, t)}</option>)}
           </select>
         </label>
       )}

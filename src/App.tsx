@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shell, PageHeader } from "./components/ui";
+import { CopyContext, Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
 import { TodayPage } from "./pages/TodayPage";
@@ -28,7 +28,7 @@ import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { activeSpace, backupData, dataMode, guestImportState, restoreData, syncMeta } from "./lib/data/store";
+import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreData, syncMeta } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, localizeActivity } from "./lib/i18n";
@@ -38,16 +38,19 @@ import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./li
 import { spaceMatches } from "./lib/cloud/space";
 import { prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
+import { formatRoute, parseRoute, type Route } from "./lib/routes";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
 import { books } from "./data/books";
 import { musicActivities } from "./data/music";
 import { findActivity, findMusic, isMusicId } from "./lib/catalog";
-import { buildActivityRecord, problemMessage, type RecordInput } from "./lib/activityRecords";
+import { buildActivityRecord, planCompletionRecords, problemMessage, type RecordInput } from "./lib/activityRecords";
+import { defaultChildId, isActiveChild } from "./lib/children";
+import { localIsoToday } from "./lib/dates";
 import { shelfOf, useBookshelf } from "./lib/bookshelf";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { DeletedChild, Entry, Lang, ModalKind, ProfileInfo, Screen, Shelf } from "./types";
+import type { DeletedChild, Entry, Lang, LessonRecord, ModalKind, Plan, ProfileInfo, Screen, Shelf } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -107,27 +110,38 @@ function reloadIntoSpace() {
   window.location.reload();
 }
 
+// Pages that exist only in builds with cloud features; elsewhere their address opens Today.
+const CLOUD_SCREENS: Screen[] = ["signIn", "account", "guestImport"];
+function allowedRoute(r: Route | null): Route | null {
+  return r && (cloudConfig.enabled || !CLOUD_SCREENS.includes(r.screen)) ? r : null;
+}
+
 export default function App() {
   const [afterSwitch] = useState(readAfterSwitch);
-  const [screen, setScreen] = useState<Screen>(afterSwitch?.screen ?? "today");
+  // The page to open: after a sign-in switch the screen it asked for, otherwise the address in the URL (a refresh,
+  // a shared link), otherwise Today.
+  const [start] = useState<Route>(() => (afterSwitch?.screen ? { screen: afterSwitch.screen } : allowedRoute(parseRoute(window.location.hash))) ?? { screen: "today" });
+  const [screen, setScreen] = useState<Screen>(start.screen);
   const [previous, setPrevious] = useState<Screen>("today");
   const [modal, setModal] = useState<ModalKind>(null);
-  const [selectedChild, setSelectedChild] = useState("emma");
+  // The child whose page is open (or was last open); "" when none. Never assumed to exist: see lib/children.ts.
+  const [selectedChild, setSelectedChild] = useState(start.child ?? "");
   // A Discover activity or a music activity: both share one id space (lib/catalog.ts).
-  const [selectedActivity, setSelectedActivity] = useState("water-pouring");
-  const [selectedBook, setSelectedBook] = useState(books[0]?.id ?? "");
-  const [discoverTab, setDiscoverTab] = useState<DiscoverTab>("activities");
+  const [selectedActivity, setSelectedActivity] = useState(start.activity ?? "water-pouring");
+  const [selectedBook, setSelectedBook] = useState(start.book ?? books[0]?.id ?? "");
+  const [discoverTab, setDiscoverTab] = useState<DiscoverTab>(start.discoverTab ?? "activities");
   const [bookshelfTab, setBookshelfTab] = useState<Shelf>("owned");
-  const [childTab, setChildTab] = useState("Journal");
+  const [childTab, setChildTab] = useState<string>(start.childTab ?? "Journal");
   // Where Add Activity was opened: a child's Activities tab (child already known) or Quick Add (child chosen in the form).
-  const [recordFrom, setRecordFrom] = useState<"child" | "quick">("child");
+  const [recordFrom, setRecordFrom] = useState<"child" | "quick">(start.screen === "record" && start.child ? "child" : "quick");
   // Entry being viewed/edited; undefined in the editor means "new entry".
-  const [selectedEntry, setSelectedEntry] = useState<string | undefined>();
+  const [selectedEntry, setSelectedEntry] = useState<string | undefined>(start.entry);
   // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal,
-  // "activity" = the activity page a memory was added from after marking it as tried, "today" = Looking Back).
-  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today">("moments");
+  // "activity" = the activity page a memory was added from after marking it as tried, "today" = Looking Back,
+  // "children" = Recent moments on Kids).
+  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today" | "children">("moments");
   // Child preselected for a new entry.
-  const [editorChild, setEditorChild] = useState<string | undefined>();
+  const [editorChild, setEditorChild] = useState<string | undefined>(start.screen === "entryEdit" ? start.child : undefined);
   // Editable starting title/date for a new entry (the activity just marked as tried).
   const [editorPrefill, setEditorPrefill] = useState<{ title: string; date: string } | undefined>();
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
@@ -145,7 +159,12 @@ export default function App() {
   const [seedVersion, setSeedVersion] = useSetting<number>("rootmap-seed-version", 0);
   // Every seed item this device has received ("child:emma", "record:r1", "obs:o1"); see mergeSeed.
   const [seenSeeds, setSeenSeeds] = useSetting<string[]>("rootmap-seed-ids", []);
-  const [profile, setProfile] = useSetting<ProfileInfo>("rootmap-profile", { name: "Alex Hao", photo: alexPhoto, contact: "" });
+  // Set on devices that started without demo data (a new family); they never receive any.
+  const [noDemo, setNoDemo] = useSetting<boolean>(NO_DEMO_KEY, false);
+  // Devices from the demo era keep the sample parent profile they always showed until it's edited; a new family's
+  // profile starts empty.
+  const [demoEra] = useState(() => !readSetting(NO_DEMO_KEY, false) && readSetting<number>("rootmap-seed-version", 0) > 0);
+  const [profile, setProfile] = useSetting<ProfileInfo>("rootmap-profile", demoEra ? { name: "Alex Hao", photo: alexPhoto, contact: "" } : { name: "", photo: "", contact: "" });
   const savedActivities = useCollection("saved");
   const saved = useMemo(() => savedActivities.items.map(s => s.id), [savedActivities.items]);
   const setSavedRecords = savedActivities.set;
@@ -217,7 +236,14 @@ export default function App() {
 
   // When the bundled seed data changes (SEED_VERSION bumped), merge in new demo items without touching anything
   // already on the device (see mergeSeed). The parent's profile and all their own data are never reset.
+  // A new family (nothing stored, never seeded) gets no demo data, now or with any later seed version; only devices
+  // that already had the demo family keep receiving its updates.
+  const freshSpace = seedVersion === 0 && !seenSeeds.length && !childrenData.length && !deletedChildren.length && !records.length && !observations.length;
   useEffect(() => {
+    if (noDemo || freshSpace) {
+      if (!noDemo) setNoDemo(true);
+      return;
+    }
     // A device without a seen-list has already received every current seed item (it's on this version, or it
     // predates the list); treating them all as seen means a demo child the parent deleted is never re-added.
     const seen = new Set(seenSeeds.length ? seenSeeds : seedIds);
@@ -231,10 +257,13 @@ export default function App() {
     }
     const all = [...new Set([...seen, ...seedIds])];
     if (all.length !== seenSeeds.length) setSeenSeeds(all);
-  }, [seedVersion, seenSeeds, setChildrenData, setRecords, setObservations, setSaved, setSeedVersion, setSeenSeeds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noDemo, seedVersion, seenSeeds, setChildrenData, setRecords, setObservations, setSaved, setSeedVersion, setSeenSeeds]);
 
   const t = copy[lang];
-  const child = childrenData.find(c => c.id === selectedChild) || childrenData[0];
+  // The open child's page; undefined once that child is removed (the page then returns to My Children).
+  const child = childrenData.find(c => c.id === selectedChild);
+  const activeChildIds = useMemo(() => childrenData.map(c => c.id), [childrenData]);
   const activity = findActivity(selectedActivity) || activities[0];
   const music = findMusic(selectedActivity) || musicActivities[0];
   const book = books.find(b => b.id === selectedBook) || books[0];
@@ -287,9 +316,17 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, [toast]);
 
+  // "System Default" follows the device's setting, also when it changes while RootMap is open.
   useEffect(() => {
-    const dark = appearance === "dark" || (appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const dark = appearance === "dark" || (appearance === "system" && media.matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    };
+    apply();
+    if (appearance !== "system") return;
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
   }, [appearance]);
 
   useEffect(() => {
@@ -301,6 +338,91 @@ export default function App() {
     setScreen(s);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  // Returning to an earlier page (a back button, or leaving a form): see "Browser history" below.
+  const goBack = (s: Screen) => {
+    backNav.current = true;
+    go(s);
+  };
+
+  // ── Browser history ────────────────────────────────────────────────────────────────────────────────────
+  // The URL follows the page shown (lib/routes.ts). Opening a page adds a history entry. RootMap's own back buttons
+  // (and leaving a form after saving or cancelling) go through `goBack`: when the page they return to is the one just
+  // before in the browser history, that is a browser Back, so both Backs agree and the history doesn't grow;
+  // otherwise the current entry is replaced. Browser Back/Forward set the page from the URL.
+  const hash = formatRoute({
+    screen,
+    activity: selectedActivity,
+    book: selectedBook,
+    child: screen === "record" ? (recordFrom === "child" ? selectedChild : undefined) : screen === "entryEdit" ? editorChild : selectedChild,
+    entry: selectedEntry,
+    discoverTab,
+    childTab: childTab === "Activities" ? "Activities" : "Journal",
+  });
+  const history = useRef<{ stack: string[]; idx: number } | null>(null);
+  const backNav = useRef(false);
+  useEffect(() => {
+    const h = history.current;
+    const isBack = backNav.current;
+    backNav.current = false;
+    if (!h) {
+      // First render: this page is the current history entry.
+      window.history.replaceState({ ...window.history.state, rmIdx: 0 }, "", hash);
+      history.current = { stack: [hash], idx: 0 };
+      return;
+    }
+    if (window.location.hash === hash) return;
+    if (isBack && h.idx > 0 && h.stack[h.idx - 1] === hash) { window.history.back(); return; }
+    // Switching tabs within a page (Discover's tabs, a child's tabs) updates the address without a new entry.
+    const sameScreen = h.stack[h.idx]?.split("/")[1]?.split("?")[0] === hash.split("/")[1]?.split("?")[0] && (screen === "discover" || screen === "child");
+    if (sameScreen || isBack) {
+      window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", hash);
+      h.stack[h.idx] = hash;
+      return;
+    }
+    h.stack = [...h.stack.slice(0, h.idx + 1), hash];
+    h.idx += 1;
+    window.history.pushState({ rmIdx: h.idx }, "", hash);
+  }, [hash, screen]);
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const h = history.current;
+      const r = allowedRoute(parseRoute(window.location.hash)) ?? { screen: "today" as Screen };
+      if (h) {
+        // An address typed into the browser has no index yet: it becomes the next entry.
+        const idx = typeof e.state?.rmIdx === "number" ? e.state.rmIdx : h.idx + 1;
+        if (typeof e.state?.rmIdx !== "number") window.history.replaceState({ ...e.state, rmIdx: idx }, "", window.location.hash);
+        h.stack = idx >= h.stack.length ? [...h.stack.slice(0, idx), window.location.hash] : h.stack;
+        h.stack[idx] = window.location.hash;
+        h.idx = idx;
+      }
+      setModal(null);
+      setPrevious(screen);
+      if (r.activity) setSelectedActivity(r.activity);
+      if (r.book) setSelectedBook(r.book);
+      if (r.discoverTab) setDiscoverTab(r.discoverTab);
+      if (r.childTab) setChildTab(r.childTab);
+      if (r.screen === "child" || r.screen === "record") setSelectedChild(r.child ?? "");
+      if (r.screen === "record") setRecordFrom(r.child ? "child" : "quick");
+      if (r.screen === "entry" || r.screen === "entryEdit") setSelectedEntry(r.entry);
+      if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
+      setScreen(r.screen);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [screen]);
+
+  // An address for something that no longer exists (a removed child or Moment, an activity or book taken out of the
+  // catalog) opens the list it belonged to instead.
+  useEffect(() => {
+    if (screen === "child" && !child) setScreen("children");
+    else if (screen === "entry" && !entry) setScreen("observations");
+    else if ((screen === "activity" || screen === "music") && !findActivity(selectedActivity)) { setDiscoverTab(screen === "music" ? "music" : "activities"); setScreen("discover"); }
+    else if (screen === "activity" && isMusicId(selectedActivity)) setScreen("music");
+    else if (screen === "music" && !isMusicId(selectedActivity)) setScreen("activity");
+    else if (screen === "book" && !books.some(b => b.id === selectedBook)) { setDiscoverTab("books"); setScreen("discover"); }
+    else if (screen === "entryEdit" && selectedEntry && !entry) setScreen("observations");
+  }, [screen, child, entry, selectedActivity, selectedBook, selectedEntry]);
   // Moments is no longer a tab, but keeps the bottom bar (it opens after saving a memory from Quick Add).
   const topLevel = ["today", "children", "discover", "observations", "profile"].includes(screen);
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
@@ -308,13 +430,13 @@ export default function App() {
   const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
   const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
   const toggleSaved = (id: string) => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
-  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : "observations";
-  const openEntry = (id: string, origin: "moments" | "child" | "today") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
+  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : "observations";
+  const openEntry = (id: string, origin: "moments" | "child" | "today" | "children") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
     if (!childrenData.length) { setModal("addChild"); return; }
     setSelectedEntry(undefined);
     setEntryOrigin(origin);
-    setEditorChild(childId);
+    setEditorChild(defaultChildId(childrenData, childId) || undefined);
     setEditorPrefill(prefill);
     setEditorReturn(screen);
     go("entryEdit");
@@ -323,10 +445,51 @@ export default function App() {
   // Every activity record (Add Activity and Mark as Tried) is built and stored here, through the same builder.
   // Repeat attempts are separate records. Resolves to an error message, or null once stored.
   const addActivityRecord = async (input: RecordInput) => {
-    const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), new Date().toISOString());
+    const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), new Date().toISOString(), activeChildIds);
     if ("problem" in built) return problemMessage(built.problem, t);
     const failure = await commitRecords([built.record, ...records]);
     return failure ? storageMessage(failure) : null;
+  };
+  // Corrects a record's date, notes or child. Same id and everything else unchanged (stage, skills and the activity
+  // stay as recorded). Resolves to an error message, or null once stored.
+  const editActivityRecord = async (id: string, patch: { date: string; notes: string; childId: string }) => {
+    if (!isActiveChild(childrenData, patch.childId)) return t.chooseChildFirst;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) return t.chooseDateFirst;
+    const notes = patch.notes.trim();
+    const next = records.map((r): LessonRecord => {
+      if (r.id !== id) return r;
+      // A translated seed note no longer matches once the note is edited.
+      const notesZh = (r.notes || "") === notes ? r.notesZh : undefined;
+      const { notes: _n, notesZh: _z, ...rest } = r;
+      return { ...rest, childId: patch.childId, date: patch.date, ...(notes ? { notes } : {}), ...(notesZh ? { notesZh } : {}) };
+    });
+    const failure = await commitRecords(next);
+    if (failure) return storageMessage(failure);
+    setToast(t.recordUpdated);
+    return null;
+  };
+  // My Week › complete: the plan is marked done and each of its children gets the activity in their history, through
+  // the same record builder as Mark as Tried. Completing twice never adds a second record (planCompletionRecords).
+  // Plans being completed right now: a second tap before the first save has finished is ignored.
+  const completing = useRef(new Set<string>());
+  const completePlan = async (plan: Plan) => {
+    if (plan.completed || completing.current.has(plan.id)) return;
+    completing.current.add(plan.id);
+    try {
+      const date = localIsoToday();
+      const added = planCompletionRecords(plan, records, activeChildIds, date, new Date().toISOString(), () => newRecordId("t"));
+      if (added.length && !savedOk(await commitRecords([...added, ...records]))) return;
+      if (!savedOk(await commitPlans(plans.map(p => (p.id === plan.id ? { ...p, completed: true, completedDate: date } : p))))) return;
+      setToast(added.length ? t.planCompletedRecorded : t.planCompleted);
+    } finally {
+      completing.current.delete(plan.id);
+    }
+  };
+  // Completed › Repeat: the same activity planned again for today, for the children still in My Children.
+  const repeatPlan = (plan: Plan) => {
+    const childIds = plan.childIds.filter(id => isActiveChild(childrenData, id));
+    setPlans(current => [...current, { id: newRecordId("p"), activityId: plan.activityId, date: localIsoToday(), childIds, ...(plan.note ? { note: plan.note } : {}) }]);
+    setToast(t.planRepeated);
   };
   // "Mark as Tried": the quick record for the activity already open in Discover.
   const saveTried = (childId: string, date: string, notes: string) => addActivityRecord({ kind: "tried", childId, date, activityId: activity.id, notes });
@@ -382,6 +545,7 @@ export default function App() {
           lang={lang}
           openActivity={openActivity}
           openEntry={id => openEntry(id, "today")}
+          openAddChild={() => setModal("addChild")}
           t={t}
         />
       );
@@ -392,15 +556,15 @@ export default function App() {
           childrenData={childrenData}
           entries={entries}
           goChild={goChild}
+          openEntry={id => openEntry(id, "children")}
           openAddChild={() => setModal("addChild")}
           openMoments={() => go("observations")}
-          openNotifications={() => go("notifications")}
           t={t}
         />
       );
     }
     if (screen === "discover") {
-      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} t={t} />;
+      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} childrenData={childrenData} t={t} />;
     }
     if (screen === "music") {
       if (!music) return null;
@@ -409,7 +573,7 @@ export default function App() {
           music={music}
           saved={saved.includes(music.id)}
           toggleSaved={() => toggleSaved(music.id)}
-          back={() => go(previous === "week" || previous === "today" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
           t={t}
@@ -423,7 +587,7 @@ export default function App() {
           book={book}
           shelf={shelfOf(bookshelf.items, book.id)}
           place={bookshelf.place}
-          back={() => go(previous === "bookshelf" ? "bookshelf" : "discover")}
+          back={() => goBack(previous === "bookshelf" ? "bookshelf" : "discover")}
           notify={setToast}
           t={t}
         />
@@ -437,7 +601,7 @@ export default function App() {
           setTab={setBookshelfTab}
           openBook={id => { setSelectedBook(id); go("book"); }}
           explore={() => { setDiscoverTab("books"); go("discover"); }}
-          back={() => go("profile")}
+          back={() => goBack("profile")}
           t={t}
         />
       );
@@ -448,9 +612,10 @@ export default function App() {
           activity={activity}
           saved={saved.includes(activity.id)}
           toggleSaved={() => setSaved(saved.includes(activity.id) ? saved.filter(x => x !== activity.id) : [...saved, activity.id])}
-          back={() => go(previous === "week" || previous === "today" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
+          notify={setToast}
           t={t}
         />
       );
@@ -465,17 +630,18 @@ export default function App() {
           lang={lang}
           open={id => openEntry(id, "moments")}
           write={childId => startEntry("moments", childId)}
-          back={() => go("children")}
+          back={() => goBack("children")}
           t={t}
         />
       );
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} t={t} />;
-    if (screen === "account") return <AccountPage cloud={cloud} back={() => go("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
+    if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
-      return <GuestImportPage userId={syncUser} back={() => go(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
+      return <GuestImportPage userId={syncUser} back={() => goBack(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
     }
     if (screen === "child") {
+      if (!child) return null;
       return (
         <ChildProfilePage
           child={child}
@@ -506,10 +672,12 @@ export default function App() {
             if (!window.confirm(message)) return;
             // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
             if (!savedOk(await commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
-            go("children");
+            goBack("children");
           }}
-          back={() => go("children")}
+          back={() => goBack("children")}
           record={() => { setRecordFrom("child"); go("record"); }}
+          childrenData={childrenData}
+          editRecord={editActivityRecord}
           deleteRecord={async id => {
             if (!savedOk(await commitRecords(records.filter(r => r.id !== id)))) return false;
             setToast(t.recordDeleted);
@@ -523,11 +691,12 @@ export default function App() {
       return (
         <RecordFormPage
           childrenData={childrenData}
-          childId={child?.id ?? ""}
-          lockChild={recordFrom === "child"}
+          // From a child's page that child; from Quick Add the only child, or none so the parent chooses.
+          childId={recordFrom === "child" && child ? child.id : defaultChildId(childrenData)}
+          lockChild={recordFrom === "child" && !!child}
           records={records}
           // Cancel returns to wherever the form was opened (a child's page, or any tab through Quick Add).
-          cancel={() => go(previous)}
+          cancel={() => goBack(previous)}
           t={t}
           save={async r => {
             // Activity notes stay on the activity record (Activities tab); memories are recorded through Moments.
@@ -536,7 +705,7 @@ export default function App() {
             setToast(t.entrySaved);
             setSelectedChild(r.childId);
             setChildTab("Activities");
-            go("child");
+            goBack("child");
             return null;
           }}
         />
@@ -549,12 +718,12 @@ export default function App() {
           entry={entry}
           child={childrenData.find(c => c.id === entry.childId)}
           lang={lang}
-          back={() => go(originScreen)}
+          back={() => goBack(originScreen)}
           edit={() => go("entryEdit")}
           remove={async () => {
             if (!(await storeEntries(entries.filter(e => e.id !== entry.id)))) { setToast(t.journalStorageFull); return; }
             setToast(t.entryDeleted);
-            go(originScreen);
+            goBack(originScreen);
           }}
           t={t}
         />
@@ -565,14 +734,14 @@ export default function App() {
         <EntryEditorPage
           key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}:${editorPrefill?.title || ""}`}
           childrenData={childrenData}
-          childId={entry?.childId || (editorChild && childrenData.some(c => c.id === editorChild) ? editorChild : childrenData[0]?.id || "")}
+          childId={entry?.childId || defaultChildId(childrenData, editorChild)}
           lockChild={entryOrigin === "child"}
           entry={entry}
           prefill={entry ? undefined : editorPrefill}
           lang={lang}
           // Leaving without saving returns to where the editor was opened (a tab through Quick Add, a child, an activity,
           // Moments); saving still lands on the origin. The autosaved draft is kept either way.
-          back={() => go(entry ? "entry" : editorReturn)}
+          back={() => goBack(entry ? "entry" : editorReturn)}
           save={async (f, draft) => {
             const now = new Date().toISOString();
             const fields = { childId: f.childId, date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
@@ -584,7 +753,7 @@ export default function App() {
               if (!(await storeEntries([{ id: newRecordId("m"), ...fields, createdAt: now, updatedAt: now }, ...entries], draft))) return false;
             }
             setToast(t.entrySaved);
-            go(originScreen);
+            goBack(originScreen);
             return true;
           }}
           t={t}
@@ -592,7 +761,7 @@ export default function App() {
       );
     }
     if (screen === "goals") {
-      return <GoalsPage goals={goals} setGoals={setGoals} back={() => go("profile")} openNotes={() => go("notes")} t={t} />;
+      return <GoalsPage goals={goals} setGoals={setGoals} back={() => goBack("profile")} openNotes={() => go("notes")} t={t} />;
     }
     if (screen === "week") {
       return (
@@ -600,12 +769,14 @@ export default function App() {
           saved={saved}
           plans={plans}
           setPlans={setPlans}
+          completePlan={plan => void completePlan(plan)}
+          repeatPlan={repeatPlan}
           childFilter={weekFilter}
           setChildFilter={setWeekFilter}
           childrenData={childrenData}
           openActivity={openActivity}
           openAdd={() => setModal("weekAdd")}
-          back={() => go("profile")}
+          back={() => goBack("profile")}
           t={t}
         />
       );
@@ -613,12 +784,12 @@ export default function App() {
     if (screen === "saved") {
       return (
         <main className="simple-page">
-          <PageHeader title={t.savedActivities} back={() => go("profile")} />
+          <PageHeader title={t.savedActivities} back={() => goBack("profile")} />
           <div className="week-list">
             {saved.map(id => {
               const a = findActivity(id);
               if (!a) return null;
-              return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(id)}><Icon name="chevron" /></button>} key={id} />;
+              return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(id)} aria-label={localizeActivity(a, t).title}><Icon name="chevron" /></button>} key={id} />;
             })}
           </div>
         </main>
@@ -641,7 +812,7 @@ export default function App() {
             try { sessionStorage.setItem(JUST_RESTORED_KEY, "1"); } catch { /* no confirmation toast */ }
             window.location.reload();
           }}
-          back={() => go("profile")}
+          back={() => goBack("profile")}
           lang={lang}
           t={t}
         />
@@ -662,16 +833,16 @@ export default function App() {
             if (!savedOk(await commitChildren([...childrenData, profile]))) return;
             setToast(t.childRestored.replace("{name}", d.first));
           }}
-          back={() => go("profile")}
+          back={() => goBack("profile")}
           lang={lang}
           t={t}
         />
       );
     }
     if (screen === "notifications") {
-      return <NotificationsPage childrenData={childrenData} back={() => go("children")} goChild={goChild} t={t} />;
+      return <NotificationsPage back={() => goBack("children")} t={t} />;
     }
-    return <SettingsPage screen={screen} back={() => go(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
+    return <SettingsPage screen={screen} back={() => goBack(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
   };
 
   if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {
@@ -697,6 +868,7 @@ export default function App() {
   }
 
   return (
+    <CopyContext.Provider value={t}>
     <div className="app-shell">
       <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel}>
         {content()}
@@ -719,5 +891,6 @@ export default function App() {
       {toast && <div className="toast" role="status">{toast}</div>}
       {isBeta && <BetaNotice t={t} />}
     </div>
+    </CopyContext.Provider>
   );
 }

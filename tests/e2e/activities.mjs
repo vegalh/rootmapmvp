@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
-import { BASE, tempProfile } from "./env.mjs";
+import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
 // One activity catalog, two ways to record: Kids › child › Activities › Add Activity (search-first picker, then the
 // form) and Discover › activity › Mark as Tried (the activity is already known). Both store records the same way;
@@ -26,11 +26,12 @@ async function step(name, fn) {
 }
 
 const q = s => JSON.stringify(s);
-const appReady = () => page.waitFor(`document.querySelector(".bottom-nav")`, 15000, "app rendered");
+// Ready on whatever page the URL names (a refresh stays on the current page).
+const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, main")`, 15000, "app rendered");
 // Child and form pages have no bottom bar: go back to My Children first.
 const nav = async index => {
   if (await page.eval(`!document.querySelector(".bottom-nav") && !!document.querySelector(".child-header > button")`)) { await page.eval(`__t.clickSel(".child-header > button")`); await sleep(200); }
-  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
   await page.eval(`__t.clickSel(".bottom-nav button", ${index})`); await sleep(200);
 };
 const NAV = { today: 0, discover: 1, kids: 3, profile: 4 };
@@ -58,7 +59,7 @@ const openPicker = async () => {
 const save = async () => { await page.eval(`__t.clickSel(".form-bottom button")`); await sleep(300); };
 let lang = "en";
 
-await page.nav(`${BASE}/`);
+await openDemoEraDevice(page, `${BASE}/`);
 await appReady();
 await page.waitFor(`__t.dbExists()`, 10000, "data stored");
 const today = await page.eval(`(() => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })()`);
@@ -73,7 +74,7 @@ await step("Kids › child › Activities › Add Activity opens the search-firs
   assert.ok(await page.eval(`document.querySelector(".picker-page .search input").placeholder.includes("Search activities")`));
   const chips = await page.eval(`[...document.querySelectorAll(".category-chips button")].map(b => b.textContent)`);
   assert.equal(chips[0], "All");
-  for (const c of ["Practical Life", "Art", "Movement", "Music"]) assert.ok(chips.includes(c), c);
+  for (const c of ["Everyday Life", "Art", "Movement", "Music"]) assert.ok(chips.includes(c), c);
   assert.ok(!(await page.eval(`document.body.innerText.includes("Recently Used")`)), "no recent activities yet: section hidden");
   assert.ok((await rows()).length > 0);
   assert.ok(await page.eval(`!!document.querySelector(".picker-custom")`), "custom option offered");
@@ -97,11 +98,11 @@ await step("Search: English title, Chinese title, keywords, partial and no resul
 });
 
 await step("Category and search filter together; Music is a category", async () => {
-  await chip("Practical Life");
+  await chip("Everyday Life");
   await search("water");
   const found = await rows();
   assert.ok(found.length > 0);
-  assert.ok(found.every(r => r.meta.startsWith("Practical Life")), JSON.stringify(found));
+  assert.ok(found.every(r => r.meta.startsWith("Everyday Life")), JSON.stringify(found));
   await search("");
   await chip("Music");
   const music = await rows();
@@ -181,7 +182,7 @@ await step("Custom activity: name and learning area, stored as typed and never a
   const before = (await live("records")).length;
   await page.eval(`__t.type(".form-fields input:not([type=date])", "Climbing at the playground")`);
   await save();
-  assert.ok(await page.eval(`document.querySelector(".journal-status.error")?.textContent === "Choose a learning area."`));
+  assert.ok(await page.eval(`document.querySelector(".journal-status.error")?.textContent === "Choose a category."`));
   assert.equal((await live("records")).length, before, "nothing saved without an area");
   const areas = await page.eval(`[...document.querySelectorAll(".form-fields select option")].map(o => o.value).filter(Boolean)`);
   assert.ok(areas.includes("Movement") && areas.includes("Music"), "Discover categories offered");
@@ -224,7 +225,9 @@ await step("History shows older records, new records and Mark as Tried; never bl
   for (const r of legacy) {
     const row = h.find(x => x.startsWith(r.lesson));
     assert.ok(row, `older record ${r.lesson}`);
-    if (r.stage) assert.ok(row.includes(r.stage), `${r.lesson} keeps its stage`);
+    // Stored stages are kept; they're shown in gentler words ("Independent" reads "On their own").
+    const shown = { Introduced: "First try", Practicing: "Practicing", Independent: "On their own" }[r.stage];
+    if (r.stage) assert.ok(row.includes(shown), `${r.lesson} keeps its stage`);
   }
   assert.ok(h.some(x => x.startsWith(musicTitle) && !/Introduced|Practicing|Independent/.test(x)), "no stage on a record without one");
 });
@@ -260,7 +263,7 @@ await step("Chinese: picker, search and history", async () => {
   assert.ok((await rows()).every(r => /[一-鿿]/.test(r.title)), "Chinese titles");
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
-  assert.equal(await page.eval(`document.querySelector(".form-fields textarea").placeholder`), "你观察到了什么？");
+  assert.equal(await page.eval(`document.querySelector(".form-fields textarea").placeholder`), "有什么想记下的？");
   assert.ok(await page.eval(`document.body.innerText.includes("随手记（可选）") && document.body.innerText.includes("探索技能")`));
   assert.ok(!(await page.eval(`document.body.innerText.includes("学习阶段") || document.body.innerText.includes("观察到的技能")`)));
   assert.ok(await page.eval(`[...document.querySelectorAll(".activity-skills span")].every(s => /[一-鿿]/.test(s.textContent))`), "skills in Chinese");

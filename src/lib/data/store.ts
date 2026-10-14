@@ -34,7 +34,21 @@ export type DataMode = "indexeddb" | "localStorage";
 export type DataStatus = { mode: DataMode } | { mode: "unavailable"; error: string };
 
 export const DEFAULT_SAVED = ["water-pouring", "dotting"];
+// What a collection showed before the parent ever changed it, on devices from the demo era (see `defaultsFor`).
 export const defaults: Defaults = { children: initialChildren, records: initialRecords, observations: initialObservations, saved: DEFAULT_SAVED };
+// A new family starts with nothing: no demo children, records, Moments or favorites.
+export const EMPTY_DEFAULTS: Defaults = { children: [], records: [], observations: [], saved: [] };
+// Set on a device that started without demo data, so it never receives any later (also read by App's seed merge).
+export const NO_DEMO_KEY = "rootmap-no-demo";
+
+// Devices that already used RootMap before demo data was removed saw the demo family wherever a collection had never
+// been saved, so they keep reading those defaults (nothing they saw disappears). A device with no RootMap data at
+// all is a new family and starts empty.
+export function defaultsFor(values: Record<string, unknown>): Defaults {
+  if (values[NO_DEMO_KEY] === true) return EMPTY_DEFAULTS;
+  const usedBefore = Object.values(LEGACY_KEYS).some(k => k in values) || "rootmap-seed-version" in values || "rootmap-profile" in values;
+  return usedBefore ? defaults : EMPTY_DEFAULTS;
+}
 
 // Set once the migration has completed. If IndexedDB later fails to open, the app must not quietly fall back to
 // the older localStorage copy (it would look like recent memories were lost), so it asks to reopen instead.
@@ -101,7 +115,7 @@ export async function initData(target: Space = GUEST): Promise<DataStatus> {
     const error = await withMigrationLock(async () => {
       migrated = await isMigrated(opened);
       if (migrated) return null;
-      const result = await migrateFromLocalStorage(opened, localStorage, defaults);
+      const result = await migrateFromLocalStorage(opened, localStorage, defaultsFor(readLegacySafely()));
       if (!result.ok) return result.error;
       migrated = true;
       if (result.report.warnings.length) console.info("RootMap data migration notes:", result.report.warnings);
@@ -193,6 +207,10 @@ export const activeSpaceMeta = () => spaceMeta;
 // Local changes waiting for sync, oldest first (always empty in the guest space).
 export const pendingOutbox = () => [...outbox.values()].sort((a, b) => a.seq - b.seq);
 
+function readLegacySafely(): Record<string, unknown> {
+  try { return readLegacyStorage(localStorage).values; } catch { return {}; }
+}
+
 function withMigrationLock<T>(fn: () => Promise<T>): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   return locks ? (locks.request("rootmap-migration", fn) as Promise<T>) : fn();
@@ -232,10 +250,10 @@ function startLegacy(reason: string): DataStatus {
   try {
     const source = readLegacyStorage(localStorage);
     for (const u of source.unplaced) if (u.reason === "unreadable") backupCorrupt(u.key, u.raw);
-    built = buildFromLegacy(source, { now: nowIso(), defaults, extractPhotos: false, newPhotoId, photoSource: "upload" });
+    built = buildFromLegacy(source, { now: nowIso(), defaults: defaultsFor(source.values), extractPhotos: false, newPhotoId, photoSource: "upload" });
   } catch {
-    // localStorage itself is unreadable (e.g. blocked): the app starts with its defaults, as it always did.
-    built = buildFromLegacy({ values: {}, unplaced: [] }, { now: nowIso(), defaults, extractPhotos: false, newPhotoId, photoSource: "upload" });
+    // localStorage itself is unreadable (e.g. blocked): the app starts empty.
+    built = buildFromLegacy({ values: {}, unplaced: [] }, { now: nowIso(), defaults: EMPTY_DEFAULTS, extractPhotos: false, newPhotoId, photoSource: "upload" });
   }
   cache.collections = built.collections;
   cache.settings = new Map(Object.entries(built.settings));
@@ -595,7 +613,7 @@ export async function backupData(): Promise<Record<string, unknown>> {
 export async function restoreData(data: Record<string, unknown>): Promise<boolean> {
   if (mode !== "indexeddb" || !db) return false;
   const now = nowIso();
-  const built = buildFromLegacy({ values: data, unplaced: [] }, { now, defaults, extractPhotos: true, newPhotoId, photoSource: "restored" });
+  const built = buildFromLegacy({ values: data, unplaced: [] }, { now, defaults: defaultsFor(data), extractPhotos: true, newPhotoId, photoSource: "restored" });
   // Every record the restore writes, by collection (for the outbox in an account space).
   const written: [OutboxCollection, { id: string; deletedAt?: string | null }[]][] = COLLECTIONS.map(name => {
     const incoming = new Set(built.collections[name].map(r => r.id));

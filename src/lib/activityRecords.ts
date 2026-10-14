@@ -1,7 +1,7 @@
 import { areaLessons } from "../data/progress";
 import { findActivity, isMusicId } from "./catalog";
 import { learningAreaLabel, lessonLabel, localizeActivity, stageLabel, type Copy } from "./i18n";
-import type { Activity, LessonRecord, Stage } from "../types";
+import type { Activity, LessonRecord, Plan, Stage } from "../types";
 
 // The one way an activity record is made, whichever screen it comes from: Add Activity (a catalog or a custom
 // activity, with optional stage, notes and skills) and Mark as Tried (kind "tried": a catalog activity, a date
@@ -19,13 +19,17 @@ export type RecordInput = {
   stage?: Stage;
   notes?: string;
   skills?: string[];
+  // My Week: the plan this record completes (see LessonRecord.planId).
+  planId?: string;
 };
 
 // What's missing when a record can't be built.
 export type RecordProblem = "child" | "date" | "activity" | "name" | "area";
 
-export function buildActivityRecord(input: RecordInput, id: string, now: string): { record: LessonRecord } | { problem: RecordProblem } {
-  if (!input.childId) return { problem: "child" };
+// `activeChildIds`: the children currently in My Children. When given, a record for any other id (a removed child,
+// or one that never existed) is refused, so nothing is ever saved to a child the parent can't see.
+export function buildActivityRecord(input: RecordInput, id: string, now: string, activeChildIds?: string[]): { record: LessonRecord } | { problem: RecordProblem } {
+  if (!input.childId || (activeChildIds && !activeChildIds.includes(input.childId))) return { problem: "child" };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { problem: "date" };
   let lesson: string;
   let activityId: string | undefined;
@@ -57,6 +61,7 @@ export function buildActivityRecord(input: RecordInput, id: string, now: string)
     date: input.date,
     ...(notes ? { notes } : {}),
     ...(input.skills?.length ? { skills: input.skills } : {}),
+    ...(input.planId ? { planId: input.planId } : {}),
     createdAt: now,
   };
   return { record };
@@ -109,4 +114,17 @@ export function recentActivityIds(records: LessonRecord[], childId: string | und
     .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""));
   const ordered = [...newest.filter(r => r.childId === childId), ...newest.filter(r => r.childId !== childId)];
   return [...new Set(ordered.map(r => r.activityId!))].slice(0, limit);
+}
+
+// My Week › complete: the records a completed plan adds to its children's activity history, one per child still in
+// My Children, dated `date`. A child who already has a record for this plan gets no second one, so completing
+// twice (a double tap, or a retry after a failed save) never duplicates history.
+export function planCompletionRecords(plan: Plan, records: LessonRecord[], activeChildIds: string[], date: string, now: string, newId: () => string): LessonRecord[] {
+  const out: LessonRecord[] = [];
+  for (const childId of new Set(plan.childIds)) {
+    if (records.some(r => r.planId === plan.id && r.childId === childId && !r.deletedAt)) continue;
+    const built = buildActivityRecord({ kind: "tried", childId, date, activityId: plan.activityId, planId: plan.id }, newId(), now, activeChildIds);
+    if ("record" in built) out.push(built.record);
+  }
+  return out;
 }

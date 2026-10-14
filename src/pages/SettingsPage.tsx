@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { PageHeader, NotificationToggle, Field } from "../components/ui";
+import { PageHeader, Field } from "../components/ui";
+import { cloudConfig } from "../lib/cloud/config";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 import { saveSetting } from "../lib/data/hooks";
@@ -63,8 +64,12 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
     return (
       <main className="simple-page">
         <PageHeader title={title} back={back} />
-        <div className="choice-list">
-          {[t.followUpReminders, t.weeklyPlanningReminders, t.classroomUpdates].map(x => <NotificationToggle label={x} key={x} />)}
+        {/* Reminders don't exist yet, so there is nothing to switch on or off; the page says so instead of showing
+            switches that would change nothing. */}
+        <div className="info-card">
+          <Icon name="bell" size={28} />
+          <h2>{t.notificationsComingSoonTitle}</h2>
+          <p>{t.notificationsComingSoon}</p>
         </div>
       </main>
     );
@@ -80,7 +85,7 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
       <main className="simple-page">
         <PageHeader title={title} back={back} />
         <div className="info-card">
-          <img className="profile-edit-photo" src={photoUrl(photo)} alt="" />
+          {photo ? <img className="profile-edit-photo" src={photoUrl(photo)} alt="" /> : <i className="profile-edit-photo profile-photo-empty"><Icon name="user" size={30} /></i>}
           <p>{t.personalText}</p>
           <label className="wide-primary photo-upload-button">
             {t.uploadPhoto}
@@ -88,10 +93,10 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
           </label>
         </div>
         <div className="form-fields">
-          <Field label={t.fullNameLabel}><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
+          <Field label={t.fullNameLabel}><input type="text" value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></Field>
           <Field label={t.contactInfoLabel}><input type="text" value={contact} onChange={e => setContact(e.target.value)} placeholder={t.contactPlaceholder} /></Field>
         </div>
-        <button className="wide-primary" onClick={() => setProfile({ name: name.trim() || profile.name, photo, contact: contact.trim() })}>{t.save}</button>
+        <button className="wide-primary" onClick={() => { setProfile({ name: name.trim() || profile.name, photo, contact: contact.trim() }); back(); }}>{t.save}</button>
       </main>
     );
   }
@@ -104,10 +109,9 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
         <h2>{title}</h2>
         <p>
           {screen === "privacy"
-            ? t.privacyText
+            ? (cloudConfig.enabled ? `${t.privacyText} ${t.privacyTextAccount}` : t.privacyText)
             : t.helpText}
         </p>
-        <button className="wide-primary">{screen === "help" ? t.contactSupport : t.manageButton}</button>
       </div>
     </main>
   );

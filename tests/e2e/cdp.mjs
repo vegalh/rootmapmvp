@@ -79,6 +79,10 @@ export class Page {
     await this.send("Page.navigate", { url });
     await loaded;
   }
+  // A fresh visit to the app's address (no page in the URL), which opens Today. A reload keeps the current page.
+  async home() {
+    await this.nav(await this.eval("location.origin + location.pathname"));
+  }
   async reload() {
     const loaded = this.waitEvent("Page.loadEventFired");
     await this.send("Page.reload", { ignoreCache: false });

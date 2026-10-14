@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Icon } from "./Icon";
 import { Empty, FilterPill } from "./ui";
 import { musicActivities } from "../data/music";
-import { AGE_RANGES, localizeMusic, matchesAge, matchesCatalogQuery, musicAsActivity, musicCover } from "../lib/catalog";
+import { ageOptionsFor, localizeMusic, matchesAge, matchesCatalogQuery, musicAsActivity, musicCover } from "../lib/catalog";
 import { ageOptionLabel, type Copy } from "../lib/i18n";
 import type { MusicActivity } from "../types";
 
@@ -18,7 +18,7 @@ export default function MusicBrowser({ saved, toggleSaved, open, t }: { saved: s
       <div className="filter-row">
         <FilterPill
           label={t.age} value={age} defaultValue="All Ages" onChange={setAge}
-          options={["All Ages", ...AGE_RANGES]} renderLabel={v => ageOptionLabel(v, t)}
+          options={ageOptionsFor(musicActivities.map(m => m.ageRanges))} renderLabel={v => ageOptionLabel(v, t)}
           columns={1} isOpen={ageOpen} onOpenChange={setAgeOpen}
         />
       </div>

@@ -4,6 +4,7 @@ import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
+import { childPhotoSrc } from "../lib/children";
 
 // Full view of a single entry: who it's about, large photos and the complete written memory.
 export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
@@ -27,7 +28,7 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
       </header>
       {child && (
         <div className="entry-child">
-          <img src={photoUrl(child.photo)} alt="" />
+          <img src={childPhotoSrc(child)} alt="" />
           <span><strong>{child.first} {child.last}</strong><time>{fmtLong(entry.date, lang)}</time></span>
         </div>
       )}

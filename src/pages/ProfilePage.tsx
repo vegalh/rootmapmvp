@@ -13,22 +13,22 @@ export function ProfilePage({ go, lang, appearance, profile, deletedCount, books
         : [];
   const groups: [string, [string, string, string, string?][]][] = [
     [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["bookshelf", "book", t.familyBookshelf, bookshelfCount ? String(bookshelfCount) : undefined], ["goals", "target", t.myGoals]]],
-    [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications]]],
+    [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications, t.comingSoon]]],
     [t.account, [...accountRow, ["personal", "user", t.personal], ["deletedChildren", "clock", t.recentlyDeleted, deletedCount ? String(deletedCount) : undefined], ["privacy", "shield", t.privacy], ["help", "help", t.help]]],
   ];
   return (
     <main className="page-content profile-page">
       <PageHeader title={t.profile} subtitle={t.profileSubtitle} />
       <section className="user-summary">
-        <img src={photoUrl(profile.photo)} alt="" />
-        <div><h2>{profile.name}</h2><p>{t.teacherRole}</p></div>
+        {profile.photo ? <img src={photoUrl(profile.photo)} alt="" /> : <i className="profile-photo-empty"><Icon name="user" size={26} /></i>}
+        <div><h2>{profile.name || t.addYourName}</h2><p>{t.teacherRole}</p></div>
       </section>
       {groups.map(([title, items]) => (
         <section className="menu-section" key={title}>
           <h3>{title}</h3>
           <div>
             {items.map(([screen, icon, label, value]) => (
-              <button onClick={() => go(screen as Screen)} key={`${title}-${label}`}>
+              <button onClick={() => go(screen as Screen)} key={`${title}-${label}`} aria-label={value ? `${label}, ${value}` : label}>
                 <i><Icon name={icon} size={18} /></i><span>{label}</span>{value && <small>{value}</small>}<Icon name="chevron" size={16} />
               </button>
             ))}

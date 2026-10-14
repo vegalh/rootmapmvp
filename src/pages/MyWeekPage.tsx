@@ -2,15 +2,19 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, Empty } from "../components/ui";
 import { findActivity } from "../lib/catalog";
-import { newRecordId } from "../lib/data/schema";
-import { fmt, isoToday } from "../lib/dates";
+import { childOptionLabel, childShortName } from "../lib/children";
+import { fmt, fmtWeekday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 
-export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: {
+export function MyWeekPage({ saved, plans, setPlans, completePlan, repeatPlan, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: {
   saved: string[];
   plans: Plan[];
   setPlans: React.Dispatch<React.SetStateAction<Plan[]>>;
+  // Marks a plan done and adds the activity to each planned child's history (App, through the shared recorder).
+  completePlan: (plan: Plan) => void;
+  // Plans a completed activity again for today.
+  repeatPlan: (plan: Plan) => void;
   childFilter: string;
   setChildFilter: (s: string) => void;
   childrenData: Child[];
@@ -23,16 +27,18 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
   const shownPlans = plans.filter(p => childFilter === "all" || p.childIds.includes(childFilter));
   const planned = shownPlans.filter(p => !p.completed).sort((a, b) => a.date.localeCompare(b.date));
   const complete = shownPlans.filter(p => p.completed);
-  const mark = (id: string) => setPlans(current => current.map(p => (p.id === id ? { ...p, completed: true, completedDate: isoToday() } : p)));
+  const lang = t.code === "zh" ? "zh" : "en";
+  // Names of the plan's children still in My Children (a removed child's name is not shown).
+  const names = (p: Plan) => p.childIds.map(id => childrenData.find(c => c.id === id)).filter((c): c is Child => !!c).map(c => childShortName(c, childrenData)).join(lang === "zh" ? "、" : ", ");
   return (
     <main className="week-page">
-      <PageHeader title={t.myWeek} subtitle={t.weekSubtitle} back={back} action={<button className="round-add" onClick={openAdd}><Icon name="plus" /></button>} />
+      <PageHeader title={t.myWeek} subtitle={t.weekSubtitle} back={back} action={<button className="round-add" onClick={openAdd} aria-label={t.add}><Icon name="plus" /></button>} />
       <div className="week-controls">
         <label>
           <span>{t.selectChildren}</span>
           <select value={childFilter} onChange={e => setChildFilter(e.target.value)}>
             <option value="all">{t.allChildren}</option>
-            {childrenData.map(c => <option value={c.id} key={c.id}>{c.first}</option>)}
+            {childrenData.map(c => <option value={c.id} key={c.id}>{childOptionLabel(c, childrenData, t)}</option>)}
           </select>
         </label>
         <div className="segmented">
@@ -45,7 +51,7 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
         {tab === "saved" && saved.map(id => {
           const a = findActivity(id);
           if (!a) return null;
-          return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)}><Icon name="chevron" /></button>} key={id} />;
+          return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)} aria-label={localizeActivity(a, t).title}><Icon name="chevron" /></button>} key={id} />;
         })}
         {tab === "plan" && (
           <>
@@ -54,12 +60,15 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
               if (!a) return null;
               return (
                 <article className="day-plan" key={p.id}>
-                  <time><b>{new Date(`${p.date}T12:00`).toLocaleDateString("en-US", { weekday: "short" })}</b>{new Date(`${p.date}T12:00`).getDate()}</time>
+                  <time dateTime={p.date}><b>{fmtWeekday(p.date, lang)}</b>{Number(p.date.slice(8, 10))}</time>
                   <ActivityRow
                     a={a}
                     t={t}
-                    subtitle={p.childIds.length ? p.childIds.map(id => childrenData.find(c => c.id === id)?.first).join(", ") : t.noChildAssigned}
-                    action={<div className="plan-actions"><button onClick={() => mark(p.id)}><Icon name="check" size={16} /></button><button onClick={() => setPlans(x => x.filter(y => y.id !== p.id))}>×</button></div>}
+                    subtitle={names(p) || t.noChildAssigned}
+                    action={<div className="plan-actions">
+                      <button onClick={() => completePlan(p)} aria-label={t.markDoneLabel.replace("{title}", localizeActivity(a, t).title)}><Icon name="check" size={16} /></button>
+                      <button onClick={() => setPlans(x => x.filter(y => y.id !== p.id))} aria-label={t.removePlanLabel.replace("{title}", localizeActivity(a, t).title)}>×</button>
+                    </div>}
                   />
                 </article>
               );
@@ -76,8 +85,8 @@ export function MyWeekPage({ saved, plans, setPlans, childFilter, setChildFilter
                 <ActivityRow
                   a={a}
                   t={t}
-                  subtitle={`${p.childIds.map(id => childrenData.find(c => c.id === id)?.first).join(", ") || t.unassigned} · ${fmt(p.completedDate || p.date)}`}
-                  action={<button onClick={() => setPlans(x => [...x, { ...p, id: newRecordId("p"), date: isoToday(), completed: false }])}>{t.repeat}</button>}
+                  subtitle={`${names(p) || t.unassigned} · ${fmt(p.completedDate || p.date, lang)}`}
+                  action={<button onClick={() => repeatPlan(p)}>{t.repeat}</button>}
                   key={p.id}
                 />
               );

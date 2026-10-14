@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
-import { BASE, tempProfile } from "./env.mjs";
+import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
 // Discover > Activities | Books | Music, the Family Bookshelf, and music activities in the My Week workflow.
 // Checks are written against whatever books and music the data files hold, so they keep passing as the sample
@@ -26,8 +26,13 @@ async function step(name, fn) {
 }
 
 const q = s => JSON.stringify(s);
-const appReady = () => page.waitFor(`document.querySelector(".bottom-nav")`, 15000, "app rendered");
-const nav = async index => { await page.eval(`__t.clickSel(".bottom-nav button", ${index})`); await sleep(200); };
+// Ready on whatever page the URL names (a refresh stays on the current page).
+const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, main")`, 15000, "app rendered");
+// Bottom navigation only exists on top-level pages; elsewhere a fresh visit to the app address opens Today first.
+const nav = async index => {
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
+  await page.eval(`__t.clickSel(".bottom-nav button", ${index})`); await sleep(200);
+};
 const NAV = { today: 0, discover: 1, kids: 3, profile: 4 };
 const tab = async label => { await page.eval(`__t.click(${q(label)}, ".discover-tabs button")`); await sleep(150); };
 const activeTab = () => page.eval(`document.querySelector(".discover-tabs button.active")?.textContent.trim()`);
@@ -39,6 +44,15 @@ const pickAge = async option => {
   await page.eval(`__t.click(${q(option)}, ".filter-popover-option")`);
   await sleep(150);
 };
+// The age options the open tab offers: only ages that have something to show, never an empty filter.
+const offeredAges = async () => {
+  await page.eval(`__t.clickSel(".filter-row .filter-pill")`);
+  await page.waitFor(`document.querySelector(".filter-popover")`, 3000, "age options open");
+  const ages = await page.eval(`[...document.querySelectorAll(".filter-popover-option")].map(b => b.textContent.trim()).filter(x => x !== "All Ages")`);
+  await page.eval(`__t.clickSel(".filter-row .filter-pill")`); await sleep(100);
+  for (const a of ages) assert.ok(AGES.includes(a), a);
+  return ages;
+};
 const setting = async key => (await page.eval(`__t.all("settings")`)).find(s => s.key === key)?.value;
 const live = async store => (await page.eval(`__t.all(${q(store)})`)).filter(r => !r.deletedAt);
 const noOverflow = async label => {
@@ -47,7 +61,7 @@ const noOverflow = async label => {
 };
 const AGES = ["0–2", "2–3", "3–4", "4–6", "6+"];
 
-await page.nav(`${BASE}/`);
+await openDemoEraDevice(page, `${BASE}/`);
 await appReady();
 await page.waitFor(`__t.dbExists()`, 10000, "data stored");
 const plansBefore = await live("plans");
@@ -93,9 +107,10 @@ await step("Books: search by title and author, and filter by age (a book may be 
   assert.ok(await page.eval(`!!document.querySelector(".empty")`), "empty result message");
   await search("");
   let inRanges = 0;
-  for (const age of AGES) {
+  for (const age of await offeredAges()) {
     await pickAge(age);
     const n = await count(".book-tile");
+    assert.ok(n > 0, `${age} is offered only when it has books`);
     assert.ok(n <= bookCount, `${age}: ${n} of ${bookCount}`);
     assert.ok(await page.eval(`document.querySelector(".filter-row .filter-pill").textContent.includes(${q(age)})`));
     inRanges += n;
@@ -213,7 +228,7 @@ await step("Music: search and age filter", async () => {
   assert.equal(await count(".music-card"), 0);
   await search("");
   let inRanges = 0;
-  for (const age of AGES) { await pickAge(age); inRanges += await count(".music-card"); }
+  for (const age of await offeredAges()) { await pickAge(age); const n = await count(".music-card"); assert.ok(n > 0, age); inRanges += n; }
   assert.ok(inRanges >= total);
   await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
   assert.equal(await count(".music-card"), total);
@@ -259,6 +274,10 @@ await step("Music: save, Add to My Week, Mark as Tried, all through the existing
   await page.eval(`__t.click("Add to My Week", ".sticky-action button")`);
   await page.waitFor(`document.querySelector(".overlay .plan-activity")`, 3000, "plan sheet");
   assert.equal(await page.eval(`document.querySelector(".overlay .plan-activity strong").textContent`), musicTitle);
+  // Two children: none is assumed, so the plan can't be added until one is chosen.
+  assert.ok(await page.eval(`document.querySelector(".overlay .modal-primary").disabled`), "no child chosen yet");
+  await page.eval(`__t.click("Maya", ".overlay .child-checks button")`);
+  await page.waitFor(`!document.querySelector(".overlay .modal-primary").disabled`, 3000, "Maya chosen");
   await page.eval(`__t.clickSel(".overlay .modal-primary")`);
   await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week");
   const plans = (await live("plans")).filter(p => p.activityId === musicId);
@@ -268,8 +287,15 @@ await step("Music: save, Add to My Week, Mark as Tried, all through the existing
 await step("My Week shows the music activity in Weekly Plan, Completed and Saved; repeating works", async () => {
   assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in the weekly plan");
   const row = `[...document.querySelectorAll(".day-plan")].find(d => d.innerText.includes(${q(musicTitle)}))`;
+  const triedBefore = (await live("records")).filter(r => r.activityId === musicId).length;
   await page.eval(`${row}.querySelector(".plan-actions button").click()`); await sleep(200);
-  assert.equal((await live("plans")).find(p => p.activityId === musicId).completed, true);
+  const plan = (await live("plans")).find(p => p.activityId === musicId);
+  assert.equal(plan.completed, true);
+  // Completing the plan adds it to Maya's activity history, once.
+  const done = (await live("records")).filter(r => r.activityId === musicId && r.planId === plan.id);
+  assert.equal(done.length, 1, "one record for the completed plan");
+  assert.equal(done[0].childId, "emma");
+  assert.equal((await live("records")).filter(r => r.activityId === musicId).length, triedBefore + 1);
   await page.eval(`__t.click("Completed", ".segmented button")`); await sleep(150);
   assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in completed");
   await page.eval(`[...document.querySelectorAll(".week-list .activity-row")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector("button").click()`);

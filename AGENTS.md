@@ -32,7 +32,9 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `storage.ts` - localStorage primitives and storage-error reporting (`onStorageError`).
   - `photos.ts` - `addPhoto` (resize + store, returns a photo id) and `photoUrl` (id → image URL to render).
   - `welcome.ts` - Whether this device still shows the Welcome screen (new devices only, cloud builds only).
-  - `dates.ts` - Date formatting helpers (`fmt`, `isoToday`).
+  - `dates.ts` - Date helpers. Use `localIsoToday()` / `localIsoDate()` for "today" (local calendar date, never UTC); `fmt`, `fmtLong`, `fmtWeekday` format in the current language.
+  - `children.ts` - Which child a record is for (`defaultChildId`: the only child, or none so the parent chooses; never a removed child), names that tell same-name children apart, and the initials avatar (`childPhotoSrc`).
+  - `routes.ts` - Page addresses in the URL hash (`#/activity/<id>`, `#/book/<id>`, `#/child/<id>` …): browser Back, refresh and shared links. App keeps the URL in sync with `screen`.
   - `catalog.ts` - The one activity catalog: Discover activities and music activities share one id space. `findActivity(id)` resolves either (saved, My Week plans, activity records); `catalogItems()`, `catalogCategories()` and `searchCatalog()` (bilingual search, shared by Discover and Add Activity) list, group and search them. Also age labels/filters and book/music localization.
   - `activityRecords.ts` - The single way an activity record is built (`buildActivityRecord`, used by Add Activity and Mark as Tried), how a record reads in a child's history (`recordView`, incl. legacy and custom records) and Recently Used (`recentActivityIds`, derived from records).
   - `bookshelf.ts` - The Family Bookshelf (My Books / Wishlist), stored as the `rootmap-bookshelf` setting; a book is on at most one shelf.

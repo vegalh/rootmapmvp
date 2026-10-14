@@ -115,11 +115,13 @@ test("history: legacy records keep their title, area, stage and translations", (
   assert.equal(v.title, "倒水练习");
   assert.equal(v.area, zh.practical);
   assert.equal(v.stage, zh.practicing);
-  assert.equal(recordView(initialRecords[1], en).area, "Sensorial");
+  // Older learning areas read in everyday words; the stored value stays "Sensorial".
+  assert.equal(recordView(initialRecords[1], en).area, "Senses");
+  assert.equal(initialRecords[1].area, "Sensorial");
   const old: LessonRecord = { id: "old", childId: "emma", lesson: "Golden Beads", area: "Mathematics", stage: "Introduced", date: "2026-09-01" };
   assert.equal(recordView(old, zh).title, "金色珠串");
   assert.equal(recordView(old, zh).area, zh.mathematics);
-  assert.equal(recordView(old, en).area, "Mathematics");
+  assert.equal(recordView(old, en).area, "Math");
 });
 
 test("history: removed activities fall back to the stored title; nothing is blank", () => {

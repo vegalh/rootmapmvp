@@ -32,8 +32,10 @@ before(async () => {
 
 const goal = (id: string, title = id) => ({ id, title, completed: false, createdAt: "2026-10-12T00:00:00.000Z", updatedAt: "2026-10-12T00:00:00.000Z", deletedAt: null });
 
-test("start-up publishes the loaded data (demo children) before any screen renders", () => {
-  assert.deepEqual(store.publishedCollection("children").map(c => c.id), ["emma", "noah"]);
+test("start-up publishes the loaded data before any screen renders (a new device: no demo children)", () => {
+  assert.deepEqual(store.publishedCollection("children").map(c => c.id), []);
+  assert.deepEqual(store.publishedCollection("records"), []);
+  assert.deepEqual(store.publishedCollection("saved"), []);
 });
 
 test("a write made outside any screen is published and every subscriber is told once", async () => {

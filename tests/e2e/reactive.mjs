@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
-import { BASE, tempProfile } from "./env.mjs";
+import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
 // Screens follow the data store: a change written outside any screen (as a restore or a future cloud sync does)
 // appears without a reload. Also checks the collision-resistant ids for goals and repeated plans.
@@ -29,7 +29,7 @@ async function step(name, fn) {
 
 const appReady = () => page.waitFor(`document.querySelector(".app-shell") && document.querySelector(".bottom-nav, .page-content, main")`, 15000, "app rendered");
 const nav = async label => {
-  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.reload(); await appReady(); }
+  if (!(await page.eval(`!!document.querySelector(".bottom-nav")`))) { await page.home(); await appReady(); }
   await page.eval(`__t.click(${JSON.stringify(label)}, ".bottom-nav button")`);
   await sleep(150);
 };
@@ -40,7 +40,7 @@ const now = new Date().toISOString();
 const child = { id: "c-external-1", first: "Ext", last: "Child", dob: "2022-05-01", enrolled: "Sep 2025", lessons: 0, group: "Primary", photo: "", createdAt: now, updatedAt: now, deletedAt: null, origin: "user" };
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
-await page.nav(`${BASE}/`);
+await openDemoEraDevice(page, `${BASE}/`);
 await appReady();
 const firstLoad = await loads();
 

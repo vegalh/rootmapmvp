@@ -3,32 +3,38 @@ import { Icon } from "../components/Icon";
 import type { Activity } from "../types";
 import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
 
-export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, openTried, t }: {
+export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, openTried, notify, t }: {
   activity: Activity;
   saved: boolean;
   toggleSaved: () => void;
   back: () => void;
   openPlan: () => void;
   openTried: () => void;
+  // Shows a short confirmation (the app's toast).
+  notify: (message: string) => void;
   t: Copy;
 }) {
   const a = localizeActivity(rawActivity, t);
   const [checked, setChecked] = useState<number[]>([]);
+  // Shares the activity's own address (lib/routes.ts), which opens this page. Without the share sheet the link is
+  // copied; if that isn't possible either, the parent is told rather than shown a false confirmation.
   const share = async () => {
-    const data = { title: a.title, text: `${a.title} — ${a.description}` };
-    if (navigator.share) await navigator.share(data);
-    else {
-      await navigator.clipboard?.writeText(`${data.title}\n${data.text}`);
-      window.alert(t.copiedToClipboard);
+    const url = window.location.href;
+    try {
+      if (navigator.share) { await navigator.share({ title: a.title, text: a.title, url }); return; }
+      await navigator.clipboard.writeText(url);
+      notify(t.linkCopied);
+    } catch (e) {
+      if ((e as Error)?.name !== "AbortError") notify(t.shareFailed);
     }
   };
   return (
     <main className="detail-page">
       <div className="detail-actions">
-        <button onClick={back}><Icon name="back" /></button>
+        <button onClick={back} aria-label={t.back}><Icon name="back" /></button>
         <div>
-          <button className={saved ? "saved" : ""} onClick={toggleSaved}><Icon name="heart" filled={saved} /></button>
-          <button onClick={share}><Icon name="share" /></button>
+          <button className={saved ? "saved" : ""} onClick={toggleSaved} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", a.title)}><Icon name="heart" filled={saved} /></button>
+          <button onClick={share} aria-label={t.shareLabel.replace("{title}", a.title)}><Icon name="share" /></button>
         </div>
       </div>
       <img className="detail-hero" src={a.image} alt="" />
@@ -41,10 +47,16 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
             <span key={d}><i><Icon name={i === 0 ? "user" : i === 1 ? "compass" : i === 2 ? "heart" : "globe"} size={18} /></i>{d}</span>
           ))}
         </div>
+        {a.safety && (
+          <aside className="safety-note" aria-label={t.safetyTitle}>
+            <Icon name="shield" size={20} />
+            <div><strong>{t.safetyTitle}</strong><p>{a.safety}</p></div>
+          </aside>
+        )}
         <h2>{t.materials}</h2>
         <div className="material-list">
           {a.materials.map((m, i) => (
-            <button className={checked.includes(i) ? "checked" : ""} onClick={() => setChecked(checked.includes(i) ? checked.filter(x => x !== i) : [...checked, i])} key={m}>
+            <button className={checked.includes(i) ? "checked" : ""} aria-pressed={checked.includes(i)} onClick={() => setChecked(checked.includes(i) ? checked.filter(x => x !== i) : [...checked, i])} key={m}>
               <i>{checked.includes(i) && <Icon name="check" size={13} />}</i>{m}
             </button>
           ))}

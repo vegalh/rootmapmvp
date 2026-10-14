@@ -4,9 +4,9 @@ import ActivityPicker from "../components/ActivityPicker";
 import { catalogCategories, findActivity } from "../lib/catalog";
 import type { RecordInput } from "../lib/activityRecords";
 import { localIsoToday } from "../lib/dates";
-import { photoUrl } from "../lib/photos";
 import type { Child, LessonRecord } from "../types";
 import { childAge, discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { childOptionLabel, childPhotoSrc, isActiveChild } from "../lib/children";
 
 // The activity being recorded: one from the catalog, or the parent's own.
 type Choice = { activityId: string } | { custom: true };
@@ -77,6 +77,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
   const activity = "activityId" in choice ? findActivity(choice.activityId) : undefined;
   const a = activity && localizeActivity(activity, t);
   const child = childrenData.find(c => c.id === childId);
+  const validChild = isActiveChild(childrenData, childId);
   const [title, setTitle] = useState("");
   const [area, setArea] = useState("");
   const [date, setDate] = useState(localIsoToday());
@@ -87,6 +88,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
 
   const submit = async () => {
     if (saving.current) return;
+    if (!validChild) { setError(t.chooseChildFirst); return; }
     saving.current = true;
     const failure = await save(activity
       ? { childId, date, activityId: activity.id, notes }
@@ -99,18 +101,18 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
   return (
     <main className="form-page">
       <PageHeader title={t.addActivity} back={change} />
-      {lockChild && child ? (
+      {child && validChild ? (
         <section className="form-child">
-          <img src={photoUrl(child.photo)} alt="" />
+          <img src={childPhotoSrc(child)} alt="" />
           <span><small>{t.recordingFor.toUpperCase()}</small><strong>{child.first} {child.last}</strong><em>{childAge(child, t)}</em></span>
         </section>
       ) : null}
       <div className="form-fields">
         {!lockChild && (
           <Field label={t.childLabel}>
-            <select value={childId} onChange={e => { setChildId(e.target.value); setError(""); }}>
-              {!child && <option value="" disabled>{t.selectChild}</option>}
-              {childrenData.map(c => <option value={c.id} key={c.id}>{c.first} {c.last}</option>)}
+            <select value={validChild ? childId : ""} onChange={e => { setChildId(e.target.value); setError(""); }} aria-invalid={!validChild}>
+              {!validChild && <option value="" disabled>{t.selectChild}</option>}
+              {childrenData.map(c => <option value={c.id} key={c.id}>{childOptionLabel(c, childrenData, t)}</option>)}
             </select>
           </Field>
         )}
@@ -149,7 +151,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
         {error && <p className="journal-status error" role="alert">{error}</p>}
       </div>
       <div className="form-bottom">
-        <button onClick={submit}>{t.save}</button>
+        <button onClick={submit} disabled={!validChild}>{t.save}</button>
         <button onClick={cancel}>{t.cancel}</button>
       </div>
     </main>

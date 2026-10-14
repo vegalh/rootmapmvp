@@ -70,6 +70,7 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-child-filters": "object",
   "rootmap-seed-version": "number",
   "rootmap-seed-ids": "array",
+  "rootmap-no-demo": "boolean",
   "rootmap-migrated-legacy": "array",
   "rootmap-last-backup": "string",
   "rootmap-personal-notes": "text",
