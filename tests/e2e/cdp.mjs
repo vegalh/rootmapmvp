@@ -52,7 +52,9 @@ export class Page {
       if (m.method === "Runtime.exceptionThrown") this.errors.push(`exception: ${m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text}`);
       if (m.method === "Log.entryAdded" && m.params.entry.level === "error" && !/favicon\.ico/.test(m.params.entry.url || "")) this.errors.push(`log: ${m.params.entry.text} ${m.params.entry.url || ""}`);
       if (m.method === "Page.javascriptDialogOpening") {
+        // The app asks with its own dialogs; a native alert/confirm/prompt is a regression (step fails on errors).
         this.dialogs.push(m.params.message);
+        this.errors.push(`native ${m.params.type} dialog: ${m.params.message}`);
         this.send("Page.handleJavaScriptDialog", { accept: true, promptText: this.promptText ?? m.params.defaultPrompt });
       }
     };
@@ -96,6 +98,15 @@ export class Page {
       await sleep(80);
     }
     throw new Error(`waitFor timed out: ${label} (last: ${JSON.stringify(last)?.slice(0, 200)})`);
+  }
+  // Answers the app's confirmation dialog (ConfirmDialog in components/ui.tsx) with its confirm button, or with
+  // Cancel; resolves to the dialog's text once it has closed.
+  async confirmDialog({ cancel = false } = {}) {
+    await this.waitFor(`document.querySelector(".confirm-dialog [data-confirm]:not(:disabled)")`, 5000, "confirmation dialog");
+    const text = await this.eval(`document.querySelector(".confirm-dialog").innerText`);
+    await this.eval(`document.querySelector(".confirm-dialog ${cancel ? "[data-cancel]" : "[data-confirm]"}").click()`);
+    await this.waitFor(`!document.querySelector(".confirm-dialog")`, 5000, "confirmation dialog closed");
+    return text;
   }
   async setFiles(selector, files) {
     const { root } = await this.send("DOM.getDocument", { depth: -1 });

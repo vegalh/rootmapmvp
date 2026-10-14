@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CopyContext, Shell, PageHeader } from "./components/ui";
+import { ConfirmProvider, CopyContext, Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
 import { TodayPage } from "./pages/TodayPage";
@@ -659,14 +659,8 @@ export default function App() {
           }}
           edit={() => setModal("editChild")}
           remove={async () => {
-            // The child's journal entries, activity records, plans and drafts are never deleted with the profile;
-            // the warning says how much is attached so nothing disappears from view unexpectedly.
-            const entryCount = entries.filter(e => e.childId === child.id).length;
-            const recordCount = records.filter(r => r.childId === child.id).length;
-            const message = entryCount || recordCount
-              ? t.confirmDeleteChildWithData.split("{name}").join(child.first).replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))
-              : t.confirmDeleteChild.replace("{name}", `${child.first} ${child.last}`.trim());
-            if (!window.confirm(message)) return;
+            // Runs once the parent confirms in the page's dialog. The child's journal entries, activity records,
+            // plans and drafts are never deleted with the profile.
             // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
             if (!savedOk(await commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
             goBack("children");
@@ -824,7 +818,7 @@ export default function App() {
           records={records}
           restore={async d => {
             if (childrenData.some(c => c.id === d.id)) return;
-            if (!window.confirm(t.confirmRestoreChild.replace("{name}", `${d.first} ${d.last}`.trim()))) return;
+            // Runs once the parent confirms in the page's dialog.
             // Clearing deletedAt brings the same record (same id) back, with its entries and records.
             const { deletedAt: _deletedAt, ...profile } = d;
             if (!savedOk(await commitChildren([...childrenData, profile]))) return;
@@ -839,7 +833,7 @@ export default function App() {
     if (screen === "notifications") {
       return <NotificationsPage back={() => goBack("children")} t={t} />;
     }
-    return <SettingsPage screen={screen} back={() => goBack(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} t={t} />;
+    return <SettingsPage screen={screen} back={() => goBack(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
   };
 
   if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {
@@ -866,6 +860,7 @@ export default function App() {
 
   return (
     <CopyContext.Provider value={t}>
+    <ConfirmProvider>
     <div className="app-shell">
       <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel}>
         {content()}
@@ -883,11 +878,13 @@ export default function App() {
         selectedChild={selectedChild}
         saveTried={saveTried}
         addMemory={(childId, date) => { setModal(null); startEntry("activity", childId, { title: localizeActivity(activity, t).title, date }); }}
+        notify={setToast}
         t={t}
       />
       {toast && <div className="toast" role="status">{toast}</div>}
       {isBeta && <BetaNotice t={t} />}
     </div>
+    </ConfirmProvider>
     </CopyContext.Provider>
   );
 }

@@ -11,6 +11,8 @@
   --lavender: #e3ebe0;
   --silver: #ded0ba;
   --orange: #d98b62;
+  /* Destructive actions: a deeper shade of the orange, readable with white text. */
+  --danger: #b5582f;
   --apricot: #fbe9d7;
   --text: #3b2a1a;
   --muted: #8a7863;
@@ -28,7 +30,7 @@
   --bg: #141a16; --card: #1e2620; --elevated: #26302a; --primary: #8fcf9a;
   --dark-purple: #f3f7f0; --lavender: #26302a; --silver: #3a443c; --text: #f3f7f0;
   --muted: #b9c2b4; --border: #3a443c; --apricot: #3a2c22; --shadow: 0 8px 24px rgba(0,0,0,.3);
-  --backdrop: #0d110e;
+  --backdrop: #0d110e; --danger: #f0a07c;
   /* Native controls (date pickers, selects, scrollbars) follow the theme too. */
   color-scheme: dark;
 }
@@ -198,6 +200,14 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .restore-summary { display: flex; flex-direction: column; gap: 4px; padding: 11px 13px; border-radius: 13px; background: var(--card); }.restore-summary strong { font-size: 15px; }.restore-summary span { color: var(--muted); font-size: 14px; line-height: 1.5; }
 .restore-warning { margin: 12px 0; padding: 11px 13px; border-radius: 13px; background: var(--apricot); font-size: 14.5px; line-height: 1.5; }.restore-step { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
 .sheet-buttons.even { grid-template-columns: 1fr 1fr; }.sheet-buttons button.danger { padding: 0 6px;  color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* Confirmation dialog (ConfirmDialog in components/ui.tsx): centered in the app frame, above any open sheet. */
+.confirm-overlay { z-index: 85; align-items: center; padding: 16px; }
+.confirm-dialog { width: min(100%, 360px); max-height: 100%; overflow-y: auto; background: var(--bg); border-radius: 24px; padding: 22px 20px 18px; box-shadow: 0 15px 50px rgba(23,19,30,.25); animation: confirm-in .18s ease-out; }
+@keyframes confirm-in { from { transform: scale(.96); opacity: 0; } }
+.confirm-dialog h2 { margin: 0; font: 600 26px/1.2 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
+.confirm-body { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.6; }.confirm-body p { margin: 0; }
+.confirm-facts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; padding: 11px 13px; border-radius: 13px; background: var(--card); border: 1px solid var(--border); }.confirm-facts div { display: flex; justify-content: space-between; gap: 10px; color: var(--text); font-size: 15px; }.confirm-facts strong { font-variant-numeric: tabular-nums; }
+.sheet-buttons button.destructive { color: white; background: var(--danger); border: 0; }:root[data-theme="dark"] .sheet-buttons button.destructive { color: #17131e; }
 .record-detail { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 13px; border-radius: 13px; background: var(--card); }.record-detail p { margin: 0; font-size: 15px; }.record-detail .record-notes { color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
 /* Opening experience (src/components/OpeningExperience.tsx): link colours from the original design. */
 .opening-link { position: relative; color: #2f4d3d; }.opening-link:hover { color: #4b7c63; }
@@ -288,7 +298,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .entry-child-pick strong { display: block; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-child-pick svg { color: var(--muted); }
 .entry-child-pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.toast { position: fixed; z-index: 60; left: 50%; bottom: 112px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px; color: white; background: var(--dark-purple); font-size: 14.5px; font-weight: 600; box-shadow: var(--shadow); text-align: center; }
+.toast { position: fixed; z-index: 90; left: 50%; bottom: 112px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px; color: white; background: var(--dark-purple); font-size: 14.5px; font-weight: 600; box-shadow: var(--shadow); text-align: center; }
 :root[data-theme="dark"] .toast { color: #17131e; }
 
 /* My Goals: the parent's own short list of intentions. */

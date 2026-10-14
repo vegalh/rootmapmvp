@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { useSetting } from "../lib/data/hooks";
 import type { Screen } from "../types";
@@ -171,6 +171,92 @@ export function Modal({ title, close, children: content }: { title: string; clos
         <i />
         <header><h2>{title}</h2><button onClick={() => close()} aria-label={t.close}>×</button></header>
         {content}
+      </section>
+    </div>
+  );
+}
+
+// A question before an action, centered in the app frame (the browser's own confirm() would open outside it).
+// `onConfirm` runs while the dialog stays open and shows it's busy, so a second tap can't repeat the action; the
+// dialog closes when it settles. Cancel, Escape and tapping outside do nothing else.
+export type ConfirmRequest = {
+  title: string;
+  body?: React.ReactNode;
+  confirmLabel: string;
+  destructive?: boolean;
+  onConfirm: () => unknown;
+};
+
+// The newest value of a prop, for a confirmed action: it runs after the parent decides, so it must act on the data
+// as it is then (a sync may have arrived while the question was open), not as it was when the dialog opened.
+export function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
+const ConfirmContext = createContext<(request: ConfirmRequest) => void>(() => {});
+export const useConfirm = () => useContext(ConfirmContext);
+
+export function ConfirmProvider({ children: content }: { children: React.ReactNode }) {
+  const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  // While one question is open, another can't replace it.
+  const ask = useCallback((next: ConfirmRequest) => setRequest(current => current ?? next), []);
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {content}
+      {request && <ConfirmDialog request={request} close={() => setRequest(null)} />}
+    </ConfirmContext.Provider>
+  );
+}
+
+function ConfirmDialog({ request, close }: { request: ConfirmRequest; close: () => void }) {
+  const t = useContext(CopyContext);
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const dialog = useRef<HTMLElement>(null);
+  const id = useId();
+  const cancel = () => { if (!running.current) close(); };
+
+  // Focus starts on the safe choice (Cancel for a destructive action) and returns to the opener afterwards.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialog.current?.querySelector<HTMLButtonElement>(request.destructive ? "[data-cancel]" : "[data-confirm]")?.focus();
+    return () => { if (opener?.isConnected) opener.focus(); };
+  }, []);
+
+  // Escape cancels only this dialog (not a sheet underneath), and Tab stays inside it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cancel(); return; }
+      if (e.key !== "Tab" || !dialog.current) return;
+      const buttons = [...dialog.current.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+      if (!buttons.length) { e.preventDefault(); return; }
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (!dialog.current.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  });
+
+  const confirm = async () => {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    try { await request.onConfirm(); } finally { close(); }
+  };
+
+  return (
+    <div className="overlay confirm-overlay" onMouseDown={e => { if (e.target === e.currentTarget) cancel(); }}>
+      <section ref={dialog} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={request.body ? `${id}-body` : undefined} aria-busy={busy}>
+        <h2 id={`${id}-title`}>{request.title}</h2>
+        {request.body && <div id={`${id}-body`} className="confirm-body">{request.body}</div>}
+        <div className="sheet-buttons even">
+          <button data-cancel onClick={cancel} disabled={busy}>{t.cancel}</button>
+          <button data-confirm className={request.destructive ? "destructive" : undefined} onClick={() => void confirm()} disabled={busy}>{request.confirmLabel}</button>
+        </div>
       </section>
     </div>
   );

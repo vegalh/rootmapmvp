@@ -58,6 +58,7 @@ html:lang(zh) {
 .section-title h2:lang(zh),
 .detail-content h2:lang(zh),
 .bottom-sheet h2:lang(zh),
+.confirm-dialog h2:lang(zh),
 .user-summary h2:lang(zh),
 .info-card h2:lang(zh) {
   font-family: var(--font-heading-zh);

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
-import { Modal } from "../components/ui";
+import { Modal, useConfirm, useLatest } from "../components/ui";
 import { draftKey, readDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
@@ -33,7 +33,7 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
   edit: () => void;
   back: () => void;
   record: () => void;
-  remove: () => void;
+  remove: () => Promise<void>;
   // Corrects one record's date, notes or child; resolves to an error message, or null once stored.
   editRecord: (id: string, patch: { date: string; notes: string; childId: string }) => Promise<string | null>;
   // Deletes one activity record by id; false (with an error already shown) when the device couldn't save.
@@ -42,6 +42,25 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
 }) {
   // Several attempts on the same day keep the order they were recorded in (newest first).
   const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const confirm = useConfirm();
+  const latestRemove = useLatest(remove);
+  // The profile is soft-deleted: its Moments and activity records stay, so the question says how many come back
+  // with it from Recently Deleted.
+  const confirmRemove = () => confirm({
+    title: t.deleteChildTitle.replace("{name}", childOptionLabel(child, childrenData, t)),
+    body: (
+      <>
+        <div className="confirm-facts">
+          <div><span>{t.deleteChildMoments}</span><strong>{entries.filter(e => e.childId === child.id).length}</strong></div>
+          <div><span>{t.deleteChildRecords}</span><strong>{lessons.length}</strong></div>
+        </div>
+        <p>{t.deleteChildRestoreNote.split("{name}").join(child.first)}</p>
+      </>
+    ),
+    confirmLabel: t.deleteChild,
+    destructive: true,
+    onConfirm: () => latestRemove.current(),
+  });
   return (
     <main className="child-profile">
       <header className="child-header">
@@ -49,7 +68,7 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
         <TreeLogo />
         <div className="child-header-actions">
           <button onClick={edit}>{t.edit}</button>
-          <button onClick={remove} aria-label={t.deleteChildLabel.replace("{name}", child.first)}><Icon name="trash" size={18} /></button>
+          <button onClick={confirmRemove} aria-label={t.deleteChildLabel.replace("{name}", child.first)}><Icon name="trash" size={18} /></button>
         </div>
       </header>
       <section className="profile-hero">
@@ -132,6 +151,8 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, t }
   // Record shown in the detail sheet, where a mistaken one can be corrected or deleted.
   const [open, setOpen] = useState<LessonRecord>();
   const [editing, setEditing] = useState(false);
+  const confirm = useConfirm();
+  const latestDelete = useLatest(deleteRecord);
   const view = open && recordView(open, t);
   const close = () => { setOpen(undefined); setEditing(false); };
   return (
@@ -177,8 +198,13 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, t }
               className="danger"
               onClick={() => {
                 // Removes only this record (by id): other attempts, the Discover activity and journal entries stay.
-                if (!window.confirm(t.confirmDeleteRecord)) return;
-                void deleteRecord(open.id).then(ok => ok && close());
+                confirm({
+                  title: t.confirmDeleteRecord,
+                  body: <p>{t.confirmDeleteRecordBody}</p>,
+                  confirmLabel: t.deleteRecord,
+                  destructive: true,
+                  onConfirm: () => latestDelete.current(open.id).then(ok => ok && close()),
+                });
               }}
             ><Icon name="trash" size={17} />{t.deleteRecord}</button>
             <button onClick={() => setEditing(true)}>{t.editRecord}</button>

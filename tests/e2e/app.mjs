@@ -308,9 +308,27 @@ await step("19. Delete a child (soft delete, one write) and restore it (same id,
   await nav("Kids");
   await page.eval(`__t.click("小明", ".child-select-card")`);
   await page.waitFor(`document.querySelector(".profile-hero")`);
+  // Cancel (and Escape, and tapping outside) leave the child exactly as they were.
   await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
+  await page.confirmDialog({ cancel: true });
+  await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
+  await page.waitFor(`document.querySelector(".confirm-dialog")`);
+  await page.eval(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog")`, 3000, "Escape cancels");
+  await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
+  await page.waitFor(`document.querySelector(".confirm-dialog")`);
+  await page.eval(`document.querySelector(".confirm-overlay").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog")`, 3000, "tapping outside cancels");
+  assert.ok(!(await page.eval(`__t.all("children").then(c => c.find(x => x.id === "c-1760000000000").deletedAt)`)), "not deleted");
+  // The question names the child, counts what stays attached, and says where to restore from.
+  await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
+  await page.waitFor(`document.querySelector(".confirm-dialog [data-confirm]")`);
+  assert.equal(await page.eval(`document.activeElement?.hasAttribute("data-cancel")`), true, "focus starts on Cancel");
+  const asked = await page.eval(`document.querySelector(".confirm-dialog").innerText`);
+  assert.ok(/Delete 小明/.test(asked) && /Moments\s*2/.test(asked) && /Activity records\s*\d/.test(asked) && asked.includes("Recently Deleted Children"), asked);
+  // A double tap on Delete Child is one deletion.
+  await page.eval(`document.querySelector(".confirm-dialog [data-confirm]").click(); document.querySelector(".confirm-dialog [data-confirm]")?.click()`);
   await page.waitFor(`__t.all("children").then(c => c.find(x => x.id === "c-1760000000000").deletedAt)`);
-  assert.ok(page.dialogs.at(-1).includes("Journal entries: 2"), page.dialogs.at(-1));
   const afterDelete = await dump();
   assert.equal(afterDelete.entries.filter(e => e.childId === "c-1760000000000" && !e.deletedAt).length, 2, "entries kept");
   await page.waitFor(`!document.body.innerText.includes("小明")`);
@@ -319,6 +337,7 @@ await step("19. Delete a child (soft delete, one write) and restore it (same id,
   await page.waitFor(`document.body.innerText.includes("小明") && document.body.innerText.includes("Zoë")`);
   await page.waitFor(`__t.imagesLoaded(".deleted-row img").every(i => i.ok)`, 5000, "deleted child photos");
   await page.eval(`[...document.querySelectorAll(".deleted-row")].find(r => r.innerText.includes("小明")).querySelector("button").click()`);
+  assert.ok((await page.confirmDialog()).includes("Restore 小明"));
   await page.waitFor(`document.querySelector(".toast")?.textContent.includes("restored")`);
   const now = await dump();
   const c = now.children.find(x => x.id === "c-1760000000000");
@@ -333,6 +352,7 @@ await step("Restore a migrated deleted child (Zoë) and her migrated entry + pho
   await page.eval(`__t.click("Recently Deleted Children")`);
   await page.waitFor(`document.body.innerText.includes("Zoë")`);
   await page.eval(`[...document.querySelectorAll(".deleted-row")].find(r => r.innerText.includes("Zoë")).querySelector("button").click()`);
+  await page.confirmDialog();
   await page.waitFor(`document.querySelector(".toast")?.textContent.includes("restored")`);
   await nav("Moments");
   await page.waitFor(`document.body.innerText.includes("Zoë's garden")`);
@@ -343,6 +363,7 @@ await step("Other soft deletes: deleting an entry and a goal keeps them stored b
   await page.eval(`__t.click("Zoë's garden", ".journal-card")`);
   await page.waitFor(`document.querySelector(".journal-entry")`);
   await page.eval(`document.querySelector('.journal-editor-bar button[aria-label]').click()`);
+  await page.confirmDialog();
   await page.waitFor(`document.querySelector(".toast")?.textContent === "Deleted"`);
   const e = (await page.eval(`__t.all("entries")`)).find(x => x.id === "m-1760000000002-zzzzzz");
   assert.ok(e && e.deletedAt && e.photos.length === 1, "entry tombstoned, still identifiable");

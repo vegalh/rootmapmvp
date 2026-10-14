@@ -9,7 +9,7 @@ import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
 import { discoverCategoryLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 import { childOptionLabel, childPhotoSrc, childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
-export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, t }: {
+export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
   modal: ModalKind;
   close: (destination?: Screen | ModalKind) => void;
   childrenData: Child[];
@@ -24,6 +24,8 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   selectedChild: string;
   // Records that `childId` tried the selected activity; resolves to an error message when it couldn't be stored.
   saveTried: (childId: string, date: string, notes: string) => Promise<string | null>;
+  // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
+  notify: (message: string) => void;
   // Opens the Moments editor for `childId`, prefilled with the selected activity as context.
   addMemory: (childId: string, date: string) => void;
   t: Copy;
@@ -68,7 +70,7 @@ export function ModalOverlay({ modal, close, childrenData, setChildrenData, filt
   // Profile pictures are shown as small avatars, so they're downscaled before being stored on this device.
   const pickPhoto = (file: File | undefined, onLoad: (ref: string) => void) => {
     if (!file) return;
-    addPhoto(file, 640, 0.85).then(onLoad, (e: Error) => window.alert(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
+    addPhoto(file, 640, 0.85).then(onLoad, (e: Error) => notify(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
   };
 
   const childProblem = childFormProblem(name, dob, t);

@@ -1,4 +1,4 @@
-import { Empty, PageHeader } from "../components/ui";
+import { Empty, PageHeader, useConfirm, useLatest } from "../components/ui";
 import { fmtLong } from "../lib/dates";
 import type { Child, DeletedChild, Entry, Lang, LessonRecord } from "../types";
 import type { Copy } from "../lib/i18n";
@@ -11,11 +11,13 @@ export function DeletedChildrenPage({ deleted, childrenData, entries, records, r
   childrenData: Child[];
   entries: Entry[];
   records: LessonRecord[];
-  restore: (child: DeletedChild) => void;
+  restore: (child: DeletedChild) => Promise<void>;
   back: () => void;
   lang: Lang;
   t: Copy;
 }) {
+  const confirm = useConfirm();
+  const latestRestore = useLatest(restore);
   const shown = [...deleted].sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || ""));
   return (
     <main className="simple-page">
@@ -38,7 +40,12 @@ export function DeletedChildrenPage({ deleted, childrenData, entries, records, r
                 </span>
                 {active
                   ? <em>{t.alreadyInChildren}</em>
-                  : <button onClick={() => restore(c)}>{t.restoreChild}</button>}
+                  : <button onClick={() => confirm({
+                      title: t.confirmRestoreChild.replace("{name}", `${c.first} ${c.last}`.trim()),
+                      body: <p>{t.deletedChildData.replace("{entries}", String(entryCount)).replace("{records}", String(recordCount))}</p>,
+                      confirmLabel: t.restoreChild,
+                      onConfirm: () => latestRestore.current(c),
+                    })}>{t.restoreChild}</button>}
               </div>
             );
           })}

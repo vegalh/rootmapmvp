@@ -8,8 +8,10 @@ import { saveSetting } from "../lib/data/hooks";
 import { readSetting } from "../lib/data/store";
 import { addPhoto, photoUrl } from "../lib/photos";
 
-export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, t }: {
+export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, notify, t }: {
   screen: Screen;
+  // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
+  notify: (message: string) => void;
   back: () => void;
   lang: Lang;
   setLang: (l: Lang) => void;
@@ -79,7 +81,7 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
     // Downscaled like child photos (it's shown as a small avatar) and stored on this device.
     const pickPhoto = (file: File | undefined) => {
       if (!file) return;
-      addPhoto(file, 640, 0.85).then(setPhoto, (e: Error) => window.alert(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
+      addPhoto(file, 640, 0.85).then(setPhoto, (e: Error) => notify(e.message === "full" ? t.storageFull : e.message === "failed" ? t.storageFailed : t.photoUnsupported));
     };
     return (
       <main className="simple-page">

@@ -241,8 +241,13 @@ await step("Records persist after a refresh; deleting one leaves Moments and oth
   const all = (await live("records")).length;
   await page.eval(`[...document.querySelectorAll(".lesson-list > button")].find(b => b.innerText.startsWith("Climbing at the playground")).click()`);
   await page.waitFor(`document.querySelector(".overlay .record-detail")`, 3000, "detail");
-  await page.eval(`window.confirm = () => true`);
   await page.eval(`__t.clickSel(".overlay .danger")`);
+  // The question opens above the record sheet; Escape closes only the question.
+  await page.waitFor(`document.querySelector(".confirm-dialog")`, 3000, "question");
+  await page.eval(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await page.waitFor(`!document.querySelector(".confirm-dialog") && document.querySelector(".overlay .record-detail")`, 3000, "sheet stays");
+  await page.eval(`__t.clickSel(".overlay .danger")`);
+  assert.ok((await page.confirmDialog()).includes("Only this attempt is removed"));
   await page.waitFor(`!document.querySelector(".overlay")`, 3000, "deleted");
   assert.equal((await live("records")).length, all - 1);
   assert.equal((await live("entries")).length, entriesBefore.length, "Moments untouched");

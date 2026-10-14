@@ -1,4 +1,5 @@
 import { Icon } from "../components/Icon";
+import { useConfirm, useLatest } from "../components/ui";
 import { fmtLong } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
@@ -13,17 +14,19 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
   lang: Lang;
   back: () => void;
   edit: () => void;
-  remove: () => void;
+  remove: () => Promise<void>;
   t: Copy;
 }) {
   const text = entryText(entry, lang);
+  const confirm = useConfirm();
+  const latestRemove = useLatest(remove);
   return (
     <main className="journal-entry">
       <header className="journal-editor-bar">
         <button onClick={back}><Icon name="back" size={18} />{t.back}</button>
         <div>
           <button onClick={edit}>{t.editEntry}</button>
-          <button aria-label={t.deleteEntry} onClick={() => { if (window.confirm(t.confirmDeleteEntry)) remove(); }}><Icon name="trash" size={18} /></button>
+          <button aria-label={t.deleteEntry} onClick={() => confirm({ title: t.confirmDeleteEntry, body: <p>{t.confirmDeleteEntryBody}</p>, confirmLabel: t.deleteEntry, destructive: true, onConfirm: () => latestRemove.current() })}><Icon name="trash" size={18} /></button>
         </div>
       </header>
       {child && (

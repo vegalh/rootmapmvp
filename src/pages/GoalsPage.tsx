@@ -2,7 +2,7 @@ import { useState } from "react";
 import { newRecordId } from "../lib/data/schema";
 import { readSetting } from "../lib/data/store";
 import { Icon } from "../components/Icon";
-import { PageHeader } from "../components/ui";
+import { PageHeader, useConfirm, useLatest } from "../components/ui";
 import type { Goal } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -17,6 +17,8 @@ export function GoalsPage({ goals, setGoals, back, openNotes, t }: {
 }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const latest = useLatest({ goals, setGoals });
   const active = goals.filter(g => !g.completed);
   const completed = goals.filter(g => g.completed).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
   const hasLegacyNotes = Boolean(readSetting("rootmap-personal-notes", "").trim());
@@ -27,11 +29,15 @@ export function GoalsPage({ goals, setGoals, back, openNotes, t }: {
     setGoals(goals.map(x => (x.id === id ? { ...x, title, description: description || undefined } : x)));
     setEditing(null);
   };
-  const remove = (id: string) => {
-    if (!window.confirm(t.confirmDeleteGoal)) return;
-    setGoals(goals.filter(x => x.id !== id));
-    setEditing(null);
-  };
+  const remove = (id: string) => confirm({
+    title: t.confirmDeleteGoal,
+    confirmLabel: t.deleteGoal,
+    destructive: true,
+    onConfirm: () => {
+      latest.current.setGoals(latest.current.goals.filter(x => x.id !== id));
+      setEditing(null);
+    },
+  });
 
   const row = (g: Goal) =>
     editing === g.id ? (

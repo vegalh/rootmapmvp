@@ -164,8 +164,8 @@ await step("A removed child can't receive anything: not preselected, not offered
   const leo = (await live("children")).find(c => c.first === "Leo");
   await page.eval(`location.hash = ${q(`#/child/${leo.id}`)}`);
   await page.waitFor(`document.querySelector(".child-profile")`, 3000, "Leo");
-  await page.eval(`window.confirm = () => true`);
   await page.eval(`document.querySelector(".child-header-actions button:last-child").click()`);
+  await page.confirmDialog();
   await page.waitFor(`!document.querySelector(".child-profile")`, 3000, "removed");
   const recordsBefore = (await page.eval(`__t.all("records")`)).filter(r => r.childId === leo.id).length;
   // The page of the removed child is gone (its address opens Kids), and no form offers him.
