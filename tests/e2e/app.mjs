@@ -203,7 +203,7 @@ await step("16. Create a new Moment with 3 large camera-sized photos (one ~13 MB
   await page.nav(`${BASE}/`);
   await appReady();
   await nav("Moments");
-  await page.eval(`__t.type(".moments-controls select", "c-1760000000000")`);
+  await page.eval(`__t.clickSel(".moments-controls .child-chips [data-child='c-1760000000000']")`);
   await page.eval(`__t.click("Add Moment")`);
   await page.waitFor(`document.querySelector(".journal-text-input")`);
   await page.setFiles(".journal-add-photo input[type=file]", ["landscape.png", "noise.png", "portrait.png"].map(f => path.join(IMG, f)));
@@ -229,7 +229,7 @@ await step("16. Create a new Moment with 3 large camera-sized photos (one ~13 MB
 
 await step("17. Edit an existing entry: same id, createdAt kept, photos kept, updatedAt changes", async () => {
   const orig = db.entries.find(x => x.id === "m-1760000000000-a1b2c3");
-  await page.eval(`__t.type(".moments-controls select", "All")`);
+  await page.eval(`__t.clickSel(".moments-controls .child-chips [data-child='All']")`);
   await page.waitFor(`document.body.innerText.includes("第一次骑车")`);
   await page.eval(`__t.click("第一次骑车", ".journal-card")`);
   await page.waitFor(`document.querySelector(".journal-entry")`);
@@ -252,7 +252,7 @@ await step("17. Edit an existing entry: same id, createdAt kept, photos kept, up
 
 await step("Drafts: autosave, survive refresh, resume without duplicating", async () => {
   await nav("Moments");
-  await page.eval(`__t.type(".moments-controls select", "noah")`);
+  await page.eval(`__t.clickSel(".moments-controls .child-chips [data-child='noah']")`);
   await page.eval(`__t.click("Add Moment")`);
   await page.waitFor(`document.querySelector(".journal-text-input")`);
   await page.eval(`__t.type(".journal-text-input", "Leo stacked five blocks")`);
@@ -261,7 +261,7 @@ await step("Drafts: autosave, survive refresh, resume without duplicating", asyn
   await page.reload();
   await appReady();
   await nav("Moments");
-  await page.eval(`__t.type(".moments-controls select", "noah")`);
+  await page.eval(`__t.clickSel(".moments-controls .child-chips [data-child='noah']")`);
   await page.waitFor(`document.body.innerText.includes("Continue writing")`);
   await page.eval(`__t.click("Continue writing", "button")`);
   await page.waitFor(`document.querySelector(".journal-text-input")?.value === "Leo stacked five blocks"`);

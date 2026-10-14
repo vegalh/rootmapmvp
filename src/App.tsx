@@ -16,6 +16,7 @@ import { RecordFormPage } from "./pages/RecordFormPage";
 import { EntryEditorPage } from "./pages/EntryEditorPage";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
+import { WeeklyRecapPage } from "./pages/WeeklyRecapPage";
 import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
@@ -135,10 +136,15 @@ export default function App() {
   const [recordFrom, setRecordFrom] = useState<"child" | "quick">(start.screen === "record" && start.child ? "child" : "quick");
   // Entry being viewed/edited; undefined in the editor means "new entry".
   const [selectedEntry, setSelectedEntry] = useState<string | undefined>(start.entry);
+  // Weekly recap: the week shown ("" lets the page choose) and the child it is narrowed to ("" = every child).
+  const [recapWeek, setRecapWeek] = useState(start.week ?? "");
+  const [recapChild, setRecapChild] = useState(start.screen === "recap" ? start.child ?? "" : "");
+  // An activity record to open on its child's Activities tab (Today's Looking Back); cleared once it is shown.
+  const [focusRecord, setFocusRecord] = useState<string>();
   // Where the current entry flow started, so detail/editor return there ("child" = that child's Journal,
   // "activity" = the activity page a memory was added from after marking it as tried, "today" = Looking Back,
   // "children" = Recent moments on Kids).
-  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today" | "children">("moments");
+  const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today" | "children" | "recap">("moments");
   // Child preselected for a new entry.
   const [editorChild, setEditorChild] = useState<string | undefined>(start.screen === "entryEdit" ? start.child : undefined);
   // Editable starting title/date for a new entry (the activity just marked as tried).
@@ -352,7 +358,8 @@ export default function App() {
     screen,
     activity: selectedActivity,
     book: selectedBook,
-    child: screen === "record" ? (recordFrom === "child" ? selectedChild : undefined) : screen === "entryEdit" ? editorChild : selectedChild,
+    child: screen === "record" ? (recordFrom === "child" ? selectedChild : undefined) : screen === "entryEdit" ? editorChild : screen === "recap" ? recapChild || undefined : selectedChild,
+    week: recapWeek || undefined,
     entry: selectedEntry,
     discoverTab,
     childTab: childTab === "Activities" ? "Activities" : "Journal",
@@ -372,7 +379,7 @@ export default function App() {
     if (window.location.hash === hash) return;
     if (isBack && h.idx > 0 && h.stack[h.idx - 1] === hash) { window.history.back(); return; }
     // Switching tabs within a page (Discover's tabs, a child's tabs) updates the address without a new entry.
-    const sameScreen = h.stack[h.idx]?.split("/")[1]?.split("?")[0] === hash.split("/")[1]?.split("?")[0] && (screen === "discover" || screen === "child");
+    const sameScreen = h.stack[h.idx]?.split("/")[1]?.split("?")[0] === hash.split("/")[1]?.split("?")[0] && (screen === "discover" || screen === "child" || screen === "recap");
     if (sameScreen || isBack) {
       window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", hash);
       h.stack[h.idx] = hash;
@@ -403,6 +410,7 @@ export default function App() {
       if (r.screen === "child" || r.screen === "record") setSelectedChild(r.child ?? "");
       if (r.screen === "record") setRecordFrom(r.child ? "child" : "quick");
       if (r.screen === "entry" || r.screen === "entryEdit") setSelectedEntry(r.entry);
+      if (r.screen === "recap") { setRecapWeek(r.week ?? ""); setRecapChild(r.child ?? ""); }
       if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
       setScreen(r.screen);
       window.scrollTo({ top: 0 });
@@ -429,8 +437,8 @@ export default function App() {
   const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
   const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
   const toggleSaved = (id: string) => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
-  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : "observations";
-  const openEntry = (id: string, origin: "moments" | "child" | "today" | "children") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
+  const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : entryOrigin === "recap" ? "recap" : "observations";
+  const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
     if (!childrenData.length) { setModal("addChild"); return; }
     setSelectedEntry(undefined);
@@ -544,6 +552,9 @@ export default function App() {
           lang={lang}
           openActivity={openActivity}
           openEntry={id => openEntry(id, "today")}
+          openRecord={(childId, recordId) => { setSelectedChild(childId); setChildTab("Activities"); setFocusRecord(recordId); go("child"); }}
+          openRecap={week => { setRecapWeek(week); setRecapChild(""); go("recap"); }}
+          openDiscover={() => { setDiscoverTab("activities"); go("discover"); }}
           openAddChild={() => setModal("addChild")}
           t={t}
         />
@@ -627,6 +638,7 @@ export default function App() {
           lang={lang}
           open={id => openEntry(id, "moments")}
           write={childId => startEntry("moments", childId)}
+          openRecap={childId => { setRecapWeek(""); setRecapChild(childId ?? ""); go("recap"); }}
           back={() => goBack("children")}
           t={t}
         />
@@ -669,6 +681,8 @@ export default function App() {
           record={() => { setRecordFrom("child"); go("record"); }}
           childrenData={childrenData}
           editRecord={editActivityRecord}
+          focusRecord={focusRecord}
+          focusedRecord={() => setFocusRecord(undefined)}
           deleteRecord={async id => {
             if (!savedOk(await commitRecords(records.filter(r => r.id !== id)))) return false;
             setToast(t.recordDeleted);
@@ -805,6 +819,22 @@ export default function App() {
           }}
           back={() => goBack("profile")}
           lang={lang}
+          t={t}
+        />
+      );
+    }
+    if (screen === "recap") {
+      return (
+        <WeeklyRecapPage
+          entries={entries}
+          childrenData={childrenData}
+          week={recapWeek}
+          setWeek={setRecapWeek}
+          child={recapChild}
+          setChild={setRecapChild}
+          lang={lang}
+          open={id => openEntry(id, "recap")}
+          back={() => goBack("today")}
           t={t}
         />
       );

@@ -119,7 +119,7 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
         <button className="activity-name" onClick={() => open(a.id)}>{a.title}</button>
         <button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(a.id)} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", a.title)}><Icon name="heart" size={18} filled={saved} /></button>
         <p>{a.age} · {discoverCategoryLabel(a.area, t)}</p>
-        <small><Icon name="clock" size={13} />{a.minutes} {t.min} <Icon name="layers" size={13} />{a.materialsLabel}</small>
+        <small><span><Icon name="clock" size={13} />{a.minutes} {t.min}</span><span><Icon name="layers" size={13} />{a.materialsLabel}</span></small>
       </div>
     </article>
   );

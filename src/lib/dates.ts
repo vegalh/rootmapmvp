@@ -39,4 +39,6 @@ export const fmtMonthDay = (d: string, lang: "en" | "zh") => asDate(d).toLocaleD
 // "October 11, 2026" / "2026年10月11日"
 export const fmtLong = (d: string, lang: "en" | "zh") => asDate(d).toLocaleDateString(dateLocale(lang), { month: "long", day: "numeric", year: "numeric" });
 // "Mon" / "周一"
+// "Wed, October 8" / "10月8日周三"
+export const fmtDayMonth = (d: string, lang: "en" | "zh") => asDate(d).toLocaleDateString(dateLocale(lang), { weekday: "short", month: "long", day: "numeric" });
 export const fmtWeekday = (d: string, lang: "en" | "zh") => asDate(d).toLocaleDateString(dateLocale(lang), { weekday: "short" });

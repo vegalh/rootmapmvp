@@ -1,8 +1,9 @@
 import { Icon } from "./Icon";
 import { ChildPhoto } from "./ui";
 import { entryText, groupByMonth } from "../lib/entries";
-import { fmtMonthDay, fmtMonthYear } from "../lib/dates";
+import { fmtDayMonth, fmtMonthDay, fmtMonthYear } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
+import { childShortName } from "../lib/children";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -14,6 +15,21 @@ export function WriteButton({ label, draft, write, lang, t }: { label: string; d
       <span><small>{t.unfinishedEntry}</small><strong>{draft.title.trim() || draft.text.trim().slice(0, 60) || fmtMonthDay(draft.date, lang)}</strong></span>
       <b>{t.continueWriting}</b>
     </button>
+  );
+}
+
+// Which child's Moments to show: "All" or one child, each with their avatar so the right one is found at a glance.
+// Used by Moments and the weekly recap; one-child families don't need it.
+export function ChildFilter({ value, onChange, childrenData, allValue = "All", t }: { value: string; onChange: (v: string) => void; childrenData: Child[]; allValue?: string; t: Copy }) {
+  return (
+    <div className="child-chips" role="group" aria-label={t.filterChildren}>
+      <button data-child={allValue} className={value === allValue ? "active" : ""} aria-pressed={value === allValue} onClick={() => onChange(allValue)}>{t.allChildren}</button>
+      {childrenData.map(c => (
+        <button data-child={c.id} key={c.id} className={value === c.id ? "active" : ""} aria-pressed={value === c.id} onClick={() => onChange(c.id)}>
+          <ChildPhoto child={c} />{childShortName(c, childrenData)}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -49,17 +65,12 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
                 {c ? (
                   <span className="entry-child">
                     <ChildPhoto child={c} />
-                    <span><strong>{c.first} {c.last}</strong><time>{fmtMonthDay(e.date, lang)}</time></span>
+                    <span><strong>{c.first} {c.last}</strong><time>{fmtDayMonth(e.date, lang)}</time></span>
                   </span>
                 ) : (
-                  <time>{fmtMonthDay(e.date, lang)}</time>
+                  <time>{fmtDayMonth(e.date, lang)}</time>
                 )}
-                {e.photos.length > 0 && (
-                  <span className="journal-card-photo">
-                    <img src={photoUrl(e.photos[0])} alt="" loading="lazy" />
-                    {e.photos.length > 1 && <em>+{e.photos.length - 1}</em>}
-                  </span>
-                )}
+                {e.photos.length > 0 && <EntryPhotos photos={e.photos} />}
                 {e.title && <strong>{e.title}</strong>}
                 {text && <p>{text}</p>}
               </button>
@@ -68,6 +79,17 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
         </section>
       ))}
     </>
+  );
+}
+
+// Up to three of a Moment's photos (one large, the others beside it), with how many more there are.
+export function EntryPhotos({ photos }: { photos: string[] }) {
+  const shown = photos.slice(0, 3);
+  return (
+    <span className={`journal-card-photo n${shown.length}`}>
+      {shown.map((p, i) => <img src={photoUrl(p)} alt="" loading="lazy" key={i} />)}
+      {photos.length > 3 && <em>+{photos.length - 3}</em>}
+    </span>
   );
 }
 

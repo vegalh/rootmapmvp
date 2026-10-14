@@ -20,6 +20,8 @@ export type Route = {
   entry?: string;
   discoverTab?: DiscoverTabRoute;
   childTab?: ChildTabRoute;
+  // Weekly recap: the Monday that starts the week ("2026-10-05"); `child` narrows it to one child.
+  week?: string;
 };
 
 // Screens addressed by name alone.
@@ -71,6 +73,8 @@ export function formatRoute(r: Route): string {
       return r.entry ? `#/moment/${enc(r.entry)}` : "#/moments";
     case "entryEdit":
       return r.entry ? `#/moment/${enc(r.entry)}/edit` : `#/new-moment${q(r.child)}`;
+    case "recap":
+      return `#/moments-week${r.week ? `/${enc(r.week)}` : ""}${q(r.child)}`;
     default:
       return `#/${NAMED[r.screen] ?? "today"}`;
   }
@@ -101,6 +105,8 @@ export function parseRoute(hash: string): Route | null {
       return extra === "edit" ? { screen: "entryEdit", entry: id } : { screen: "entry", entry: id };
     case "new-moment":
       return { screen: "entryEdit", child };
+    case "moments-week":
+      return { screen: "recap", week: id && /^\d{4}-\d{2}-\d{2}$/.test(id) ? id : undefined, child };
     default:
       return BY_NAME[head] ? { screen: BY_NAME[head] } : null;
   }

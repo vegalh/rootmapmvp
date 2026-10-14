@@ -1,7 +1,9 @@
 import type { MusicActivity } from "../types";
-import coverSage from "../assets/music/cover-sage.svg";
-import coverApricot from "../assets/music/cover-apricot.svg";
-import coverMeadow from "../assets/music/cover-meadow.svg";
+import coverFreezeDance from "../assets/music/cover-freeze-dance.svg";
+import coverClapTheBeat from "../assets/music/cover-clap-the-beat.svg";
+import coverAnimalWalks from "../assets/music/cover-animal-walks.svg";
+import coverFastAndSlow from "../assets/music/cover-fast-and-slow.svg";
+import coverEchoSong from "../assets/music/cover-echo-song.svg";
 
 // Discover > Music: activities a parent and child do together, guided by a short recording. Not a music library.
 //
@@ -16,7 +18,8 @@ import coverMeadow from "../assets/music/cover-meadow.svg";
 //   import freezeDanceAudio from "../assets/music/freeze-dance.mp3";
 //   { id: "music-freeze-dance", …, audioSrc: freezeDanceAudio }
 //
-// The covers below are simple illustrations; replace `coverImage` with an imported image (about 4:3) if you like.
+// Each activity has its own simple illustration (its own colour and motif), so the cards are easy to tell apart;
+// replace `coverImage` with an imported image (about 4:3) if you like.
 export const musicActivities: MusicActivity[] = [
   {
     id: "music-freeze-dance",
@@ -24,7 +27,7 @@ export const musicActivities: MusicActivity[] = [
     titleZh: "音乐停，我也停",
     ageRanges: ["2–3", "3–4", "4–6"],
     duration: 10,
-    coverImage: coverSage,
+    coverImage: coverFreezeDance,
     description: "Dance while the music plays and freeze the moment it stops. A joyful way to practise listening and self-control together.",
     descriptionZh: "音乐响起就跳舞，音乐一停就定住。在欢笑中一起练习倾听和自我控制。",
     howToPlay: [
@@ -48,7 +51,7 @@ export const musicActivities: MusicActivity[] = [
     titleZh: "跟着节拍拍拍手",
     ageRanges: ["0–2", "2–3"],
     duration: 5,
-    coverImage: coverApricot,
+    coverImage: coverClapTheBeat,
     description: "Feel the steady beat together by clapping, patting knees and tapping toes. Even the youngest children love joining in.",
     descriptionZh: "拍手、拍膝盖、点点脚尖，一起感受稳定的节拍。再小的孩子也喜欢参与。",
     howToPlay: [
@@ -72,7 +75,7 @@ export const musicActivities: MusicActivity[] = [
     titleZh: "小动物走路",
     ageRanges: ["2–3", "3–4"],
     duration: 10,
-    coverImage: coverMeadow,
+    coverImage: coverAnimalWalks,
     description: "Move like different animals as the recording guides you: stomp like an elephant, hop like a frog, tiptoe like a mouse.",
     descriptionZh: "跟着音频的引导，学各种小动物走路：像大象一样跺脚，像青蛙一样跳，像小老鼠一样踮脚走。",
     howToPlay: [
@@ -96,7 +99,7 @@ export const musicActivities: MusicActivity[] = [
     titleZh: "快快慢慢",
     ageRanges: ["3–4", "4–6", "6+"],
     duration: 8,
-    coverImage: coverApricot,
+    coverImage: coverFastAndSlow,
     description: "March, tiptoe and sway as the music speeds up and slows down. Children notice changes in tempo and match them with their bodies.",
     descriptionZh: "音乐变快就快走，变慢就慢慢摇摆。孩子会留意速度的变化，并用身体跟上它。",
     howToPlay: [
@@ -120,7 +123,7 @@ export const musicActivities: MusicActivity[] = [
     titleZh: "你唱我学",
     ageRanges: ["0–2", "2–3", "3–4"],
     duration: 5,
-    coverImage: coverSage,
+    coverImage: coverEchoSong,
     description: "One voice sings a short phrase and the other sings it back. A gentle singing game that builds listening and early language.",
     descriptionZh: "一个人唱一小句，另一个人跟着唱回来。一个温柔的唱歌游戏，帮助孩子学会倾听和早期语言。",
     howToPlay: [

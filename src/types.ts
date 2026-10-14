@@ -248,6 +248,8 @@ export type Screen =
   | "music"
   | "bookshelf"
   | "observations"
+  // The weekly look back over Moments (pages/WeeklyRecapPage.tsx).
+  | "recap"
   | "profile"
   | "week"
   | "saved"

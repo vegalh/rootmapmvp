@@ -45,7 +45,7 @@ function MusicCard({ music, saved, toggleSaved, open, t }: { music: MusicActivit
         <button className="activity-name" onClick={() => open(music.id)}>{m.title}</button>
         <button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(music.id)} aria-label={t.saved}><Icon name="heart" size={18} filled={saved} /></button>
         <p>{m.ages}</p>
-        <small><Icon name="clock" size={13} />{music.duration} {t.min}</small>
+        <small><span><Icon name="clock" size={13} />{music.duration} {t.min}</span></small>
       </div>
     </article>
   );

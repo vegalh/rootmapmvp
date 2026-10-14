@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { PageHeader, FilterSelect } from "../components/ui";
+import { PageHeader } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
+import { ChildFilter, EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { latestNewDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
 // Main timeline of every child's entries, the same collection each child's Journal reads from.
-export function MomentsPage({ entries, childrenData, childFilter, setChildFilter, lang, open, write, back, t }: {
+export function MomentsPage({ entries, childrenData, childFilter, setChildFilter, lang, open, write, openRecap, back, t }: {
   entries: Entry[];
   childrenData: Child[];
   // "All" or a child id; owned by App so it survives opening an entry.
@@ -18,6 +18,8 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
   open: (id: string) => void;
   // Opens the editor for a new entry, preselecting `childId` (e.g. to continue its draft).
   write: (childId?: string) => void;
+  // The weekly recap, narrowed to the child shown here (if any).
+  openRecap: (childId?: string) => void;
   back: () => void;
   t: Copy;
 }) {
@@ -28,16 +30,13 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
   const mine = entries.filter(e => (filter === "All" ? known.includes(e.childId) : e.childId === filter)).sort(newestFirst);
   const shown = mine.filter(e => matchesQuery(e, query));
   const pending = latestNewDraft(filter === "All" ? known : [filter]);
-  const name = (id: string) => {
-    const c = childrenData.find(x => x.id === id);
-    return c ? `${c.first} ${c.last}`.trim() : id;
-  };
 
   return (
     <main className="page-content moments-page">
       <PageHeader title={t.observations} subtitle={t.momentsSubtitle} back={back} />
       <div className="moments-controls">
-        <FilterSelect label="" value={filter} onChange={setChildFilter} options={["All", ...known]} renderLabel={v => (v === "All" ? t.allChildren : name(v))} />
+        {/* With one child there is nothing to choose. */}
+        {childrenData.length > 1 ? <ChildFilter value={filter} onChange={setChildFilter} childrenData={childrenData} t={t} /> : <span className="moments-controls-fill" />}
         <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
           <Icon name={searching ? "close" : "search"} />
         </button>
@@ -47,6 +46,9 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
         <WriteButton label={t.addMoment} draft={pending?.draft} write={() => write(pending?.childId ?? (filter === "All" ? undefined : filter))} lang={lang} t={t} />
       )}
 
+      {mine.length > 0 && !searching && (
+        <button className="today-more moments-week-link" onClick={() => openRecap(filter === "All" ? undefined : filter)}>{t.recapFromMoments}<Icon name="chevron" size={15} /></button>
+      )}
       {mine.length === 0 && !searching && <p className="journal-empty">{t.momentsEmpty}</p>}
       {searching && query.trim() && shown.length === 0 && <p className="journal-empty">{t.journalNoResults}</p>}
       <EntryTimeline entries={shown} childrenData={childrenData} lang={lang} open={open} />

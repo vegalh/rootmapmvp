@@ -12,8 +12,14 @@ export function PageHeader({ title, subtitle, back, action }: { title: string; s
   const t = useContext(CopyContext);
   return (
     <header className={`page-header ${back ? "with-back" : ""}`}>
-      {back && <button className="icon-button" onClick={back} aria-label={t.back}><Icon name="back" /></button>}
-      <div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div>
+      <div>
+        {/* The back button sits beside the title (not the subtitle), however long the subtitle is. */}
+        <div className="page-title-row">
+          {back && <button className="icon-button" onClick={back} aria-label={t.back}><Icon name="back" /></button>}
+          <h1>{title}</h1>
+        </div>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
       {action && <div className="header-action">{action}</div>}
     </header>
   );

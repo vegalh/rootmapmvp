@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
@@ -13,7 +13,7 @@ import { childOptionLabel } from "../lib/children";
 import { localIsoToday } from "../lib/dates";
 import { Field } from "../components/ui";
 
-export function ChildProfilePage({ child, childrenData, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, editRecord, deleteRecord, t }: {
+export function ChildProfilePage({ child, childrenData, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
   child: Child;
   // Every child in My Children (a record can be moved to another child).
   childrenData: Child[];
@@ -37,6 +37,9 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
   editRecord: (id: string, patch: { date: string; notes: string; childId: string }) => Promise<string | null>;
   // Deletes one activity record by id; false (with an error already shown) when the device couldn't save.
   deleteRecord: (id: string) => Promise<boolean>;
+  // A record to open on arrival (from Today's Looking Back), and the call that says it has been shown.
+  focusRecord?: string;
+  focusedRecord?: () => void;
   t: Copy;
 }) {
   // Several attempts on the same day keep the order they were recorded in (newest first).
@@ -84,7 +87,7 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
         {tab === "Activities" ? (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
-            <LessonList records={lessons} childrenData={childrenData} lang={lang} editRecord={editRecord} deleteRecord={deleteRecord} t={t} />
+            <LessonList records={lessons} childrenData={childrenData} lang={lang} editRecord={editRecord} deleteRecord={deleteRecord} focusRecord={focusRecord} focusedRecord={focusedRecord} t={t} />
             <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.addActivity}</button>
           </>
         ) : (
@@ -139,16 +142,20 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
   );
 }
 
-function LessonList({ records, childrenData, lang, editRecord, deleteRecord, t }: {
+function LessonList({ records, childrenData, lang, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
   records: LessonRecord[];
   childrenData: Child[];
   lang: Lang;
   editRecord: (id: string, patch: { date: string; notes: string; childId: string }) => Promise<string | null>;
   deleteRecord: (id: string) => Promise<boolean>;
+  focusRecord?: string;
+  focusedRecord?: () => void;
   t: Copy;
 }) {
-  // Record shown in the detail sheet, where a mistaken one can be corrected or deleted.
-  const [open, setOpen] = useState<LessonRecord>();
+  // Record shown in the detail sheet, where a mistaken one can be corrected or deleted. Opens on arrival when Today's
+  // Looking Back asked for it.
+  const [open, setOpen] = useState<LessonRecord | undefined>(() => records.find(r => r.id === focusRecord));
+  useEffect(() => { if (focusRecord) focusedRecord?.(); }, []);
   const [editing, setEditing] = useState(false);
   const confirm = useConfirm();
   const latestDelete = useLatest(deleteRecord);

@@ -47,7 +47,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .discover-page { padding-bottom: 140px; }
 .page-header { min-height: 130px; padding: var(--safe-top) 0 16px; display: flex; align-items: flex-end; gap: 10px; position: relative; }
 .page-header.with-back { padding-left: 42px; }
-.page-header > .icon-button { position: absolute; left: 0; bottom: 18px; }
+.page-title-row { position: relative; }.page-title-row > .icon-button { position: absolute; left: -42px; top: 50%; transform: translateY(-50%); }
 .page-header h1, .hero-title h1, .detail-content h1 { font: 700 38px/1.15 var(--font-heading); color: var(--dark-purple); margin: 0; }
 .page-header p, .hero-title p { font-size: 16px; color: var(--muted); margin: 6px 0 0; line-height: 1.45; }
 .header-action { margin-left: auto; align-self: flex-end; }
@@ -109,10 +109,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .activity-image img { width: 100%; height: 100%; object-fit: cover; }
 .activity-image span { position: absolute; left: 7px; bottom: 7px; padding: 4px 7px; border-radius: 10px; background: color-mix(in srgb, var(--card) 90%, transparent); color: var(--primary); font-size: 14px; font-weight: 700; }
 .activity-card > div { padding: 9px 9px 10px; position: relative; }
-.activity-name { max-width: calc(100% - 25px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border: 0; padding: 0; background: transparent; font: 600 20px var(--font-heading); text-align: left; }
+/* Long titles get two lines (then an ellipsis) rather than being cut off after a word or two. */
+.activity-name { max-width: calc(100% - 25px); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; border: 0; padding: 0; background: transparent; font: 600 20px/1.15 var(--font-heading); text-align: left; }
 .heart { position: absolute; top: 7px; right: 7px; padding: 2px; border: 0; background: transparent; color: var(--muted); }.heart.saved { color: var(--orange); }
 .activity-card p { margin: 5px 0 7px; color: var(--muted); font-size: 15px; }
-.activity-card small { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted); }
+.activity-card small { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 14px; color: var(--muted); }.activity-card small > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 
 .detail-page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); background: var(--bg); }
 .detail-actions { height: 93px; padding: var(--safe-top) 19px 8px; display: flex; align-items: center; justify-content: space-between; }
@@ -235,7 +236,11 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .journal-card { width: 100%; display: block; margin-bottom: 14px; padding: 15px; text-align: left; border: 1px solid var(--border); border-radius: 22px; background: var(--card); box-shadow: var(--shadow); }
 .journal-card time { display: block; font-size: 13px; letter-spacing: .4px; color: var(--muted); }
 .journal-card-photo { position: relative; display: block; margin-top: 10px; aspect-ratio: 4 / 3; border-radius: 16px; overflow: hidden; background: var(--elevated); }
-.journal-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.journal-card-photo img { width: 100%; height: 100%; min-height: 0; object-fit: cover; display: block; }
+/* Several photos: the first large, the next one or two beside it. */
+.journal-card-photo.n2, .journal-card-photo.n3 { display: grid; gap: 3px; grid-template-columns: 2fr 1fr; }
+.journal-card-photo.n2 { grid-template-columns: 1fr 1fr; }
+.journal-card-photo.n3 { grid-template-rows: 1fr 1fr; }.journal-card-photo.n3 > img:first-child { grid-row: span 2; }
 .journal-card-photo em { position: absolute; right: 9px; bottom: 9px; padding: 3px 9px; border-radius: 12px; font-style: normal; font-size: 13px; font-weight: 700; color: white; background: rgba(30,24,16,.55); }
 .journal-card strong { display: block; margin-top: 11px; font: 600 24px/1.2 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
 .journal-card p { margin: 8px 0 0; font-size: 15.5px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -280,6 +285,26 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 /* Moments + Journal share one entry collection; Moments cards also name the child. */
 .moments-page .page-header { min-height: 125px; }
 .moments-controls { display: flex; align-items: center; gap: 8px; }
+.moments-controls .child-chips { flex: 1; min-width: 0; margin: 0 0 0 -20px; padding-right: 4px; }.moments-controls-fill { flex: 1; }
+.moments-week-link { margin: 6px 0 -10px; }
+/* Weekly recap (pages/WeeklyRecapPage.tsx). */
+.recap-page .child-chips { margin-bottom: 4px; }
+.recap-weeks { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 6px; margin: 8px 0 16px; }
+.recap-weeks h2 { margin: 0; text-align: center; font: 600 23px var(--font-heading); color: var(--primary); }
+.recap-weeks h2:lang(zh) { font-family: var(--font-heading-zh); font-size: 18px; font-weight: 500; }
+.recap-weeks .icon-button { display: grid; place-items: center; border: 1px solid var(--border); border-radius: 13px; background: var(--card); color: var(--primary); }
+.recap-weeks .icon-button:disabled { opacity: .35; cursor: default; }
+.recap-empty { padding: 22px 18px; border-radius: 20px; background: var(--lavender); text-align: center; }
+.recap-empty p { margin: 0; font-size: 15.5px; line-height: 1.6; color: var(--text); }
+.recap-highlight .journal-card-photo { margin: 0 0 12px; }
+.recap-rest { margin-top: 22px; }
+.recap-rest h3 { margin: 0 0 10px 2px; font: 600 22px var(--font-heading); color: var(--primary); }
+.recap-rest h3:lang(zh) { font-family: var(--font-heading-zh); font-size: 18px; font-weight: 500; }
+.recap-row { width: 100%; display: grid; grid-template-columns: 52px minmax(0, 1fr) 16px; align-items: center; gap: 12px; margin-bottom: 8px; padding: 9px 12px 9px 9px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--text); text-align: left; }
+.recap-row img { width: 52px; height: 52px; display: block; border-radius: 12px; object-fit: cover; }
+.recap-row strong { display: block; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recap-row small { display: block; margin-top: 2px; font-size: 13.5px; color: var(--muted); }
+.recap-row svg { color: var(--muted); }
 .moments-controls .mini-select { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 11px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
 .moments-controls .mini-select span { display: none; }
 .moments-controls .mini-select select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; font-weight: 600; }
@@ -389,6 +414,27 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-memory.tried em { display: block; font-style: normal; font-size: 14px; color: var(--muted); }
 .today-memory.tried .today-link { margin-top: 8px; }
 /* A Thought for Parents: quiet, text only. */
+/* Today's idea is for one child at a time; siblings switch with these chips (also used, as .child-chips, to find a
+   child's Moments on Moments and in the weekly recap). */
+.today-for, .child-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -20px 12px; padding: 2px 20px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.today-for::-webkit-scrollbar, .child-chips::-webkit-scrollbar { display: none; }
+.today-for button, .child-chips button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px 0 5px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.child-chips button[data-child="All"], .child-chips button[data-child=""] { padding-left: 14px; }
+.today-for img, .child-chips img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.today-for button.active, .child-chips button.active { border-color: var(--primary); background: var(--lavender); color: var(--primary); font-weight: 700; }
+.today-feature-child { display: block; margin-bottom: 6px; font-size: 14.5px; font-weight: 700; color: var(--primary); }
+.today-more { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 4px; padding: 0 2px; border: 0; background: transparent; color: var(--primary); font-size: 15px; font-weight: 700; }
+/* The week's Moments, offered to revisit. */
+.today-week { width: 100%; display: block; padding: 16px 16px 18px; border: 1px solid var(--border); border-radius: 24px; background: var(--card); box-shadow: var(--shadow); color: inherit; text-align: left; transition: transform .15s ease; }
+.today-week:active { transform: scale(.985); }
+.today-week-photos { display: grid; gap: 4px; margin-bottom: 14px; height: 150px; border-radius: 16px; overflow: hidden; }
+.today-week-photos.n2 { grid-template-columns: 1fr 1fr; }.today-week-photos.n3 { grid-template-columns: 2fr 1fr 1fr; }
+.today-week-photos img { width: 100%; height: 100%; min-width: 0; display: block; object-fit: cover; background: var(--elevated); }
+.today-week-caption { display: block; }
+.today-week-caption strong { display: block; font: 700 28px/1.15 var(--font-heading); color: var(--dark-purple); }
+.today-week-caption time { display: block; margin-top: 3px; font-size: 14.5px; color: var(--muted); }
+.today-week > .today-link { margin-top: 10px; }
+.today-week-caption strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 21px; font-weight: 500; line-height: 1.35; }
 .today-thought { margin-top: 36px; padding: 26px 8px 4px; border-top: 1px solid var(--border); text-align: center; }
 .today-thought .today-eyebrow { margin-left: 0; }
 .today-thought blockquote { max-width: 30ch; margin: 0 auto; text-wrap: balance; font: 600 28px/1.3 var(--font-heading); color: var(--dark-purple); }
@@ -419,7 +465,11 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .book-tile small { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .book-cover { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 5px 12px 12px 5px; background: var(--elevated); box-shadow: var(--shadow); }
 .book-cover::before { content: ""; position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 6px; background: rgba(59, 42, 26, .07); }
-.book-cover img { width: 100%; height: 100%; display: block; object-fit: contain; }
+/* A real cover stands on the shared 3:4 matte, bottom-aligned like a book on a shelf: whole (never cropped), with the
+   same frame and spacing whatever its own proportions. */
+.book-cover:not(.placeholder) { display: flex; align-items: flex-end; justify-content: center; padding: 12px 12px 10px; }
+.book-cover:not(.placeholder)::before { display: none; }
+.book-cover img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 2px 5px 5px 2px; box-shadow: 0 6px 14px rgba(59, 42, 26, .2); }
 .book-cover.placeholder { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding: 16px 14px 16px 18px; }
 .book-cover.placeholder strong { font: 700 22px/1.1 var(--font-heading); color: inherit; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .book-cover.tone-0 { background: var(--lavender); color: var(--primary); }
@@ -492,7 +542,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
    hit area (::after) extends them where enlarging would crowd the layout. */
 .icon-button, .detail-actions button, .bottom-sheet header button { width: 44px; height: 44px; }
 .page-header.with-back { padding-left: 48px; }
-.page-header > .icon-button { left: -6px; bottom: 14px; }
+.page-title-row > .icon-button { left: -54px; }
 .round-add { width: 44px; height: 44px; }
 .search-clear, .filter-pill, .age-suggestions button, .material-list button { position: relative; }
 .heart::after, .search-clear::after, .age-suggestions button::after { content: ""; position: absolute; inset: -8px; }
