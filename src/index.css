@@ -418,7 +418,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
    child's Moments on Moments and in the weekly recap). */
 .today-for, .child-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -20px 12px; padding: 2px 20px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .today-for::-webkit-scrollbar, .child-chips::-webkit-scrollbar { display: none; }
-.today-for button, .child-chips button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px 0 5px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.today-for button, .child-chips button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 14px 0 6px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); font-size: 14.5px; font-weight: 600; white-space: nowrap; }
 .child-chips button[data-child="All"], .child-chips button[data-child=""] { padding-left: 14px; }
 .today-for img, .child-chips img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
 .today-for button.active, .child-chips button.active { border-color: var(--primary); background: var(--lavender); color: var(--primary); font-weight: 700; }
