@@ -37,3 +37,11 @@ export function detectPlatform(win: { Capacitor?: CapacitorGlobal } | undefined 
 }
 
 export const platform: Platform = { ...webPlatform(), kind: detectPlatform() };
+
+// Inside the iOS app the page never zooms: a pinch, or tapping a field with text under 16px, would enlarge the whole
+// app and leave it sliding sideways under the finger. The website stays zoomable (accessibility).
+export function lockNativeZoom(kind: PlatformKind = platform.kind, doc: Document | undefined = typeof document !== "undefined" ? document : undefined) {
+  if (kind !== "ios" || !doc) return;
+  const meta = doc.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+  if (meta && !/user-scalable/.test(meta.content)) meta.content += ", maximum-scale=1, user-scalable=no";
+}

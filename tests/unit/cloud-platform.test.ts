@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assertSafeClientEnv, environmentForMode, isSecretKey, resolveCloudConfig } from "../../src/lib/cloud/environment.ts";
 import { readLegacyStorage } from "../../src/lib/data/legacy.ts";
-import { detectPlatform } from "../../src/lib/platform/index.ts";
+import { detectPlatform, lockNativeZoom } from "../../src/lib/platform/index.ts";
 import { SESSION_PREFIX, webSessionStore } from "../../src/lib/platform/web.ts";
 
 const jwt = (payload: object) => `${btoa(JSON.stringify({ alg: "HS256" }))}.${btoa(JSON.stringify(payload)).replace(/=+$/, "")}.sig`;
@@ -109,4 +109,19 @@ test("web session store: unreadable storage means no session; a failed save is r
   assert.equal(await store.getItem("k"), null);
   await assert.rejects(store.setItem("k", "v"));
   await store.removeItem("k");
+});
+
+test("zoom: locked inside the iOS app only, once", () => {
+  const doc = (content: string) => {
+    const meta = { content };
+    return { meta, doc: { querySelector: () => meta } as unknown as Document };
+  };
+  const base = "width=device-width, initial-scale=1.0, viewport-fit=cover";
+  const web = doc(base);
+  lockNativeZoom("web", web.doc);
+  assert.equal(web.meta.content, base, "the website stays zoomable");
+  const ios = doc(base);
+  lockNativeZoom("ios", ios.doc);
+  lockNativeZoom("ios", ios.doc);
+  assert.equal(ios.meta.content, `${base}, maximum-scale=1, user-scalable=no`);
 });

@@ -42,3 +42,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 }
+
+// The app's web view (set as the view controller in Main.storyboard). Without the rubber-band bounce the page no
+// longer stretches past its top and bottom edges while scrolling, so the app frame stays put.
+class RootMapViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        webView?.scrollView.bounces = false
+    }
+}
