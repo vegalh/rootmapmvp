@@ -1,0 +1,6 @@
+{
+	"appId": "com.rootmap.app",
+	"appName": "RootMap",
+	"webDir": "dist",
+	"packageClassList": []
+}
