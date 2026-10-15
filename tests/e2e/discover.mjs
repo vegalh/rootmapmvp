@@ -322,8 +322,8 @@ await step("Existing plans and saved activities are unchanged; Saved Activities 
   await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on Kids");
 });
 
-const BOOKS_EN = ["Guess How Much I Love You", "The Carrot Seed", "A Pocketful of Kisses", "Something from Nothing", "The Runaway Bunny", "The Giving Tree", "Charlie Needs a Cloak", "A Squash and a Squeeze", "The Smartest Giant in Town", "Lazy Ozzie"];
-const BOOKS_ZH = ["猜猜我有多爱你", "胡萝卜种子", "一口袋的吻", "爷爷一定有办法", "逃家小兔", "爱心树", "阿利的红斗篷", "小房子变大房子", "城里最漂亮的巨人", "懒奥西"];
+const BOOKS_EN = ["Guess How Much I Love You", "The Carrot Seed", "A Pocketful of Kisses", "Something from Nothing", "The Runaway Bunny", "The Giving Tree", "Charlie Needs a Cloak", "A Squash and a Squeeze", "The Smartest Giant in Town", "Lazy Ozzie", "The Reason for Being Late", "Badger's Parting Gifts", "The Cat That Lived a Million Times", "The Little Mouse Series", "Where Does Thursday Go?", "Happy Birthday, Moon", "Little Bear's Special Wish", "The Crocodile and the Dentist", "The Color Monster", "Dotty and Scaly", "Just Like My Mum", "Just Like My Dad", "A Child of Books", "Delicious!", "Little Polar Bear and the Brave Little Hare", "Lots: The Diversity of Life on Earth", "Tiny Creatures: The World of Microbes", "Musical Max", "Guess How Much I Love You: Counting", "Guess How Much I Love You: Colors", "Little Bear and the Best Dad", "The Storm Seal", "The Snowman", "Mole and the Baby Bird", "The Tanya Books"];
+const BOOKS_ZH = ["猜猜我有多爱你", "胡萝卜种子", "一口袋的吻", "爷爷一定有办法", "逃家小兔", "爱心树", "阿利的红斗篷", "小房子变大房子", "城里最漂亮的巨人", "懒奥西", "迟到的理由", "獾的礼物", "活了一百万次的猫", "可爱的鼠小弟", "“星期四”要去哪里呢？", "月亮生日快乐", "小熊的特别愿望", "鳄鱼怕怕牙医怕怕", "我的情绪小怪兽", "花点点和鳞片片", "像妈妈一样", "像爸爸一样", "书之子", "最好喝的汤", "小北极熊和勇敢的小野兔", "数不清！大自然的生物多样性", "微生物：看不见的魔术师", "爱音乐的马可", "猜猜我有多爱你（数一数）", "猜猜我有多爱你（颜色）", "小熊和最好的爸爸", "暴风雨后的小海豹", "雪人", "鼹鼠与小鸟", "爱跳舞的孩子"];
 const setLanguage = async (from, to, check) => {
   await nav(NAV.profile);
   await page.eval(`__t.click(${q(from)}, ".menu-section button")`);
@@ -344,7 +344,7 @@ const checkCovers = (list, titles, badge) => {
   }
 };
 
-await step("Books: the ten curated books, covers and titles follow the language without a refresh; the bookshelf never doubles", async () => {
+await step("Books: the curated books, covers and titles follow the language without a refresh; the bookshelf never doubles", async () => {
   await nav(NAV.discover);
   await tab("Books");
   const en = await covers(".book-grid .book-tile");

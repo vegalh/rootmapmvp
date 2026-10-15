@@ -112,7 +112,7 @@ test("catalog: book and music data are complete", () => {
   }
 });
 
-test("books: the ten curated books, one record per book with both editions' titles", () => {
+test("books: the curated books, one record per book with both editions' titles", () => {
   assert.deepEqual(books.map(b => [b.id, b.title, b.titleZh, b.author]), [
     ["guess-how-much-i-love-you", "Guess How Much I Love You", "猜猜我有多爱你", "Sam McBratney"],
     ["the-carrot-seed", "The Carrot Seed", "胡萝卜种子", "Ruth Krauss"],
@@ -124,6 +124,31 @@ test("books: the ten curated books, one record per book with both editions' titl
     ["a-squash-and-a-squeeze", "A Squash and a Squeeze", "小房子变大房子", "Julia Donaldson"],
     ["the-smartest-giant-in-town", "The Smartest Giant in Town", "城里最漂亮的巨人", "Julia Donaldson"],
     ["lazy-ozzie", "Lazy Ozzie", "懒奥西", "Michael Coleman"],
+    ["the-reason-for-being-late", "The Reason for Being Late", "迟到的理由", "Yao Jia"],
+    ["badgers-parting-gifts", "Badger's Parting Gifts", "獾的礼物", "Susan Varley"],
+    ["the-cat-that-lived-a-million-times", "The Cat That Lived a Million Times", "活了一百万次的猫", "Yoko Sano"],
+    ["little-mouse-series", "The Little Mouse Series", "可爱的鼠小弟", "Yoshio Nakae and Noriko Ueno"],
+    ["where-does-thursday-go", "Where Does Thursday Go?", "“星期四”要去哪里呢？", "Janeen Brian"],
+    ["happy-birthday-moon", "Happy Birthday, Moon", "月亮生日快乐", "Frank Asch"],
+    ["little-bears-special-wish", "Little Bear's Special Wish", "小熊的特别愿望", "Gillian Lobel"],
+    ["the-crocodile-and-the-dentist", "The Crocodile and the Dentist", "鳄鱼怕怕牙医怕怕", "Taro Gomi"],
+    ["the-color-monster", "The Color Monster", "我的情绪小怪兽", "Anna Llenas"],
+    ["dotty-and-scaly", "Dotty and Scaly", "花点点和鳞片片", "Daniela Kulot"],
+    ["just-like-my-mum", "Just Like My Mum", "像妈妈一样", "David Melling"],
+    ["just-like-my-dad", "Just Like My Dad", "像爸爸一样", "David Melling"],
+    ["a-child-of-books", "A Child of Books", "书之子", "Oliver Jeffers and Sam Winston"],
+    ["delicious", "Delicious!", "最好喝的汤", "Helen Cooper"],
+    ["little-polar-bear-and-the-brave-little-hare", "Little Polar Bear and the Brave Little Hare", "小北极熊和勇敢的小野兔", "Hans de Beer"],
+    ["lots", "Lots: The Diversity of Life on Earth", "数不清！大自然的生物多样性", "Nicola Davies"],
+    ["tiny-creatures", "Tiny Creatures: The World of Microbes", "微生物：看不见的魔术师", "Nicola Davies"],
+    ["musical-max", "Musical Max", "爱音乐的马可", "Robert Kraus"],
+    ["guess-how-much-i-love-you-counting", "Guess How Much I Love You: Counting", "猜猜我有多爱你（数一数）", "Sam McBratney"],
+    ["guess-how-much-i-love-you-colors", "Guess How Much I Love You: Colors", "猜猜我有多爱你（颜色）", "Sam McBratney"],
+    ["little-bear-and-the-best-dad", "Little Bear and the Best Dad", "小熊和最好的爸爸", "Arend van Dam"],
+    ["the-storm-seal", "The Storm Seal", "暴风雨后的小海豹", "Judy Waite"],
+    ["the-snowman", "The Snowman", "雪人", "Raymond Briggs"],
+    ["mole-and-the-baby-bird", "Mole and the Baby Bird", "鼹鼠与小鸟", "Marjorie Newman"],
+    ["tanya-books", "The Tanya Books", "爱跳舞的孩子", "Patricia Lee Gauch"],
   ]);
   assert.ok(!books.some(b => b.id.startsWith("sample-")), "no sample books left");
   for (const b of books) assert.ok(b.authorZh && b.descriptionZh && b.whyWeRecommendZh, `${b.id} has Chinese text`);
