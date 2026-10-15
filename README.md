@@ -1,73 +1,133 @@
-# RootMap MVP
+<p align="center">
+  <img src="docs/logo.svg" alt="RootMap logo" width="88" height="88">
+</p>
 
-RootMap MVP is a parent-facing Montessori companion that helps families stay connected to their child’s learning journey at home and in the classroom. It gives parents a simple way to follow activities, revisit meaningful moments, and understand how their child is growing through daily work.
+<h1 align="center">RootMap</h1>
 
-## What this app does
+<p align="center">
+  A calm, Montessori-inspired companion for parents of young children.<br>
+  Find meaningful things to do together, keep the moments that matter, and see your child grow.
+</p>
 
-- Show each child’s profile, age, enrollment information, and learning snapshot
-- Browse Montessori-inspired activities and learning areas for home or classroom exploration
-- Save favorite activities and add them to a personal weekly plan
-- Follow child progress through recorded lessons, observations, and skills practiced
-- Capture life moments that matter and revisit them later with context
-- Support both English and simplified Chinese language experiences
-- Store demo data locally in the browser for quick prototyping and review
+<p align="center">
+  <a href="https://vegalh.github.io/rootmapmvp/"><strong>Try the web app</strong></a>
+  &nbsp;·&nbsp; English &amp; 简体中文 &nbsp;·&nbsp; Web &amp; iOS
+</p>
 
-## Why RootMap
+---
 
-RootMap is designed around the idea that parents want to feel close to their child’s early learning, even when they are not in the classroom. Montessori education emphasizes purposeful repetition, independence, and careful observation, and this app brings that philosophy into a parent-friendly digital experience.
+## About
 
-The goal is to help parents:
+RootMap is for parents and caregivers of toddlers and preschoolers (roughly ages 1 to 5), especially families drawn to Montessori ideas of independence, repetition and careful observation.
 
-- understand what their child is learning and exploring
-- see meaningful moments that are worth celebrating
-- revisit activities and ideas at home
-- stay connected to the rhythm of the classroom and the child’s growth
+Each day it suggests one hands-on activity suited to each child's age, with clear steps and a materials list drawn from everyday home life. When something happens worth remembering, a parent can save it as a short moment with a photo. Over the weeks, those moments and activities build into a simple record of how each child is growing.
 
-## Current product scope
+## Screenshots
 
-This MVP focuses on the parent experience:
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/today.jpg" alt="Today screen with today's inspiration for Maya" width="240"><br><sub><b>Today</b>: one idea per child</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/discover.jpg" alt="Discover screen with the activity library" width="240"><br><sub><b>Discover</b>: activities, books and music</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/activity-detail.jpg" alt="Water Pouring activity details" width="240"><br><sub><b>Activity</b>: skills, materials and steps</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/moments.jpg" alt="My Moments timeline" width="240"><br><sub><b>Moments</b>: photos and notes, by month</sub></td>
+    <td align="center"><img src="docs/screenshots/my-week.jpg" alt="My Week plan" width="240"><br><sub><b>My Week</b>: a gentle weekly plan</sub></td>
+    <td align="center"><img src="docs/screenshots/child-profile.jpg" alt="Child profile with journal" width="240"><br><sub><b>Child profile</b>: journal and activities</sub></td>
+  </tr>
+</table>
 
-- Child profiles and personal learning snapshots
-- A discoverable activity library
-- Saved activities and weekly planning
-- Lesson history and growth tracking
-- Observation capture for special moments and milestones
-- Family-facing notifications and updates
-- Local browser storage for prototype usage
+<sub>Screenshots are from the current app at iPhone size (390 × 844 pt) and show a demo family.</sub>
 
-## Tech stack
+## Features
 
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS v4
-- Local browser storage for prototype data
+- **Today.** A daily activity idea for each child, a look back at a moment from earlier weeks, and a short reflection for parents.
+- **Discover.** A library of Montessori-style activities you can search and filter by age, topic and learning area, plus curated picture books (English and Chinese editions) and music activities.
+- **Activity details.** The skills an activity builds, what you'll need, and step-by-step guidance. Save it, add it to your week, or mark it as tried.
+- **Moments.** Photos and a few words, grouped by month, searchable, with a week-by-week recap.
+- **Child profiles.** Each child has a journal and a history of the activities they've tried, so you can see their own path.
+- **My Week.** Plan activities for the days ahead, keep saved ideas, and see what's been completed. Family goals and a family bookshelf are also available from Profile.
+- **Bilingual, light and dark.** Full English and Simplified Chinese, plus light and dark appearance.
+- **Private by default.** Everything is stored on the device, with no account needed. You can export and restore a backup at any time.
+- **Account and sync (beta).** An optional email-code sign-in that backs up and syncs a family's data across devices. It's turned on only in beta builds; the public website stays local-only.
+
+## Technology
+
+| Area | What RootMap uses |
+|---|---|
+| Frontend | React 19, TypeScript 5.7, Vite 8 |
+| Styling | Tailwind CSS v4 (`@tailwindcss/vite`) plus global CSS design tokens |
+| Local data | IndexedDB through a single data layer (`src/lib/data/`), with a one-time migration from older localStorage data |
+| Cloud backend (beta) | Supabase: Postgres with row-level security, private photo storage, and an Edge Function that verifies uploaded photos. Schema lives in `supabase/migrations/`. |
+| Authentication (beta) | Supabase Auth email one-time codes |
+| iOS | Capacitor 8 wraps the same web build in a native iOS app, with native haptics and status bar handling |
+| Hosting | GitHub Pages, deployed by GitHub Actions on every push to `main` |
+| Testing | Node's built-in test runner for unit and database tests; browser tests drive headless Chrome over the DevTools Protocol; database tests run in CI against a local Supabase stack |
+
+For how data is stored and synced, see [docs/data-architecture.md](docs/data-architecture.md) and [docs/data-architecture-phase2.md](docs/data-architecture-phase2.md).
 
 ## Getting started
 
-1. Install dependencies:
-   npm install
-2. Start the development server:
-   npm run dev
-3. Build for production:
-   npm run build
-4. Preview the production build:
-   npm run preview
+**Requirements:** Node.js 24 (needed for the tests; the app itself builds on Node 22) and npm. For iOS you also need macOS with Xcode.
+
+### Run the web app
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:8443. Without any `.env` file, the app runs fully local, with no account and no network calls.
+
+### Build
+
+```bash
+npm run build      # production build in dist/
+npm run preview    # serve that build locally
+```
+
+### Run the iOS app
+
+The iOS project in `ios/` loads the same `dist/` build.
+
+```bash
+npm run build
+npx cap sync ios   # copy the build into the iOS project
+npx cap open ios   # open it in Xcode
+```
+
+In Xcode, choose a simulator or a connected iPhone and press **Run**. Run `npm run build` and `npx cap sync ios` again after any web change.
+
+### Tests
+
+```bash
+npm test             # unit tests
+npm run typecheck    # TypeScript
+npm run test:e2e     # browser tests (needs Google Chrome)
+```
+
+Database tests (`npm run test:db`) need Docker and a local Supabase stack (`npm run db:start`). See [tests/README.md](tests/README.md) for every suite.
+
+### Cloud features (optional)
+
+To try sign-in and sync against a local or staging Supabase project, copy the relevant block of [.env.example](.env.example) into `.env.development.local` or `.env.staging.local`. Only publishable keys belong there; the build refuses secret keys.
 
 ## Project structure
 
-- `src/App.tsx` — application state and screen flow
-- `src/pages/` — screens for children, activity discovery, observations, profile, and weekly planning
-- `src/data/` — seed data for children, activities, lessons, and family moments
-- `src/lib/` — localization and helper logic
-- `src/components/` — shared UI and reusable app elements
+```
+src/
+  pages/        one file per screen
+  components/   shared UI
+  data/         activities, books, music and other built-in content
+  lib/          data layer, sync, i18n, dates and other helpers
+supabase/       database migrations and the verify-photo Edge Function
+ios/            Capacitor iOS project
+tests/          unit, browser and database tests
+docs/           architecture notes and README images
+```
 
-## Notes for contributors
+To add an activity, book or music recording, see the notes in [AGENTS.md](AGENTS.md).
 
-This is a prototype intended to explore the parent experience in a Montessori setting. Most data is mock content stored locally in the browser so the product can be reviewed quickly and iterated on without a backend.
+## Status
 
-If you want to adjust the product content, start in the seed files under `src/data/` to change children, activities, and learning records.
-
-## License
-
-This project is currently a prototype and does not yet include a formal public license.
+RootMap is in active development. The web app and the local-only experience are complete and live; account sync is in beta, and the iOS app is in early setup. There is no open-source license yet.
