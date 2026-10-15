@@ -22,11 +22,14 @@
     "test:db": "node --import ./tests/loader.mjs --test --test-concurrency=1 \"tests/db/*.test.ts\""
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
     "@supabase/supabase-js": "^2.117.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.23.1",
