@@ -144,7 +144,9 @@ await step("Weekly recap from Today: last week's Moments, a few highlights, one 
 });
 
 await step("Earlier weeks: the recap goes back week by week; an empty week is gentle and offers an earlier one", async () => {
-  await write({ entries: [moment("m-long-ago", ada.id, daysAgo(35), { title: "Long ago" })] });
+  // In the week of the backdated Moment (30 days ago), on its Monday: that week is both the nearest earlier one
+  // with Moments and the earliest, whatever weekday the suite runs on.
+  await write({ entries: [moment("m-long-ago", ada.id, mondayOf(daysAgo(30)), { title: "Long ago" })] });
   await go(`#/moments-week/${LAST_MONDAY}`);
   await page.waitFor(`document.querySelector(".recap-highlight")`, 3000, "last week");
   assert.equal(await page.eval(`document.querySelector(".recap-weeks .recap-next").disabled`), false, "this week is ahead");
