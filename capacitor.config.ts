@@ -6,6 +6,8 @@ const config: CapacitorConfig = {
   appId: 'com.rootmap.app',
   appName: 'RootMap',
   webDir: 'dist',
+  // The app's cream background behind the web view, so launching never flashes white before the page paints.
+  backgroundColor: '#fbf2e4',
 }
 
 export default config

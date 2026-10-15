@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
-import { Modal, Field, ChildPhoto } from "./ui";
+import { Modal, Field, ChildPhoto, SheetContext } from "./ui";
 import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
@@ -9,7 +9,15 @@ import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
 import { discoverCategoryLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
-export function ModalOverlay({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
+type OverlayProps = Parameters<typeof ModalSheets>[0];
+
+// The open sheet. `closing` while App keeps a just-closed sheet on screen for its slide-away animation.
+export function ModalOverlay({ closing = false, ...props }: OverlayProps & { closing?: boolean }) {
+  const sheet = useMemo(() => ({ closing }), [closing]);
+  return <SheetContext.Provider value={sheet}><ModalSheets {...props} /></SheetContext.Provider>;
+}
+
+function ModalSheets({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
   modal: ModalKind;
   close: (destination?: Screen | ModalKind) => void;
   childrenData: Child[];

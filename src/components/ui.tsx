@@ -4,6 +4,7 @@ import { useSetting } from "../lib/data/hooks";
 import type { Child, Screen } from "../types";
 import { childInitialsSrc, childPhotoSrc } from "../lib/children";
 import { copy, type Copy } from "../lib/i18n";
+import { haptic, prefersReducedMotion, revealFocusedField } from "../lib/native";
 
 // The current language's strings, for shared controls' accessible names (Back, Close). Provided by App.
 export const CopyContext = createContext<Copy>(copy.en);
@@ -37,7 +38,7 @@ export function BottomNav({ active, go, openQuick, t }: { active: Screen; go: (s
       {items.slice(0, 2).map(([s, i, l]) => (
         <button className={active === s ? "active" : ""} aria-current={active === s ? "page" : undefined} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
       ))}
-      <button className="nav-add" onClick={openQuick} aria-label={t.quickAdd}><i><Icon name="plus" size={25} /></i></button>
+      <button className="nav-add" onClick={() => { haptic("light"); openQuick(); }} aria-label={t.quickAdd}><i><Icon name="plus" size={25} /></i></button>
       {items.slice(2).map(([s, i, l]) => (
         <button className={active === s ? "active" : ""} aria-current={active === s ? "page" : undefined} onClick={() => go(s)} key={s}><Icon name={i} /><span>{l}</span></button>
       ))}
@@ -164,19 +165,112 @@ export function Field({ label, children: content }: { label: string; children: R
   return <label className="field"><span>{label}</span>{content}</label>;
 }
 
+// How long a sheet or dialog takes to slide or fade away (matches --dur-exit in index.css).
+export const EXIT_MS = 200;
+
+// Sheets opened through ModalOverlay are kept on screen by App while they slide away, whoever closes them (a Save
+// button too); `closing` is then true. Any other sheet animates its own dismissal.
+export const SheetContext = createContext<{ closing: boolean } | null>(null);
+
+// While any sheet or dialog is open the page behind it doesn't scroll along under the finger.
+let scrollLocks = 0;
+function useScrollLock() {
+  useEffect(() => {
+    scrollLocks += 1;
+    document.documentElement.classList.add("sheet-open");
+    return () => {
+      scrollLocks -= 1;
+      if (!scrollLocks) document.documentElement.classList.remove("sheet-open");
+    };
+  }, []);
+}
+
+// A bottom sheet. It can be dismissed with ×, Escape, a tap outside it, or by pulling it down (from its top, or
+// anywhere once its content is scrolled to the top), as on iOS.
 export function Modal({ title, close, children: content }: { title: string; close: () => void; children: React.ReactNode }) {
   const t = useContext(CopyContext);
+  const managed = useContext(SheetContext);
+  const [leaving, setLeaving] = useState(false);
+  const sheet = useRef<HTMLElement>(null);
+  const latestClose = useLatest(close);
+  const dismiss = useLatest(() => {
+    if (managed || prefersReducedMotion()) { latestClose.current(); return; }
+    if (leaving) return;
+    setLeaving(true);
+    window.setTimeout(() => latestClose.current(), EXIT_MS);
+  });
+  const closing = leaving || !!managed?.closing;
+  useScrollLock();
+
   // Escape closes the sheet, like tapping outside it.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss.current(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [close]);
+  }, [dismiss]);
+
+  useEffect(() => {
+    const el = sheet.current;
+    if (!el) return;
+    const stopRevealing = revealFocusedField(el);
+    // Pull down to dismiss. Only a downward pull that starts with the content at its top moves the sheet; scrolling
+    // the content and touching a field work as before.
+    let startY = 0, lastY = 0, lastT = 0, speed = 0, tracking = false, dragging = false;
+    const onStart = (e: TouchEvent) => {
+      tracking = e.touches.length === 1 && el.scrollTop <= 0 && !(e.target as HTMLElement).closest("input, textarea, select, [contenteditable]");
+      dragging = false;
+      startY = lastY = e.touches[0]?.clientY ?? 0;
+      lastT = e.timeStamp;
+      speed = 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking) return;
+      const y = e.touches[0].clientY;
+      const dy = y - startY;
+      if (!dragging) {
+        if (dy < -4) { tracking = false; return; }
+        if (dy < 8) return;
+        dragging = true;
+        el.style.transition = "none";
+      }
+      e.preventDefault();
+      speed = (y - lastY) / Math.max(1, e.timeStamp - lastT);
+      lastY = y;
+      lastT = e.timeStamp;
+      el.style.transform = `translateY(${Math.max(0, dy - 8)}px)`;
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!dragging) { tracking = false; return; }
+      tracking = dragging = false;
+      const moved = lastY - startY;
+      // A finger that stopped before lifting isn't a flick.
+      if (e.timeStamp - lastT > 100) speed = 0;
+      if (moved > Math.min(140, el.offsetHeight * 0.3) || (speed > 0.5 && moved > 30)) {
+        haptic("light");
+        dismiss.current();
+      } else {
+        el.style.transition = "";
+        el.style.transform = "";
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      stopRevealing();
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [dismiss]);
+
   return (
-    <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}>
-      <section className="bottom-sheet" role="dialog" aria-modal="true" aria-label={title}>
-        <i />
-        <header><h2>{title}</h2><button onClick={() => close()} aria-label={t.close}>×</button></header>
+    <div className={`overlay ${closing ? "closing" : ""}`} onMouseDown={e => { if (e.target === e.currentTarget) dismiss.current(); }}>
+      <section ref={sheet} className="bottom-sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <i className="sheet-grabber" aria-hidden="true" />
+        <header><h2>{title}</h2><button onClick={() => dismiss.current()} aria-label={t.close}><Icon name="close" size={18} /></button></header>
         {content}
       </section>
     </div>
@@ -202,40 +296,66 @@ export function useLatest<T>(value: T) {
   return ref;
 }
 
-type OwnedRequest = ConfirmRequest & { owner: symbol };
+type OwnedRequest = ConfirmRequest & { owner: symbol; id: number };
 const ConfirmContext = createContext<{ ask: (request: OwnedRequest) => void; dismiss: (owner: symbol) => void }>({ ask: () => {}, dismiss: () => {} });
 
 // A question belongs to the screen or sheet that asked it: when that goes away (browser Back, or a sync removing
 // the child it was about) the question closes unanswered instead of acting on a page that is no longer there.
+let requestIds = 0;
 export function useConfirm() {
   const { ask, dismiss } = useContext(ConfirmContext);
   const [owner] = useState(() => Symbol("confirm"));
   useEffect(() => () => dismiss(owner), [dismiss, owner]);
-  return useCallback((request: ConfirmRequest) => ask({ ...request, owner }), [ask, owner]);
+  return useCallback((request: ConfirmRequest) => ask({ ...request, owner, id: ++requestIds }), [ask, owner]);
 }
 
 export function ConfirmProvider({ children: content }: { children: React.ReactNode }) {
   const [request, setRequest] = useState<OwnedRequest | null>(null);
+  // An answered question fades out before it goes (a page going away closes its question at once).
+  const [leaving, setLeaving] = useState<OwnedRequest | null>(null);
+  useEffect(() => {
+    if (!leaving) return;
+    const id = window.setTimeout(() => setLeaving(null), EXIT_MS);
+    return () => window.clearTimeout(id);
+  }, [leaving]);
   // While one question is open, another can't replace it.
   const ask = useCallback((next: OwnedRequest) => setRequest(current => current ?? next), []);
-  const dismiss = useCallback((owner: symbol) => setRequest(current => (current?.owner === owner ? null : current)), []);
+  const dismiss = useCallback((owner: symbol) => {
+    setRequest(current => (current?.owner === owner ? null : current));
+    setLeaving(current => (current?.owner === owner ? null : current));
+  }, []);
+  const shown = request ?? leaving;
+  const latestRequest = useLatest(request);
   const value = useMemo(() => ({ ask, dismiss }), [ask, dismiss]);
   return (
     <ConfirmContext.Provider value={value}>
       {content}
       {/* Closing clears only this question, never one asked after it. */}
-      {request && <ConfirmDialog request={request} close={() => setRequest(current => (current === request ? null : current))} />}
+      {shown && (
+        <ConfirmDialog
+          key={shown.id}
+          request={shown}
+          closing={!request}
+          close={() => {
+            // Already gone (its page closed it): nothing to fade out.
+            if (latestRequest.current !== shown) return;
+            if (!prefersReducedMotion()) setLeaving(shown);
+            setRequest(null);
+          }}
+        />
+      )}
     </ConfirmContext.Provider>
   );
 }
 
-function ConfirmDialog({ request, close }: { request: ConfirmRequest; close: () => void }) {
+function ConfirmDialog({ request, closing, close }: { request: ConfirmRequest; closing: boolean; close: () => void }) {
   const t = useContext(CopyContext);
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
   const dialog = useRef<HTMLElement>(null);
   const id = useId();
-  const cancel = () => { if (!running.current) close(); };
+  const cancel = () => { if (!running.current && !closing) close(); };
+  useScrollLock();
 
   // Focus starts on the safe choice (Cancel for a destructive action) and returns to the opener afterwards.
   useEffect(() => {
@@ -247,6 +367,7 @@ function ConfirmDialog({ request, close }: { request: ConfirmRequest; close: () 
   // Escape cancels only this dialog (not a sheet underneath), and Tab stays inside it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (closing) return;
       if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cancel(); return; }
       if (e.key !== "Tab" || !dialog.current) return;
       const buttons = [...dialog.current.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
@@ -264,11 +385,12 @@ function ConfirmDialog({ request, close }: { request: ConfirmRequest; close: () 
     if (running.current) return;
     running.current = true;
     setBusy(true);
+    if (request.destructive) haptic("medium");
     try { await request.onConfirm(); } finally { close(); }
   };
 
   return (
-    <div className="overlay confirm-overlay" onMouseDown={e => { if (e.target === e.currentTarget) cancel(); }}>
+    <div className={`overlay confirm-overlay ${closing ? "closing" : ""}`} onMouseDown={e => { if (e.target === e.currentTarget) cancel(); }}>
       <section ref={dialog} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={request.body ? `${id}-body` : undefined} aria-busy={busy}>
         <h2 id={`${id}-title`}>{request.title}</h2>
         {request.body && <div id={`${id}-body`} className="confirm-body">{request.body}</div>}

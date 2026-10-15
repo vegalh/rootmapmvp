@@ -1,5 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmProvider, CopyContext, Shell, PageHeader } from "./components/ui";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { ConfirmProvider, CopyContext, EXIT_MS, Shell, PageHeader } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
 import { TodayPage } from "./pages/TodayPage";
@@ -40,6 +41,7 @@ import { spaceMatches } from "./lib/cloud/space";
 import { prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { formatRoute, parseRoute, type Route } from "./lib/routes";
+import { haptic, prefersReducedMotion, setNativeAppearance } from "./lib/native";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
@@ -111,6 +113,25 @@ function reloadIntoSpace() {
   window.location.reload();
 }
 
+// How a page change animates (index.css, "Page transitions"): a page pushed on top slides in from the right, Back
+// slides it away, switching tabs cross-fades. Uses the View Transitions API where the browser has it (iOS 18+), only
+// at phone width and never with Reduce Motion; otherwise the page simply changes, as before.
+type PageMotion = "push" | "back" | "tab";
+const TAB_SCREENS: Screen[] = ["today", "children", "discover", "observations", "profile"];
+type ViewTransitionDoc = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
+function changePage(motion: PageMotion, update: () => void) {
+  const doc = document as ViewTransitionDoc;
+  if (!doc.startViewTransition || prefersReducedMotion() || !matchMedia("(max-width: 559px)").matches || doc.visibilityState !== "visible") {
+    update();
+    return;
+  }
+  const root = doc.documentElement;
+  root.dataset.pageMotion = motion;
+  const transition = doc.startViewTransition(() => flushSync(update));
+  transition.ready.catch(() => undefined); // skipped by a quicker second tap: the page still changes
+  transition.finished.finally(() => { if (root.dataset.pageMotion === motion) delete root.dataset.pageMotion; });
+}
+
 // Pages that exist only in builds with cloud features; elsewhere their address opens Today.
 const CLOUD_SCREENS: Screen[] = ["signIn", "account", "guestImport"];
 function allowedRoute(r: Route | null): Route | null {
@@ -125,6 +146,13 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(start.screen);
   const [previous, setPrevious] = useState<Screen>("today");
   const [modal, setModal] = useState<ModalKind>(null);
+  // A sheet that was just closed, still shown while it slides away (see closeModal).
+  const [leavingModal, setLeavingModal] = useState<ModalKind>(null);
+  useEffect(() => {
+    if (!leavingModal) return;
+    const id = window.setTimeout(() => setLeavingModal(null), EXIT_MS);
+    return () => window.clearTimeout(id);
+  }, [leavingModal]);
   // The child whose page is open (or was last open); "" when none. Never assumed to exist: see lib/children.ts.
   const [selectedChild, setSelectedChild] = useState(start.child ?? "");
   // A Discover activity or a music activity: both share one id space (lib/catalog.ts).
@@ -317,6 +345,9 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return;
+    // A confirmation is felt as well as seen; a problem feels different from a success.
+    const problems = [t.storageFull, t.storageFailed, t.journalStorageFull, t.photoUnsupported, t.shareFailed];
+    haptic(problems.includes(toast) ? "error" : "success");
     const id = window.setTimeout(() => setToast(""), 2200);
     return () => window.clearTimeout(id);
   }, [toast]);
@@ -327,6 +358,8 @@ export default function App() {
     const apply = () => {
       const dark = appearance === "dark" || (appearance === "system" && media.matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
+      // Inside the iOS app the status bar text and the colour behind the page follow (same as --bg in index.css).
+      setNativeAppearance(dark, dark ? "#141a16" : "#fbf2e4");
     };
     apply();
     if (appearance !== "system") return;
@@ -338,15 +371,30 @@ export default function App() {
     document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
   }, [lang]);
 
-  const go = (s: Screen) => {
-    setPrevious(screen);
-    setScreen(s);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // Where each page was scrolled to when it was left, so going back returns to the same place in it (as on iOS);
+  // a newly opened page starts at its top.
+  const scrollMemory = useRef(new Map<string, number>());
+  const pendingScroll = useRef<"top" | "restore" | null>(null);
+  const shownHash = useRef("");
+  const go = (s: Screen, motion?: PageMotion) => {
+    // The page already open (its tab tapped again, say) scrolls back to its top.
+    if (s === screen) {
+      setPrevious(screen);
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      return;
+    }
+    scrollMemory.current.set(shownHash.current, window.scrollY);
+    const kind = motion ?? (TAB_SCREENS.includes(screen) && TAB_SCREENS.includes(s) ? "tab" : "push");
+    changePage(kind, () => {
+      pendingScroll.current = kind === "back" ? "restore" : "top";
+      setPrevious(screen);
+      setScreen(s);
+    });
   };
   // Returning to an earlier page (a back button, or leaving a form): see "Browser history" below.
   const goBack = (s: Screen) => {
     backNav.current = true;
-    go(s);
+    go(s, "back");
   };
 
   // ── Browser history ────────────────────────────────────────────────────────────────────────────────────
@@ -364,6 +412,19 @@ export default function App() {
     discoverTab,
     childTab: childTab === "Activities" ? "Activities" : "Journal",
   });
+  shownHash.current = hash;
+  // Scroll position after a page change, applied before the new page is painted (and before a page transition
+  // takes its picture of it).
+  useLayoutEffect(() => {
+    const pending = pendingScroll.current;
+    if (!pending) return;
+    pendingScroll.current = null;
+    window.scrollTo({ top: pending === "restore" ? scrollMemory.current.get(hash) ?? 0 : 0 });
+  }, [hash, screen]);
+  // RootMap restores scroll positions itself (above); the browser's own restoring would fight it.
+  useEffect(() => {
+    try { window.history.scrollRestoration = "manual"; } catch { /* not supported: the browser restores */ }
+  }, []);
   const history = useRef<{ stack: string[]; idx: number } | null>(null);
   const backNav = useRef(false);
   useEffect(() => {
@@ -402,6 +463,14 @@ export default function App() {
         h.idx = idx;
       }
       setModal(null);
+      setLeavingModal(null);
+      // Browser Back/Forward (and the iOS edge swipe, which already animates) change the page without a transition.
+      // Back through RootMap's own buttons has already shown the page by now.
+      const alreadyShown = window.location.hash === shownHash.current;
+      if (!alreadyShown) {
+        scrollMemory.current.set(shownHash.current, window.scrollY);
+        pendingScroll.current = "restore";
+      }
       setPrevious(screen);
       if (r.activity) setSelectedActivity(r.activity);
       if (r.book) setSelectedBook(r.book);
@@ -413,7 +482,6 @@ export default function App() {
       if (r.screen === "recap") { setRecapWeek(r.week ?? ""); setRecapChild(r.child ?? ""); }
       if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
       setScreen(r.screen);
-      window.scrollTo({ top: 0 });
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -436,7 +504,7 @@ export default function App() {
   // An activity or music activity page (whichever is selected) opens through the same route.
   const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
   const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
-  const toggleSaved = (id: string) => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
+  const toggleSaved = (id: string) => { haptic("light"); setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]); };
   const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : entryOrigin === "recap" ? "recap" : "observations";
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
@@ -505,7 +573,12 @@ export default function App() {
     setModal(null);
     // Closing without a destination (×, Cancel, tapping outside) stays where the parent was; a stray argument
     // such as a click event must never be treated as a screen (it used to fall through to Help & Support).
-    if (typeof destination !== "string") return;
+    // The sheet then slides away; one that leads somewhere else is replaced by that page at once.
+    if (typeof destination !== "string") {
+      if (modal && !prefersReducedMotion()) setLeavingModal(modal);
+      return;
+    }
+    setLeavingModal(null);
     if (destination === "record") {
       if (!childrenData.length) { setModal("addChild"); return; }
       setRecordFrom("quick");
@@ -619,7 +692,7 @@ export default function App() {
         <ActivityDetailPage
           activity={activity}
           saved={saved.includes(activity.id)}
-          toggleSaved={() => setSaved(saved.includes(activity.id) ? saved.filter(x => x !== activity.id) : [...saved, activity.id])}
+          toggleSaved={() => toggleSaved(activity.id)}
           back={() => goBack(previous === "week" || previous === "today" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
@@ -896,7 +969,8 @@ export default function App() {
         {content()}
       </Shell>
       <ModalOverlay
-        modal={modal}
+        modal={modal ?? leavingModal}
+        closing={!modal && !!leavingModal}
         close={closeModal}
         childrenData={childrenData}
         setChildrenData={async next => savedOk(await commitChildren(next))}
@@ -911,7 +985,7 @@ export default function App() {
         notify={setToast}
         t={t}
       />
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast && <div className="toast" role="status" key={toast}>{toast}</div>}
       {isBeta && <BetaNotice t={t} />}
     </div>
     </ConfirmProvider>

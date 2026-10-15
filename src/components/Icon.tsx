@@ -7,7 +7,8 @@ const paths: Record<string, React.ReactNode> = {
   list: <><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="5" cy="6" r="1" /><circle cx="5" cy="12" r="1" /><circle cx="5" cy="18" r="1" /></>,
   chevron: <path d="m9 18 6-6-6-6" />,
   down: <path d="m6 9 6 6 6-6" />,
-  back: <><path d="m15 18-6-6 6-6" /><path d="M9 12h11" /></>,
+  // The iOS back chevron, used by every back button.
+  back: <path d="m15 19-7-7 7-7" />,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>,
   users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
   home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10M9 20v-6h6v6" /></>,

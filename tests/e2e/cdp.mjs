@@ -30,6 +30,9 @@ export class Page {
     await p.send("Runtime.enable");
     await p.send("Log.enable");
     await p.send("DOM.enable");
+    // The suites check what each tap does, not how it animates: with Reduce Motion the app changes pages and closes
+    // sheets at once, so a step never acts on a page that is still sliding in. RM_MOTION=1 runs them with motion.
+    if (!process.env.RM_MOTION) await p.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
     return p;
   }
   constructor(ws) {

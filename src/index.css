@@ -19,6 +19,19 @@
   --border: #eee1d0;
   --shadow: 0 6px 20px rgba(59, 42, 26, .08);
   --safe-top: max(48px, env(safe-area-inset-top));
+  /* Text and icons on a filled primary button (dark text on the light green of the dark theme). */
+  --on-primary: #fff;
+  /* Motion: one timing for the whole app. iOS's own curve for sheets and page pushes; quick fades for feedback. */
+  --ease-ios: cubic-bezier(.32, .72, 0, 1);
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --dur-tap: 120ms;
+  --dur-fast: 180ms;
+  --dur-exit: 200ms;
+  --dur-sheet: 380ms;
+  --dur-page: 360ms;
+  /* Corners: controls (buttons, fields), list rows, cards. */
+  --radius-control: 14px;
+  --keyboard-inset: 0px;
   /* Around the app frame on wide screens, and behind the safe areas. */
   --backdrop: #efe7d6;
   color: var(--text);
@@ -30,12 +43,16 @@
   --bg: #141a16; --card: #1e2620; --elevated: #26302a; --primary: #8fcf9a;
   --dark-purple: #f3f7f0; --lavender: #26302a; --silver: #3a443c; --text: #f3f7f0;
   --muted: #b9c2b4; --border: #3a443c; --apricot: #3a2c22; --shadow: 0 8px 24px rgba(0,0,0,.3);
-  --backdrop: #0d110e; --danger: #f0a07c;
+  --backdrop: #0d110e; --danger: #f0a07c; --on-primary: #17131e;
   /* Native controls (date pickers, selects, scrollbars) follow the theme too. */
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--backdrop); }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+/* Nothing can push the page sideways; `clip` (unlike `hidden`) keeps sticky elements working. */
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--backdrop); overflow-x: clip; }
+/* Taps act at once (no double-tap-to-zoom wait) and without the grey web tap flash. */
+button, a, label, select, summary, [role="button"] { touch-action: manipulation; }
 @media (max-width: 559px) { body { background: var(--bg); } }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -96,7 +113,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .filter-popover-options { display: grid; grid-template-columns: 1fr; gap: 4px; }
 .filter-popover-options.cols-2 { grid-template-columns: repeat(2, minmax(110px, 140px)); }
 .filter-popover-option { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--text); font-family: var(--font-body); font-size: 13.5px; text-align: left; white-space: normal; line-height: 1.2; overflow-wrap: break-word; }
-.filter-popover-option:hover { background: rgba(94, 143, 114, 0.1); }
+@media (hover: hover) { .filter-popover-option:hover { background: rgba(94, 143, 114, 0.1); } }
 .filter-popover-option.selected { background: var(--lavender); color: var(--primary); font-weight: 700; }
 .filter-popover-option svg { flex: 0 0 auto; color: var(--primary); }
 
@@ -161,7 +178,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .menu-section { margin-bottom: 21px; }.menu-section h3 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.1px; margin: 0 0 8px 4px; }.menu-section > div { overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--card); box-shadow: var(--shadow); }.menu-section button { width: 100%; min-height: 50px; border: 0; border-bottom: 1px solid var(--border); background: transparent; display: grid; grid-template-columns: 31px 1fr auto 17px; gap: 8px; align-items: center; text-align: left; padding: 7px 12px; }.menu-section button:last-child { border-bottom: 0; }.menu-section button > i { width: 29px; height: 29px; border-radius: 9px; background: var(--lavender); color: var(--primary); display: grid; place-items: center; font-style: normal; }.menu-section button span { font-size: 15px; font-weight: 600; }.menu-section button small { font-size: 15px; color: var(--muted); }
 
 .week-page,.simple-page,.form-page { min-height: 100vh; padding: 0 20px 30px; background: var(--bg); }.round-add { border: 0; width: 39px; height: 39px; border-radius: 50%; display: grid; place-items: center; color: white; background: var(--primary); }
-.week-controls > label { height: 44px; border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 0 11px; display: flex; align-items: center; justify-content: space-between; }.week-controls > label span { font-size: 15px; color: var(--muted); }.week-controls select { border: 0; background: transparent; font-size: 15px; }
+.week-controls > label { height: 44px; border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 0 11px; display: flex; align-items: center; justify-content: space-between; }.week-controls > label span { font-size: 15px; color: var(--muted); }.week-controls select { border: 0; background: transparent; font-size: 16px; }
 .segmented { display: grid; grid-template-columns: repeat(3,1fr); background: var(--elevated); border-radius: 12px; padding: 4px; margin: 12px 0 17px; }.segmented button { border: 0; background: transparent; border-radius: 9px; min-height: 34px; color: var(--muted); font-size: 15px; }.segmented button.active { color: var(--primary); background: var(--lavender); font-weight: 700; box-shadow: var(--shadow); }
 .week-list { display: flex; flex-direction: column; gap: 9px; }.activity-row { min-height: 82px; padding: 9px; display: grid; grid-template-columns: 83px 1fr auto; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; }.activity-row > img { width: 83px; height: 64px; object-fit: cover; border-radius: 10px; }.activity-row > span { min-width: 0; }.activity-row strong,.activity-row small,.activity-row em { display: block; }.activity-row strong { font: 600 20px var(--font-heading); }.activity-row small { color: var(--muted); font-size: 14px; margin: 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.activity-row em { font-style: normal; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 3px; }.activity-row button { border: 0; background: transparent; color: var(--primary); font-size: 15px; padding: 7px; }
 .day-plan { display: grid; grid-template-columns: 34px 1fr; gap: 7px; align-items: center; }.day-plan > time { text-align: center; color: var(--muted); font-size: 16px; }.day-plan > time b { display: block; color: var(--primary); font-size: 14px; text-transform: uppercase; }.plan-actions { display: flex; flex-direction: column; }.plan-actions button { width: 27px; height: 27px; }
@@ -174,15 +191,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .notification-item { width: 100%; min-height: 73px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 10px; display: grid; grid-template-columns: 42px 1fr 17px; gap: 10px; align-items: center; text-align: left; margin-bottom: 8px; }.notification-item.unread { background: var(--lavender); }.notification-item.reminder { border-left: 3px solid var(--orange); }.notification-item img,.notification-item > i { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }.notification-item > i { display: grid; place-items: center; color: var(--primary); background: var(--apricot); }.notification-item strong { font-size: 15px; }.notification-item p { margin: 3px 0; color: var(--muted); font-size: 15px; line-height: 1.35; }.notification-item small { color: var(--primary); font-size: 14px; }
 
 .form-child { display: flex; align-items: center; gap: 11px; padding: 12px; border-radius: 15px; background: var(--lavender); margin-bottom: 18px; }.form-child img { width: 49px; height: 49px; border-radius: 50%; object-fit: cover; }.form-child span small,.form-child span strong,.form-child span em { display: block; }.form-child small { font-size: 14px; letter-spacing: 1px; color: var(--muted); }.form-child strong { font: 600 21px var(--font-heading); }.form-child em { font-style: normal; font-size: 15px; color: var(--muted); }
-.field { display: block; margin-bottom: 15px; }.field > span, fieldset legend { display: block; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 7px; }.field input,.field textarea,.field select,.sheet-fields input,.sheet-fields textarea,.sheet-fields select { width: 100%; border: 1px solid var(--border); background: var(--card); border-radius: 11px; min-height: 43px; padding: 10px; font-size: 15px; }.field textarea,.sheet-fields textarea { resize: vertical; }
+.field { display: block; margin-bottom: 15px; }.field > span, fieldset legend { display: block; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 7px; }.field input,.field textarea,.field select,.sheet-fields input,.sheet-fields textarea,.sheet-fields select { width: 100%; border: 1px solid var(--border); background: var(--card); border-radius: 12px; min-height: 46px; padding: 11px 12px; font-size: 16px; transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; }
+.field input:focus,.field textarea:focus,.field select:focus,.sheet-fields input:focus,.sheet-fields textarea:focus,.sheet-fields select:focus { outline: 0; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }.field textarea,.sheet-fields textarea { resize: vertical; }
 .child-photo-row { display: flex; align-items: center; gap: 12px; }.child-photo-row-preview,.child-photo-row-placeholder { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }.child-photo-row-placeholder { display: grid; place-items: center; background: var(--lavender); color: var(--primary); }.child-photo-row .photo-upload-button { margin-top: 0; }
 fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }.stage-choices button { min-height: 43px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); font-size: 15px; }.stage-choices button.active,.chips button.active { color: var(--primary); border-color: var(--primary); background: var(--lavender); font-weight: 700; }.chips { display: flex; flex-wrap: wrap; gap: 6px; }.chips button { border: 1px solid var(--border); border-radius: 17px; background: var(--card); padding: 7px 9px; font-size: 14px; }
 .form-page { padding-bottom: 95px; }.form-bottom { position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: 1.7fr 1fr; gap: 9px; padding: 11px 20px max(12px,env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--border); -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; }.form-bottom button { height: 47px; border: 0; border-radius: 13px; background: var(--silver); font-size: 15px; font-weight: 700; }.form-bottom button:first-child { color: white; background: var(--primary); }
 
-.overlay { position: fixed; z-index: 80; inset: 0; background: rgba(23,19,30,.48); display: flex; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); }
-.bottom-sheet { width: min(100%,402px); max-height: 82vh; overflow-y: auto; background: var(--bg); border-radius: 24px 24px 0 0; padding: 8px 20px max(22px,env(safe-area-inset-bottom)); box-shadow: 0 -15px 50px rgba(23,19,30,.2); animation: sheet .22s ease-out; }
-@keyframes sheet { from { transform: translateY(25px); opacity: 0; } }
-.bottom-sheet > i { display: block; width: 37px; height: 4px; border-radius: 3px; background: var(--silver); margin: 0 auto 8px; }.bottom-sheet header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }.bottom-sheet h2 { margin: 0; font: 600 26px var(--font-heading); }.bottom-sheet header button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--elevated); font-size: 21px; color: var(--muted); }
+.overlay { position: fixed; z-index: 80; inset: 0; background: rgba(23,19,30,.48); display: flex; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); animation: overlay-in var(--dur-sheet) var(--ease-out) both; }
+/* Sheets rise from the bottom edge like iOS sheets, and slide back down when closed or pulled down. */
+.bottom-sheet { width: min(100%,402px); max-height: min(82vh, calc(100% - env(safe-area-inset-top) - 12px)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: var(--bg); border-radius: 24px 24px 0 0; padding: 8px 20px max(22px,env(safe-area-inset-bottom)); box-shadow: 0 -15px 50px rgba(23,19,30,.2); animation: sheet-in var(--dur-sheet) var(--ease-ios) both; transition: transform .3s var(--ease-ios); }
+.overlay.closing { pointer-events: none; animation: overlay-out var(--dur-exit) ease-in both; }
+.overlay.closing .bottom-sheet { animation: sheet-out var(--dur-exit) cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes overlay-in { from { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; } }
+@keyframes overlay-out { to { background-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; } }
+@keyframes sheet-in { from { transform: translateY(100%); } }
+@keyframes sheet-out { to { transform: translateY(100%); } }
+.bottom-sheet > i { display: block; width: 37px; height: 5px; border-radius: 3px; background: var(--silver); margin: 0 auto 6px; }
+/* The title row stays in view while a long sheet scrolls. */
+.bottom-sheet header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 11px; padding: 6px 0 4px; background: var(--bg); }.bottom-sheet h2 { margin: 0; font: 600 26px/1.2 var(--font-heading); color: var(--dark-purple); }
+/* Close: a 30px circle inside a 44px tap area. */
+.bottom-sheet header button { flex: 0 0 auto; width: 44px; height: 44px; margin-right: -7px; padding: 7px; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--elevated); background-clip: content-box; color: var(--muted); }
 .quick-actions { display: flex; flex-direction: column; gap: 8px; }.quick-actions button { min-height: 55px; padding: 0 14px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); display: flex; align-items: center; gap: 11px; text-align: left; font-size: 15px; font-weight: 600; }.quick-actions svg { color: var(--primary); }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1.6fr; gap: 9px; margin-top: 17px; }.sheet-buttons button,.modal-primary { height: 48px; border-radius: 13px; border: 1px solid var(--border); background: var(--card); font-size: 15px; font-weight: 700; }.sheet-buttons button:last-child,.modal-primary { color: white; background: var(--primary); border: 0; }.modal-primary { width: 100%; }
 .plan-activity { display: flex; align-items: center; gap: 10px; padding: 9px; background: var(--card); border-radius: 13px; margin-bottom: 14px; }.plan-activity img { width: 58px; height: 45px; border-radius: 8px; object-fit: cover; }.plan-activity strong { font: 600 20px var(--font-heading); }
@@ -203,8 +231,10 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .sheet-buttons.even { grid-template-columns: 1fr 1fr; }.sheet-buttons button.danger { padding: 0 6px;  color: var(--orange); display: flex; align-items: center; justify-content: center; gap: 6px; }
 /* Confirmation dialog (ConfirmDialog in components/ui.tsx): centered in the app frame, above any open sheet. */
 .confirm-overlay { z-index: 85; align-items: center; padding: 16px; }
-.confirm-dialog { width: min(100%, 360px); max-height: 100%; overflow-y: auto; background: var(--bg); border-radius: 24px; padding: 22px 20px 18px; box-shadow: 0 15px 50px rgba(23,19,30,.25); animation: confirm-in .18s ease-out; }
-@keyframes confirm-in { from { transform: scale(.96); opacity: 0; } }
+.confirm-dialog { width: min(100%, 360px); max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); border-radius: 24px; padding: 22px 20px 18px; box-shadow: 0 15px 50px rgba(23,19,30,.25); animation: confirm-in var(--dur-fast) var(--ease-out) both; }
+.confirm-overlay.closing .confirm-dialog { animation: confirm-out var(--dur-exit) ease-in both; }
+@keyframes confirm-in { from { transform: scale(1.06); opacity: 0; } }
+@keyframes confirm-out { to { transform: scale(.97); opacity: 0; } }
 .confirm-dialog h2 { margin: 0; font: 600 26px/1.2 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
 .confirm-body { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.6; }.confirm-body p { margin: 0; }
 .confirm-facts { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; padding: 11px 13px; border-radius: 13px; background: var(--card); border: 1px solid var(--border); }.confirm-facts div { display: flex; justify-content: space-between; gap: 10px; color: var(--text); font-size: 15px; }.confirm-facts strong { font-variant-numeric: tabular-nums; }
@@ -307,7 +337,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .recap-row svg { color: var(--muted); }
 .moments-controls .mini-select { flex: 1; min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 11px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
 .moments-controls .mini-select span { display: none; }
-.moments-controls .mini-select select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; font-weight: 600; }
+.moments-controls .mini-select select { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; font-weight: 600; }
 .moments-controls .icon-button { flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); }
 .entry-child { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .entry-child img { width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
@@ -323,7 +353,10 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .entry-child-pick strong { display: block; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .entry-child-pick svg { color: var(--muted); }
 .entry-child-pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.toast { position: fixed; z-index: 90; left: 50%; bottom: 112px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px; color: white; background: var(--dark-purple); font-size: 14.5px; font-weight: 600; box-shadow: var(--shadow); text-align: center; }
+/* A confirmation that rises in, stays about two seconds (App.tsx clears it at 2.2s) and fades out on its own. */
+.toast { position: fixed; z-index: 90; left: 50%; bottom: calc(112px + var(--keyboard-inset)); transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 22px; color: white; background: var(--dark-purple); font-size: 14.5px; font-weight: 600; box-shadow: 0 8px 24px rgba(23,19,30,.18); text-align: center; pointer-events: none; animation: toast-in var(--dur-sheet) var(--ease-ios) both, toast-out var(--dur-exit) ease-in 2s both; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.96); } }
+@keyframes toast-out { to { opacity: 0; transform: translate(-50%, 4px); } }
 :root[data-theme="dark"] .toast { color: #17131e; }
 
 /* My Goals: the parent's own short list of intentions. */
@@ -556,3 +589,74 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .segmented button, .child-checks button { min-height: 44px; }
 .bottom-nav button { min-height: 44px; }
 .children-empty { margin: 4px 0 0; padding: 20px; border: 1.5px dashed var(--border); border-radius: 18px; color: var(--muted); font-size: 16px; line-height: 1.55; text-align: center; }
+
+/* ── Native feel ─────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* Behind the status bar (clock, Dynamic Island): a frosted strip of the page colour, so content scrolling under it
+   stays legible, as under an iOS navigation bar. No height where there is no safe area (most desktop browsers). */
+body::before { content: ""; position: fixed; z-index: 75; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: color-mix(in srgb, var(--bg) 84%, transparent); backdrop-filter: saturate(1.6) blur(16px); -webkit-backdrop-filter: saturate(1.6) blur(16px); pointer-events: none; }
+
+/* Inside the iOS app, controls don't select as text or offer the long-press callout. */
+.ios-app button, .ios-app .bottom-nav, .ios-app label.wide-primary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ios-app button img { -webkit-touch-callout: none; }
+
+/* Tap feedback, immediate on press and easing back on release. Text and icon buttons dim (like iOS system buttons),
+   filled buttons press in slightly, cards give a little, and rows in grouped lists highlight. */
+button, .photo-upload-button, .journal-add-photo { transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease; }
+button:not(:disabled):active, .photo-upload-button:active, .journal-add-photo:active { opacity: .6; transition-duration: 0s; }
+:is(.wide-primary, .wide-secondary, .modal-primary, .sheet-buttons button, .sticky-action button, .form-bottom button, .small-primary, .square-primary, .journal-save, .goal-form-actions .goal-submit, .round-add, .audio-toggle, .header-add-child, .picker-custom, .deleted-row button, .photo-upload-button):not(:disabled):active { opacity: .88; transform: scale(.97); transition-duration: var(--dur-tap); }
+:is(.today-feature, .today-memory, .today-week, .book-tile, .journal-card, .activity-image, .child-select-card, .recap-row, .picker-row, .lesson-list > button, .recent-activity > button, .notification-item, .quick-actions button, .activity-row, .journal-draft, .entry-child-pick, .goals-legacy):not(:disabled):active { opacity: 1; transform: scale(.985); transition-duration: var(--dur-tap); }
+:is(.menu-section button, .choice-list button, .filter-popover-option):not(:disabled):active { opacity: 1; background-color: color-mix(in srgb, var(--text) 6%, transparent); transition-duration: 0s; }
+.bottom-nav button:active { opacity: .6; }
+/* Positioned by a transform, so it only dims. */
+.page-title-row > .icon-button:active { transform: translateY(-50%); }
+
+/* Filled primary buttons share one text colour (dark on the dark theme's light green) and one shape. */
+:is(.wide-primary, .modal-primary, .sticky-action button:not(.secondary), .form-bottom button:first-child, .sheet-buttons button:last-child, .round-add, .journal-editor-bar .journal-save, .goal-form-actions .goal-submit, .deleted-row button, .audio-toggle, .sheet-buttons button.destructive) { color: var(--on-primary); }
+.bottom-nav .nav-add i { color: var(--on-primary); }
+.goal-check { color: var(--on-primary); }
+:is(.wide-primary, .wide-secondary, .modal-primary, .sheet-buttons button, .sticky-action button, .form-bottom button, .picker-custom) { min-height: 50px; border-radius: var(--radius-control); }
+.sheet-buttons button, .sticky-action button, .form-bottom button { height: 50px; }
+
+/* Back buttons: the iOS chevron, a little larger beside a large title. */
+.page-title-row > .icon-button svg, .detail-actions > button:first-child svg { width: 26px; height: 26px; stroke-width: 2.1; }
+.child-header > button svg, .journal-editor-bar > button:first-child svg { width: 22px; height: 22px; stroke-width: 2.1; margin-left: -6px; }
+.child-header > button, .journal-editor-bar > button:first-child { gap: 1px; }
+/* Floating buttons over a page keep a soft, frosted look. */
+.detail-actions button { background: color-mix(in srgb, var(--card) 90%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* While the keyboard is open, sheets sit just above it and the bars fixed to the bottom of the screen step aside
+   (iOS would otherwise float them over the keyboard). See startViewportTracking in lib/native.ts. */
+@media (max-width: 559px) {
+  .overlay { bottom: var(--keyboard-inset); transition: bottom .25s var(--ease-ios); }
+  html.keyboard-open .bottom-sheet { padding-bottom: 16px; }
+}
+html.keyboard-open .bottom-nav, html.keyboard-open .form-bottom, html.keyboard-open .sticky-action { visibility: hidden; }
+
+/* An open sheet or dialog holds the page behind it still (touch screens: hiding the scroll bar on a desktop would
+   shift the page). */
+@media (pointer: coarse) {
+  html.sheet-open, html.sheet-open body { overflow: hidden; }
+}
+
+/* Page transitions (App.tsx, changePage): a pushed page slides in over the current one, which eases left and dims a
+   little; Back reverses it; switching tabs cross-fades quickly. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-page); animation-timing-function: var(--ease-ios); }
+html[data-page-motion="push"]::view-transition-old(root), html[data-page-motion="back"]::view-transition-old(root),
+html[data-page-motion="push"]::view-transition-new(root), html[data-page-motion="back"]::view-transition-new(root) { mix-blend-mode: normal; }
+html[data-page-motion="push"]::view-transition-old(root) { animation-name: page-behind; }
+html[data-page-motion="push"]::view-transition-new(root) { animation-name: page-in; box-shadow: -10px 0 30px rgba(23,19,30,.14); }
+html[data-page-motion="back"]::view-transition-old(root) { z-index: 1; animation-name: page-out; box-shadow: -10px 0 30px rgba(23,19,30,.14); }
+html[data-page-motion="back"]::view-transition-new(root) { animation-name: page-return; }
+html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="tab"]::view-transition-new(root) { animation-duration: var(--dur-fast); animation-timing-function: ease; }
+@keyframes page-in { from { transform: translateX(100%); } }
+@keyframes page-behind { to { transform: translateX(-26%); filter: brightness(.96); } }
+@keyframes page-out { to { transform: translateX(100%); } }
+@keyframes page-return { from { transform: translateX(-26%); filter: brightness(.96); } }
+
+/* Reduce Motion: things appear and disappear without sliding (the JavaScript skips its animations too). */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .toast { animation: none !important; }
+  :is(button, .today-feature, .today-memory, .today-week, .book-tile, .journal-card):active { transform: none !important; }
+}

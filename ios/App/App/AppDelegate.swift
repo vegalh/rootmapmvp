@@ -43,10 +43,65 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-// The app's web view (set as the view controller in Main.storyboard). Without the rubber-band bounce the page no
-// longer stretches past its top and bottom edges while scrolling, so the app frame stays put.
+// The app's web view (the window's root view controller, see SceneDelegate.swift; also set in Main.storyboard).
 class RootMapViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
+        // Without the rubber-band bounce the page no longer stretches past its top and bottom edges while scrolling,
+        // so the app frame stays put.
         webView?.scrollView.bounces = false
+        // Swiping in from the left edge goes back a page, as in a navigation controller (each RootMap page is a
+        // history entry; the web app follows it, see "Browser history" in App.tsx).
+        webView?.allowsBackForwardNavigationGestures = true
+        // A long press on an image or link doesn't open a web preview of it.
+        webView?.allowsLinkPreview = false
+        bridge?.registerPluginInstance(RootMapNativePlugin())
+    }
+}
+
+// Native touches the web app asks for (src/lib/native.ts): haptic feedback, and the status bar and web view
+// background following the app's light or dark theme.
+@objc(RootMapNativePlugin)
+public class RootMapNativePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "RootMapNativePlugin"
+    public let jsName = "RootMapNative"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "haptic", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAppearance", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func haptic(_ call: CAPPluginCall) {
+        let kind = call.getString("kind") ?? "light"
+        DispatchQueue.main.async {
+            switch kind {
+            case "selection": UISelectionFeedbackGenerator().selectionChanged()
+            case "success": UINotificationFeedbackGenerator().notificationOccurred(.success)
+            case "warning": UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            case "error": UINotificationFeedbackGenerator().notificationOccurred(.error)
+            case "medium": UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            default: UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        }
+        call.resolve()
+    }
+
+    @objc func setAppearance(_ call: CAPPluginCall) {
+        let dark = call.getBool("dark") ?? false
+        let background = RootMapNativePlugin.color(hex: call.getString("background") ?? "")
+        DispatchQueue.main.async { [weak self] in
+            self?.bridge?.statusBarStyle = dark ? .lightContent : .darkContent
+            if let background = background, let webView = self?.bridge?.webView {
+                webView.backgroundColor = background
+                webView.scrollView.backgroundColor = background
+                webView.window?.backgroundColor = background
+            }
+        }
+        call.resolve()
+    }
+
+    // "#rrggbb" → UIColor; nil for anything else.
+    static func color(hex: String) -> UIColor? {
+        let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+        return UIColor(red: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255, blue: CGFloat(value & 0xFF) / 255, alpha: 1)
     }
 }
