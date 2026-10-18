@@ -6,7 +6,7 @@ import { ageFromDob, fmtLong, localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import { childShortName } from "../lib/children";
-import { childAge, discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../lib/i18n";
 import { activities } from "../data/activities";
 import { activityAgeRanges, ageRangeForYears, findActivity } from "../lib/catalog";
 import { dayHash, pickForDay, pickMemory, recapEntries, recapWeekForToday, weekEntries, weekHighlights, weekRange, weekStart, type Memory } from "../lib/memories";
@@ -88,7 +88,7 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
             <span className="today-feature-image">
               <img src={featured.image} alt="" />
               <span className="today-feature-caption">
-                <small>{discoverCategoryLabel(featured.area, t)}</small>
+                <small>{categoryOptionLabel(featured.category, t)}</small>
                 <strong>{featured.title}</strong>
               </span>
             </span>

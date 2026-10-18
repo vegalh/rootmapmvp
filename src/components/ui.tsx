@@ -411,8 +411,8 @@ export function ChildPhoto({ child }: { child: Pick<Child, "id" | "first" | "las
   return <img src={failed === src ? childInitialsSrc(child) : src} alt="" onError={() => setFailed(src)} />;
 }
 
-export function Empty({ text }: { text: string }) {
-  return <div className="empty"><Icon name="compass" size={25} /><p>{text}</p></div>;
+export function Empty({ text, children: action }: { text: string; children?: React.ReactNode }) {
+  return <div className="empty"><Icon name="compass" size={25} /><p>{text}</p>{action}</div>;
 }
 
 export function NotificationToggle({ label }: { label: string }) {

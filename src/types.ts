@@ -94,6 +94,13 @@ export type Observation = SyncMeta & {
   nextStepsZh?: string;
 };
 
+// Stable ids for Discover's Setting and Materials filters; display labels come from lib/i18n.ts.
+export type ActivitySetting = "home" | "restaurant" | "waiting" | "airplane" | "train" | "walking" | "park" | "grocery";
+export type MaterialType = "none" | "everyday";
+// Discover's Category filter: one primary category per activity, chosen for what the activity is for. Separate from
+// `area` (the learning area that activity records snapshot and Add Activity groups by), which stays as it was.
+export type DiscoverCategory = "practical-life" | "language" | "math" | "art-creativity" | "nature-culture" | "sensory-movement";
+
 export type Activity = {
   id: string;
   title: string;
@@ -101,6 +108,7 @@ export type Activity = {
   ageKey: string;
   area: string;
   topic: string;
+  category: DiscoverCategory;
   minutes: number;
   materialsLabel: string;
   image: string;
@@ -111,6 +119,12 @@ export type Activity = {
   keywords: string;
   // A short safety note for activities with water, small objects, food that can be choked on, blades or heat.
   safety?: string;
+  // Where the activity can realistically and safely be done (Discover's Setting filter). Absent = not yet reviewed:
+  // the activity is then only listed under "All Settings".
+  settings?: ActivitySetting[];
+  // What it needs (Discover's Materials filter): "none" = nothing to bring, buy or prepare; "everyday" = common
+  // household objects or things found where you are. Absent when it needs specialized or prepared materials.
+  materialType?: MaterialType;
   // Chinese translations of the display fields above; English fields remain the stored source of truth. Search
   // (lib/catalog.ts) matches both languages.
   zh?: {
@@ -178,6 +192,9 @@ export type MusicActivity = {
   // Optional extra search words (space-separated), English and Chinese.
   keywords?: string;
   keywordsZh?: string;
+  // Discover's Setting and Materials filters, as on Activity. Music is always in the Art & Creativity category.
+  settings?: ActivitySetting[];
+  materialType?: MaterialType;
 };
 
 export type Plan = SyncMeta & {

@@ -1,6 +1,6 @@
 import { areaLessons } from "../data/progress";
 import { findActivity, isMusicId } from "./catalog";
-import { learningAreaLabel, lessonLabel, localizeActivity, stageLabel, type Copy } from "./i18n";
+import { categoryOptionLabel, learningAreaLabel, lessonLabel, localizeActivity, stageLabel, type Copy } from "./i18n";
 import type { Activity, LessonRecord, Plan, Stage } from "../types";
 
 // The one way an activity record is made, whichever screen it comes from: Add Activity (a catalog or a custom
@@ -41,6 +41,8 @@ export function buildActivityRecord(input: RecordInput, id: string, now: string,
     // English title and category as they are today: shown only if the activity is later removed from Discover.
     lesson = activity.title;
     // Mark as Tried records keep their original shape (no area); the category is read from the catalog instead.
+    // `area` stays the activity's learning area (the record's stored shape is unchanged); it's shown only if the
+    // activity is later removed from the catalog. A custom activity stores the parent-facing category id chosen.
     area = input.kind === "tried" ? undefined : activity.area;
   } else {
     if (input.kind === "tried") return { problem: "activity" };
@@ -95,11 +97,12 @@ export function recordView(r: LessonRecord, t: Copy): RecordView {
   const activity = findActivity(r.activityId);
   const stored = isLegacyLesson(r) ? lessonLabel(r.lesson, t) : r.lesson?.trim();
   const title = (activity && localizeActivity(activity, t).title) || stored || t.lessonActivityLabel;
-  // Tried records have never shown a learning area.
-  const areaKey = r.kind === "tried" ? undefined : activity?.area || r.area;
+  // Tried records have never shown a learning area. A catalog activity shows its current category, as Discover and
+  // Add Activity do; otherwise the record's stored area (never rewritten) is shown.
+  const area = r.kind === "tried" ? undefined : activity ? categoryOptionLabel(activity.category, t) : r.area && learningAreaLabel(r.area, t);
   return {
     title,
-    area: areaKey ? learningAreaLabel(areaKey, t) : undefined,
+    area: area || undefined,
     stage: r.stage ? stageLabel(r.stage, t) : undefined,
     activity,
     music: isMusicId(r.activityId),

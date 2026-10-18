@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
 import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
-// Discover > Activities | Books | Music, the book Wishlist, and music activities in the My Week workflow.
+// Discover > Activities | Books (music activities are listed in Activities), the book Wishlist, and music activities
+// in the My Week workflow.
 // Checks are written against whatever books and music the data files hold, so they keep passing as the sample
 // entries are replaced with real ones.
 
@@ -53,6 +54,14 @@ const offeredAges = async () => {
   for (const a of ages) assert.ok(AGES.includes(a), a);
   return ages;
 };
+// Activities filters by label ("Setting", "Age", "Category", "Materials"): open the pill and choose an option.
+const pills = () => page.eval(`[...document.querySelectorAll(".filter-row .filter-pill")].map(b => b.textContent.trim())`);
+const pickFilter = async (label, option) => {
+  await page.eval(`[...document.querySelectorAll(".filter-row .filter-pill")].find(b => b.textContent.trim().startsWith(${q(label + ":")})).click()`);
+  await page.waitFor(`document.querySelector(".filter-popover")`, 3000, `${label} options open`);
+  await page.eval(`__t.click(${q(option)}, ".filter-popover-option")`);
+  await sleep(150);
+};
 const setting = async key => (await page.eval(`__t.all("settings")`)).find(s => s.key === key)?.value;
 const live = async store => (await page.eval(`__t.all(${q(store)})`)).filter(r => !r.deletedAt);
 const noOverflow = async label => {
@@ -67,13 +76,14 @@ await page.waitFor(`__t.dbExists()`, 10000, "data stored");
 const plansBefore = await live("plans");
 const savedBefore = await live("saved");
 
-await step("Discover shows Activities | Books | Music, with Activities first and selected", async () => {
+await step("Discover shows Activities | Books, with Activities first and selected", async () => {
   await nav(NAV.discover);
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["Activities", "Books", "Music"]);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["Activities", "Books"]);
   assert.equal(await activeTab(), "Activities");
   assert.equal(await page.eval(`document.querySelectorAll(".bottom-nav button").length`), 5, "bottom navigation unchanged");
   assert.ok((await count(".activity-card")) > 0);
-  assert.equal(await count(".filter-row .filter-pill"), 3, "Age, Topic and Area filters");
+  assert.deepEqual(await pills(), ["Setting: All Settings", "Age: All Ages", "Category: All", "Materials: All"]);
+  assert.ok((await count(".music-card")) > 0, "music is listed with the activities");
   await noOverflow("Activities");
 });
 
@@ -208,24 +218,39 @@ await step("Wishlist (Profile) persists after a refresh; books saved earlier to 
 });
 
 let musicTitle, musicId;
-await step("Music: search and age filter", async () => {
-  await tab("Music");
-  assert.equal(await activeTab(), "Music");
+await step("Music in Activities: search, Category, and Setting + Age + Category + Materials together", async () => {
+  await tab("Activities");
+  const all = await count(".activity-card");
   const total = await count(".music-card");
-  assert.ok(total > 0);
+  assert.ok(total > 0 && all > total);
   musicTitle = await page.eval(`document.querySelector(".music-card .activity-name").textContent`);
   await search(musicTitle.slice(0, 5).toLowerCase());
   assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-name")].some(s => s.textContent === ${q(musicTitle)})`));
   await search("zzz-no-such-song");
-  assert.equal(await count(".music-card"), 0);
+  assert.equal(await count(".activity-card"), 0);
+  assert.ok(await page.eval(`!!document.querySelector(".empty .reset-link")`), "empty state offers Clear filters");
   await search("");
-  let inRanges = 0;
-  for (const age of await offeredAges()) { await pickAge(age); const n = await count(".music-card"); assert.ok(n > 0, age); inRanges += n; }
-  assert.ok(inRanges >= total);
+  await pickFilter("Category", "Art & Creativity");
+  assert.equal(await count(".music-card"), total, "every music activity is in Art & Creativity");
+  assert.ok((await count(".activity-card")) > total, "with the art activities");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-card p")].every(p => p.textContent.includes("Art & Creativity"))`));
+  await pickFilter("Setting", "Park");
+  await pickFilter("Materials", "Nothing Needed");
+  const n = await count(".activity-card");
+  assert.ok(n > 0 && n === (await count(".music-card")) && n < total, "park + art + nothing needed: the music a parent can sing or call out");
+  await pickFilter("Age", "0–2");
+  assert.ok((await count(".music-card")) > 0 && (await count(".music-card")) < n, "age narrows it further");
   await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
-  assert.equal(await count(".music-card"), total);
+  assert.equal(await count(".activity-card"), all);
+  assert.deepEqual(await pills(), ["Setting: All Settings", "Age: All Ages", "Category: All", "Materials: All"]);
   for (const sel of [".music-card img", ".music-card .music-play", ".music-card .heart", ".music-card p", ".music-card small"]) assert.ok((await count(sel)) >= total, sel);
-  await noOverflow("Music");
+  await noOverflow("Activities with music");
+});
+
+await step("An old Music tab link opens Activities", async () => {
+  await page.eval(`location.hash = "#/discover/music"`); await sleep(300);
+  assert.equal(await activeTab(), "Activities");
+  assert.ok((await count(".music-card")) > 0);
 });
 
 await step("Music details: missing audio shows 'coming soon' instead of a broken player", async () => {
@@ -405,7 +430,9 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
   assert.ok(await page.eval(`document.body.innerText.includes("心愿书单")`), "Profile row");
   await nav(NAV.discover);
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本", "音乐"]);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本"]);
+  await tab("活动");
+  assert.deepEqual(await pills(), ["场景: 全部场景", "年龄: 所有年龄", "类别: 全部", "所需材料: 全部"]);
   await tab("绘本");
   const zhTitle = await page.eval(`document.querySelector(".book-tile strong").textContent`);
   await search(zhTitle);
@@ -415,7 +442,9 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.waitFor(`document.querySelector(".book-detail")`, 3000, "book");
   assert.ok(await page.eval(`document.body.innerText.includes("推荐理由") && document.body.innerText.includes("加入心愿书单")`));
   await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
-  await tab("音乐");
+  await tab("活动");
+  await search("你唱我学");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card p")].some(p => p.textContent.includes("艺术与创造"))`), "Chinese music search and category");
   await page.eval(`__t.clickSel(".music-card .activity-image")`);
   await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music");
   for (const text of ["玩法介绍", "孩子在探索什么", "标记已尝试"]) assert.ok(await page.eval(`document.body.innerText.includes(${q(text)})`), text);
@@ -434,7 +463,7 @@ await step("Dark mode: the new screens use the dark theme and fit 390px", async 
   await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
   await nav(NAV.discover);
   const bg = sel => page.eval(`getComputedStyle(document.querySelector(${q(sel)})).backgroundColor`);
-  for (const t of ["Books", "Music"]) {
+  for (const t of ["Books", "Activities"]) {
     await tab(t);
     await noOverflow(t);
   }
@@ -448,6 +477,39 @@ await step("Dark mode: the new screens use the dark theme and fit 390px", async 
   await page.eval(`__t.click("Appearance", ".menu-section button")`);
   await page.eval(`__t.click("Light")`);
   await page.waitFor(`document.documentElement.dataset.theme === "light"`, 3000, "light");
+});
+
+await step("Every screen shows an activity's current category, in English and Chinese", async () => {
+  // Matching Color Caps: learning area Practical Life (shown as "Everyday Life" before), category Sensory & Movement.
+  const LABELS = { en: ["Practical Life", "Language", "Math", "Art & Creativity", "Nature & Culture", "Sensory & Movement"], zh: ["日常生活", "语言", "数学", "艺术与创造", "自然与文化", "感官与运动"] };
+  const check = async (lang, expected, old) => {
+    await page.eval(`location.hash = "#/activity/matching-color-caps"`);
+    await page.waitFor(`document.querySelector(".detail-page .meta")`, 3000, "activity detail");
+    const meta = await page.eval(`document.querySelector(".detail-page .meta").textContent`);
+    assert.ok(meta.includes(expected) && !meta.includes(old), `${lang} detail: ${meta}`);
+    await page.eval(`[...document.querySelectorAll(".sticky-action button")].find(b => b.textContent.includes(${q(lang === "zh" ? "标记已尝试" : "Mark as Tried")})).click()`);
+    await page.waitFor(`document.querySelector(".overlay .plan-activity small")`, 3000, "Mark as Tried sheet");
+    assert.equal(await page.eval(`document.querySelector(".overlay .plan-activity small").textContent`), expected, `${lang} Mark as Tried`);
+    await page.eval(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))`); await sleep(400);
+    await page.eval(`location.hash = "#/today"`);
+    await page.waitFor(`document.querySelector(".today-feature-caption small")`, 3000, "Today");
+    const today = await page.eval(`document.querySelector(".today-feature-caption small").textContent`);
+    assert.ok(LABELS[lang].includes(today), `${lang} Today: ${today}`);
+    await page.eval(`location.hash = "#/my-week"`);
+    await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week");
+    await page.eval(`__t.click(${q(lang === "zh" ? "已收藏" : "Saved")}, ".segmented button")`); await sleep(150);
+    const rows = await page.eval(`[...document.querySelectorAll(".week-list .activity-row small")].map(s => s.textContent)`);
+    assert.ok(rows.length > 0 && rows.every(r => LABELS[lang].includes(r.split(" · ").pop())), `${lang} My Week: ${JSON.stringify(rows)}`);
+  };
+  const setLang = async (label, code) => {
+    await page.eval(`location.hash = "#/language"`); await sleep(300);
+    await page.eval(`__t.click(${q(label)})`);
+    await page.waitFor(`document.documentElement.lang === ${q(code)}`, 3000, code);
+  };
+  await check("en", "Sensory & Movement", "Everyday Life");
+  await setLang("简体中文", "zh-CN");
+  await check("zh", "感官与运动", "日常生活");
+  await setLang("English", "en");
 });
 
 await page.close();

@@ -3,7 +3,7 @@ import { Icon } from "./Icon";
 import { Empty } from "./ui";
 import { catalogCategories, findActivity, searchCatalog, type CatalogItem } from "../lib/catalog";
 import { recentActivityIds } from "../lib/activityRecords";
-import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { categoryOptionLabel, localizeActivity, type Copy } from "../lib/i18n";
 import type { Activity, LessonRecord } from "../types";
 
 // Rows shown before "Show more", so a large catalog never renders as one endless list.
@@ -26,7 +26,7 @@ export default function ActivityPicker({ query, setQuery, category, setCategory,
   const categories = useMemo(() => ["All", ...catalogCategories({ inUse: true })], []);
   const results = useMemo(() => searchCatalog(query, { category }), [query, category]);
   const recent = useMemo(
-    () => recentActivityIds(records, childId).map(id => findActivity(id)!).filter(a => category === "All" || a.area === category),
+    () => recentActivityIds(records, childId).map(id => findActivity(id)!).filter(a => category === "All" || a.category === category),
     [records, childId, category],
   );
   const searching = !!query.trim();
@@ -41,7 +41,7 @@ export default function ActivityPicker({ query, setQuery, category, setCategory,
       <div className="category-chips" role="group" aria-label={t.learningArea}>
         {categories.map(c => (
           <button aria-pressed={category === c} className={category === c ? "active" : ""} onClick={() => { setCategory(c); setShown(PAGE); }} key={c}>
-            {c === "All" ? t.all : discoverCategoryLabel(c, t)}
+            {categoryOptionLabel(c, t)}
           </button>
         ))}
       </div>
@@ -72,7 +72,7 @@ function PickerRow({ activity, pick, t }: { activity: Activity | CatalogItem; pi
   return (
     <button className="picker-row" onClick={() => pick(a.id)}>
       <img src={a.image} alt="" />
-      <span><strong>{a.title}</strong><small>{[discoverCategoryLabel(a.area, t), a.age].filter(Boolean).join(" · ")}</small></span>
+      <span><strong>{a.title}</strong><small>{[categoryOptionLabel(a.category, t), a.age].filter(Boolean).join(" · ")}</small></span>
       <Icon name="chevron" size={15} />
     </button>
   );

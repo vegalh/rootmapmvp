@@ -67,14 +67,15 @@ const recordsBefore = await live("records");
 const entriesBefore = await live("entries");
 let childId;
 
+let pickerChips;
 await step("Kids › child › Activities › Add Activity opens the search-first picker", async () => {
   await openPicker();
   assert.ok(await page.eval(`document.querySelector(".page-header h1").textContent === "Add Activity"`));
   assert.ok(await page.eval(`document.querySelector(".page-header p").textContent.startsWith("Recording for")`), "child is known");
   assert.ok(await page.eval(`document.querySelector(".picker-page .search input").placeholder.includes("Search activities")`));
-  const chips = await page.eval(`[...document.querySelectorAll(".category-chips button")].map(b => b.textContent)`);
-  assert.equal(chips[0], "All");
-  for (const c of ["Everyday Life", "Art", "Movement", "Music"]) assert.ok(chips.includes(c), c);
+  pickerChips = await page.eval(`[...document.querySelectorAll(".category-chips button")].map(b => b.textContent)`);
+  // The same parent-facing categories as Discover; Math has no activities yet, so it isn't offered.
+  assert.deepEqual(pickerChips, ["All", "Practical Life", "Language", "Art & Creativity", "Nature & Culture", "Sensory & Movement"]);
   assert.ok(!(await page.eval(`document.body.innerText.includes("Recently Used")`)), "no recent activities yet: section hidden");
   assert.ok((await rows()).length > 0);
   assert.ok(await page.eval(`!!document.querySelector(".picker-custom")`), "custom option offered");
@@ -97,16 +98,19 @@ await step("Search: English title, Chinese title, keywords, partial and no resul
   await search("");
 });
 
-await step("Category and search filter together; Music is a category", async () => {
-  await chip("Everyday Life");
+await step("Category and search filter together; music is in Art & Creativity", async () => {
+  await chip("Practical Life");
   await search("water");
   const found = await rows();
   assert.ok(found.length > 0);
-  assert.ok(found.every(r => r.meta.startsWith("Everyday Life")), JSON.stringify(found));
+  assert.ok(found.every(r => r.meta.startsWith("Practical Life")), JSON.stringify(found));
   await search("");
-  await chip("Music");
+  await chip("Art & Creativity");
+  const art = await rows();
+  assert.ok(art.length > 0 && art.every(r => r.meta.startsWith("Art & Creativity")));
+  await search("music");
   const music = await rows();
-  assert.ok(music.length > 0 && music.every(r => r.meta.startsWith("Music")));
+  assert.ok(music.length > 0 && music.length < art.length && music.every(r => r.meta.startsWith("Art & Creativity")), "music among the art activities");
   await noOverflow("picker filtered");
 });
 
@@ -116,7 +120,7 @@ await step("Choosing an activity opens the form prefilled; notes start empty; sa
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
   assert.equal(await page.eval(`document.querySelector(".picked-activity strong").textContent`), musicTitle);
-  assert.ok(await page.eval(`document.querySelector(".picked-activity small").textContent.startsWith("Music")`), "category prefilled");
+  assert.ok(await page.eval(`document.querySelector(".picked-activity small").textContent.startsWith("Art & Creativity")`), "category prefilled");
   assert.ok(await page.eval(`!!document.querySelector(".form-child")`), "child shown, not asked again");
   assert.ok(!(await page.eval(`!!document.querySelector(".form-fields select")`)), "no child or activity dropdown");
   assert.equal(await page.eval(`document.querySelector(".form-fields input[type=date]").value`), today, "today's local date");
@@ -139,7 +143,7 @@ await step("Choosing an activity opens the form prefilled; notes start empty; sa
   childId = r.childId;
   assert.ok(r.activityId?.startsWith("music-"), "stable catalog id");
   assert.equal(r.lesson, musicTitle, "title snapshot");
-  assert.equal(r.area, "Music");
+  assert.equal(r.area, "Music", "the stored learning area snapshot is unchanged");
   assert.equal(r.date, today);
   assert.equal(r.kind, undefined);
   for (const f of ["stage", "notes", "skills"]) assert.equal(r[f], undefined, `${f} left out`);
@@ -185,19 +189,24 @@ await step("Custom activity: name and learning area, stored as typed and never a
   assert.ok(await page.eval(`document.querySelector(".journal-status.error")?.textContent === "Choose a category."`));
   assert.equal((await live("records")).length, before, "nothing saved without an area");
   const areas = await page.eval(`[...document.querySelectorAll(".form-fields select option")].map(o => o.value).filter(Boolean)`);
-  assert.ok(areas.includes("Movement") && areas.includes("Music"), "Discover categories offered");
-  await page.eval(`__t.type(".form-fields select", "Movement")`);
+  assert.deepEqual(areas, ["practical-life", "language", "math", "art-creativity", "nature-culture", "sensory-movement"], "the six categories (Math too: it's the parent's own activity)");
+  await page.eval(`__t.type(".form-fields select", "sensory-movement")`);
   await save();
   await page.waitFor(`document.querySelector(".child-profile")`, 3000, "saved");
   const r = (await live("records")).find(x => x.lesson === "Climbing at the playground");
   assert.ok(r);
-  assert.equal(r.area, "Movement");
+  assert.equal(r.area, "sensory-movement");
   assert.equal(r.activityId, undefined);
-  assert.ok((await history()).some(h => h.startsWith("Climbing at the playground Movement")));
+  assert.ok((await history()).some(h => h.startsWith("Climbing at the playground Sensory & Movement")));
   await nav(NAV.discover);
   await page.eval(`__t.type(".discover-search input", "Climbing")`); await sleep(150);
   assert.equal(await page.eval(`document.querySelectorAll(".activity-card").length`), 0, "not in Discover");
-  await page.eval(`__t.type(".discover-search input", "")`);
+  await page.eval(`__t.type(".discover-search input", "")`); await sleep(150);
+  // Discover's Category filter offers exactly what Add Activity's chips do.
+  await page.eval(`[...document.querySelectorAll(".filter-row .filter-pill")].find(b => b.textContent.startsWith("Category:")).click()`);
+  await page.waitFor(`document.querySelector(".filter-popover")`, 3000, "category options");
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".filter-popover-option")].map(b => b.textContent.trim())`), pickerChips);
+  await page.eval(`[...document.querySelectorAll(".filter-row .filter-pill")].find(b => b.textContent.startsWith("Category:")).click()`); await sleep(100);
 });
 
 await step("History shows older records, new records and Mark as Tried; never blank", async () => {

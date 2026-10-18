@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { catalogCategories, catalogItems, findActivity, searchCatalog } from "../../src/lib/catalog.ts";
+import { DISCOVER_CATEGORIES, catalogCategories, catalogItems, findActivity, searchCatalog, spreadEvenly } from "../../src/lib/catalog.ts";
 import { buildActivityRecord, recentActivityIds, recordView } from "../../src/lib/activityRecords.ts";
 import { copy } from "../../src/lib/i18n.ts";
-import { activities, categories } from "../../src/data/activities.ts";
+import { activities } from "../../src/data/activities.ts";
 import { musicActivities } from "../../src/data/music.ts";
 import { initialRecords } from "../../src/data/progress.ts";
 import type { LessonRecord } from "../../src/types.ts";
@@ -14,18 +14,34 @@ const ids = (list: { id: string }[]) => list.map(a => a.id);
 
 test("catalog: one list of every Discover activity and music activity, ids unchanged", () => {
   const items = catalogItems();
-  assert.deepEqual(ids(items), [...ids(activities), ...ids(musicActivities)]);
+  assert.deepEqual([...ids(items)].sort(), [...ids(activities), ...ids(musicActivities)].sort());
   assert.equal(new Set(ids(items)).size, items.length, "ids are unique across activities and music");
-  assert.ok(items.filter(a => a.type === "music").every(a => a.area === "Music"));
+  assert.ok(items.filter(a => a.type === "music").every(a => a.area === "Music" && a.category === "art-creativity"));
   for (const a of items) assert.equal(findActivity(a.id)?.id, a.id);
 });
 
-test("catalog: categories come from the Discover list, plus any used category it doesn't name", () => {
-  assert.deepEqual(catalogCategories().slice(0, categories.length), categories.map(c => c[0]));
-  const used = new Set(catalogItems().map(a => a.area));
-  for (const c of used) assert.ok(catalogCategories().includes(c), `${c} offered`);
-  assert.ok(catalogCategories({ inUse: true }).every(c => used.has(c)));
-  assert.ok(catalogCategories({ inUse: true }).includes("Music"));
+test("catalog: music is spread evenly through the activities, in a stable order", () => {
+  const items = ids(catalogItems());
+  assert.deepEqual(ids(catalogItems()), items, "the same order every time");
+  // Each list keeps its own order.
+  assert.deepEqual(items.filter(id => !id.startsWith("music-")), ids(activities));
+  assert.deepEqual(items.filter(id => id.startsWith("music-")), ids(musicActivities));
+  // Not all at the end, and no two music activities next to each other.
+  const at = items.map((id, i) => (id.startsWith("music-") ? i : -1)).filter(i => i >= 0);
+  assert.ok(at[0] < items.length / 2 && at[at.length - 1] < items.length - 1, JSON.stringify(at));
+  for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] > 1, JSON.stringify(at));
+  assert.deepEqual(spreadEvenly([1, 2, 3, 4, 5, 6], ["a", "b"]), [1, 2, "a", 3, 4, "b", 5, 6]);
+  assert.deepEqual(spreadEvenly([1, 2], []), [1, 2]);
+  assert.deepEqual(spreadEvenly([], ["a"]), ["a"]);
+});
+
+test("catalog: Discover and Add Activity share the six categories; an empty one (Math) isn't offered as a filter", () => {
+  assert.deepEqual(catalogCategories(), DISCOVER_CATEGORIES);
+  assert.deepEqual([...DISCOVER_CATEGORIES], ["practical-life", "language", "math", "art-creativity", "nature-culture", "sensory-movement"]);
+  const used = new Set(catalogItems().map(a => a.category));
+  assert.deepEqual(catalogCategories({ inUse: true }), DISCOVER_CATEGORIES.filter(c => used.has(c)));
+  assert.ok(!catalogCategories({ inUse: true }).includes("math"), "no math activities yet");
+  assert.ok(catalogCategories().includes("math"), "a custom activity can still be Math");
 });
 
 test("search: English title, partial and case-insensitive", () => {
@@ -53,10 +69,13 @@ test("search: keywords and category names in both languages", () => {
 });
 
 test("search: category filter and query work together; title matches come first", () => {
-  const water = searchCatalog("water", { category: "Practical Life" });
+  const water = searchCatalog("water", { category: "practical-life" });
   assert.ok(water.length > 0);
-  assert.ok(water.every(a => a.area === "Practical Life"));
-  assert.deepEqual(searchCatalog("", { category: "Music" }).map(a => a.id), ids(musicActivities));
+  assert.ok(water.every(a => a.category === "practical-life"));
+  const art = searchCatalog("", { category: "art-creativity" });
+  assert.ok(ids(musicActivities).every(id => ids(art).includes(id)), "music is in Art & Creativity");
+  assert.ok(art.some(a => a.type === "activity"), "alongside the art activities");
+  assert.deepEqual(ids(searchCatalog("", { category: "math" })), []);
   const pour = searchCatalog("pour");
   const firstNonTitle = pour.findIndex(a => !a.title.toLowerCase().includes("pour"));
   if (firstNonTitle >= 0) assert.ok(pour.slice(firstNonTitle).every(a => !a.title.toLowerCase().includes("pour")));
@@ -132,6 +151,27 @@ test("history: removed activities fall back to the stored title; nothing is blan
   assert.equal(recordView(blank, en).title, en.lessonActivityLabel);
   assert.equal(recordView(blank, en).area, undefined);
   assert.equal(recordView(blank, en).stage, undefined);
+});
+
+test("records: a custom activity can use a parent-facing category; older custom areas still read the same", () => {
+  const built = buildActivityRecord({ childId: "emma", date: "2026-10-13", customTitle: "Counting stairs", customArea: "math" }, "r-4", now);
+  assert.ok("record" in built);
+  assert.equal(built.record.area, "math");
+  assert.equal(recordView(built.record, en).area, "Math");
+  assert.equal(recordView(built.record, zh).area, "数学");
+  const older: LessonRecord = { id: "o", childId: "emma", lesson: "Climbing", area: "Movement", date: "2026-09-01" };
+  assert.equal(recordView(older, en).area, en.movement);
+  assert.equal(older.area, "Movement", "the stored value is never rewritten");
+});
+
+test("history: a catalog record shows the activity's category, the same as Discover and Add Activity", () => {
+  const m = musicActivities[0];
+  const r: LessonRecord = { id: "m", childId: "emma", activityId: m.id, lesson: m.title, area: "Music", date: "2026-10-01" };
+  assert.equal(recordView(r, en).area, "Art & Creativity");
+  assert.equal(recordView(r, zh).area, "艺术与创造");
+  assert.equal(r.area, "Music", "stored snapshot unchanged");
+  const a = activities.find(x => x.id === "matching-color-caps")!;
+  assert.equal(recordView({ id: "x", childId: "emma", activityId: a.id, lesson: a.title, area: a.area, date: "2026-10-01" }, en).area, "Sensory & Movement");
 });
 
 test("history: catalog records show the current localized title", () => {

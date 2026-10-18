@@ -1,8 +1,8 @@
-import { activities, categories } from "../data/activities";
+import { activities } from "../data/activities";
 import { musicActivities } from "../data/music";
 import defaultMusicCover from "../assets/music/cover-sage.svg";
-import type { Activity, AgeRange, Book, Lang, MusicActivity } from "../types";
-import { copy, discoverCategoryLabel, topicOptionLabel, type Copy } from "./i18n";
+import type { Activity, ActivitySetting, AgeRange, Book, DiscoverCategory, Lang, MaterialType, MusicActivity } from "../types";
+import { categoryOptionLabel, copy, discoverCategoryLabel, topicOptionLabel, type Copy } from "./i18n";
 
 // The one activity catalog: Discover activities (src/data/activities.ts) and Music activities (src/data/music.ts).
 // Both live in one id space: a saved activity, a My Week plan or an activity record may refer to either, so
@@ -115,18 +115,22 @@ export function musicAsActivity(m: MusicActivity): Activity {
     ageKey: m.ageRanges[0] ?? "",
     area: "Music",
     topic: "",
+    category: "art-creativity",
     minutes: m.duration,
-    materialsLabel: "Audio guide",
+    // "Optional" when a parent can just as well sing or call it out (see materialType in data/music.ts).
+    materialsLabel: m.materialType === "none" ? "Optional audio guide" : "Audio guide",
     image: musicCover(m),
     description: m.description,
     domains: m.whatChildrenExplore,
     materials: [],
     steps: m.howToPlay,
     keywords: "",
+    settings: m.settings,
+    materialType: m.materialType,
     zh: {
       title: m.titleZh,
       age: agesLabel(m.ageRanges, "zh"),
-      materialsLabel: "音频引导",
+      materialsLabel: m.materialType === "none" ? "可选音频引导" : "音频引导",
       description: m.descriptionZh,
       domains: m.whatChildrenExploreZh,
       steps: m.howToPlayZh,
@@ -144,27 +148,33 @@ export function findActivity(id: string | undefined): Activity | undefined {
 }
 
 export type CatalogType = "activity" | "music";
-// A catalog entry in the shared activity shape (music is converted with `musicAsActivity`, category "Music").
+// A catalog entry in the shared activity shape (music is converted with `musicAsActivity`, category Art & Creativity).
 export type CatalogItem = Activity & { type: CatalogType };
 
+// `extra` spread evenly through `main`, each list keeping its own order: with 61 and 5, one after every ~10. The
+// same input always gives the same order.
+export function spreadEvenly<T>(main: T[], extra: T[]): T[] {
+  const out = [...main];
+  extra.forEach((x, i) => out.splice(Math.round(((i + 1) * main.length) / (extra.length + 1)) + i, 0, x));
+  return out;
+}
+
 let items: CatalogItem[] | undefined;
-// Every activity and music activity, in Discover order (activities first, then music).
+// Every activity and music activity, in Discover and Add Activity order: the data files' order, with music spread
+// evenly through the activities rather than after them all.
 export function catalogItems(): CatalogItem[] {
-  items ??= [
-    ...activities.map(a => ({ ...a, type: "activity" as const })),
-    ...musicActivities.map(m => ({ ...musicAsActivity(m), type: "music" as const })),
-  ];
+  items ??= spreadEvenly<CatalogItem>(
+    activities.map(a => ({ ...a, type: "activity" as const })),
+    musicActivities.map(m => ({ ...musicAsActivity(m), type: "music" as const })),
+  );
   return items;
 }
 
-// Learning areas, from the Discover category list (its order), followed by any category an activity uses that
-// the list doesn't name yet, so a new category is never hidden. `inUse` keeps only categories with activities
-// (the picker's filters); without it every Discover category is offered (a custom activity's learning area).
-export function catalogCategories({ inUse = false } = {}): string[] {
-  const used = new Set(catalogItems().map(a => a.area).filter(Boolean));
-  const listed = categories.map(c => c[0]);
-  const all = [...listed, ...[...used].filter(c => !listed.includes(c))];
-  return inUse ? all.filter(c => used.has(c)) : all;
+// The parent-facing categories (Discover's Category filter and Add Activity's chips), in their usual order. `inUse`
+// keeps only categories with activities (filters never offer an empty one, so Math stays hidden until it has some);
+// without it all six are offered (a custom activity's category).
+export function catalogCategories({ inUse = false } = {}): DiscoverCategory[] {
+  return inUse ? DISCOVER_CATEGORIES.filter(c => catalogItems().some(a => a.category === c)) : DISCOVER_CATEGORIES;
 }
 
 // Lower-case text a search query is matched against: titles, categories, topics, keywords, what children explore and
@@ -178,6 +188,7 @@ export function searchText(a: Activity): string {
     a.title, a.zh?.title,
     a.area, discoverCategoryLabel(a.area, copy.en), discoverCategoryLabel(a.area, copy.zh),
     a.topic, a.topic && topicOptionLabel(a.topic, copy.zh),
+    categoryOptionLabel(a.category, copy.en), categoryOptionLabel(a.category, copy.zh),
     a.keywords, a.zh?.keywords, music?.keywords, music?.keywordsZh,
     ...a.domains, ...(a.zh?.domains ?? []),
     ...a.materials, ...(a.zh?.materials ?? []),
@@ -194,10 +205,33 @@ export function matchesCatalogQuery(a: Activity, query: string): boolean {
   return words.every(w => text.includes(w));
 }
 
+// Discover's Category, Setting and Materials filters, in the order they're offered. "All" is the default of each.
+export const DISCOVER_CATEGORIES: DiscoverCategory[] = ["practical-life", "language", "math", "art-creativity", "nature-culture", "sensory-movement"];
+export const ACTIVITY_SETTINGS: ActivitySetting[] = ["home", "restaurant", "waiting", "airplane", "train", "walking", "park", "grocery"];
+export const MATERIAL_TYPES: MaterialType[] = ["none", "everyday"];
+
+// An activity without setting or materials metadata is only listed under "All".
+export const matchesSetting = (a: Pick<Activity, "settings">, setting: string) => setting === "All" || !!a.settings?.includes(setting as ActivitySetting);
+export const matchesMaterials = (a: Pick<Activity, "materialType">, materials: string) => materials === "All" || a.materialType === materials;
+
+export type DiscoverFilters = { q: string; setting: string; age: string; category: string; materials: string };
+export const DEFAULT_DISCOVER_FILTERS: DiscoverFilters = { q: "", setting: "All", age: "All Ages", category: "All", materials: "All" };
+
+// Discover's Activities tab (activities and music, see catalogItems): search and every filter together, in catalog order.
+export function filterDiscoverActivities<A extends Activity>(list: A[], f: DiscoverFilters): A[] {
+  return list.filter(a =>
+    matchesCatalogQuery(a, f.q) &&
+    (f.age === "All Ages" || activityAgeRanges(a).includes(f.age as AgeRange)) &&
+    (f.category === "All" || a.category === f.category) &&
+    matchesSetting(a, f.setting) &&
+    matchesMaterials(a, f.materials)
+  );
+}
+
 // Catalog search shared by Discover and Add Activity: query and category together, title matches first.
 export function searchCatalog(query: string, { category = "All", within = catalogItems() }: { category?: string; within?: CatalogItem[] } = {}): CatalogItem[] {
   const q = query.trim().toLowerCase();
-  const found = within.filter(a => (category === "All" || a.area === category) && matchesCatalogQuery(a, q));
+  const found = within.filter(a => (category === "All" || a.category === category) && matchesCatalogQuery(a, q));
   if (!q) return found;
   const inTitle = (a: Activity) => a.title.toLowerCase().includes(q) || !!a.zh?.title?.toLowerCase().includes(q);
   return [...found.filter(inTitle), ...found.filter(a => !inTitle(a))];

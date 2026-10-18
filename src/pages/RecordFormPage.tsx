@@ -5,7 +5,7 @@ import { catalogCategories, findActivity } from "../lib/catalog";
 import type { RecordInput } from "../lib/activityRecords";
 import { localIsoToday } from "../lib/dates";
 import type { Child, LessonRecord } from "../types";
-import { childAge, discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../lib/i18n";
 import { childOptionLabel, isActiveChild } from "../lib/children";
 
 // The activity being recorded: one from the catalog, or the parent's own.
@@ -121,7 +121,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
             <legend>{t.lessonActivityLabel}</legend>
             <div className="plan-activity picked-activity">
               <img src={a.image} alt="" />
-              <span><strong>{a.title}</strong><small>{[discoverCategoryLabel(a.area, t), a.age].filter(Boolean).join(" · ")}</small></span>
+              <span><strong>{a.title}</strong><small>{[categoryOptionLabel(a.category, t), a.age].filter(Boolean).join(" · ")}</small></span>
               <button className="text-action" onClick={change}>{t.changeActivity}</button>
             </div>
           </fieldset>
@@ -133,7 +133,7 @@ function RecordForm({ choice, childrenData, childId, setChildId, lockChild, chan
             <Field label={t.learningArea}>
               <select value={area} onChange={e => { setArea(e.target.value); setError(""); }}>
                 <option value="" disabled>{t.chooseArea}</option>
-                {catalogCategories().map(c => <option value={c} key={c}>{discoverCategoryLabel(c, t)}</option>)}
+                {catalogCategories().map(c => <option value={c} key={c}>{categoryOptionLabel(c, t)}</option>)}
               </select>
             </Field>
           </>

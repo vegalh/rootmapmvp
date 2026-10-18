@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 import type { Activity } from "../types";
-import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { categoryOptionLabel, localizeActivity, type Copy } from "../lib/i18n";
 
 export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, openTried, notify, t }: {
   activity: Activity;
@@ -40,7 +40,7 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
       <img className="detail-hero" src={a.image} alt="" />
       <div className="detail-content">
         <h1>{a.title}</h1>
-        <p className="meta">{a.age}<b>·</b>{discoverCategoryLabel(a.area, t)}<b>·</b>{a.minutes} {t.minutesWord}</p>
+        <p className="meta">{a.age}<b>·</b>{categoryOptionLabel(a.category, t)}<b>·</b>{a.minutes} {t.minutesWord}</p>
         <p className="description">{a.description}</p>
         <div className="domain-row">
           {a.domains.map((d, i) => (

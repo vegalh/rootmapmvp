@@ -5,7 +5,8 @@ import coverAnimalWalks from "../assets/music/cover-animal-walks.svg";
 import coverFastAndSlow from "../assets/music/cover-fast-and-slow.svg";
 import coverEchoSong from "../assets/music/cover-echo-song.svg";
 
-// Discover > Music: activities a parent and child do together, guided by a short recording. Not a music library.
+// Music activities a parent and child do together, guided by a short recording. Not a music library. They're listed
+// in Discover > Activities (category Art & Creativity) and open their own page with the audio player.
 //
 // To add one, append an object with a unique, stable `id` (saved activities, My Week plans and "Mark as Tried"
 // records refer to it, so never change or reuse one, and don't reuse an id from src/data/activities.ts).
@@ -18,11 +19,16 @@ import coverEchoSong from "../assets/music/cover-echo-song.svg";
 //   import freezeDanceAudio from "../assets/music/freeze-dance.mp3";
 //   { id: "music-freeze-dance", …, audioSrc: freezeDanceAudio }
 //
+// `materialType` (Discover's Materials filter): "none" only when the activity works just as well with a parent singing
+// or calling it out (say so in the steps); "everyday" when playing music on a phone or speaker is part of it.
+//
 // Each activity has its own simple illustration (its own colour and motif), so the cards are easy to tell apart;
 // replace `coverImage` with an imported image (about 4:3) if you like.
 export const musicActivities: MusicActivity[] = [
   {
     id: "music-freeze-dance",
+    settings: ["home", "park"],
+    materialType: "everyday",
     title: "Freeze Dance",
     titleZh: "音乐停，我也停",
     ageRanges: ["2–3", "3–4", "4–6"],
@@ -47,6 +53,8 @@ export const musicActivities: MusicActivity[] = [
   },
   {
     id: "music-clap-the-beat",
+    settings: ["home", "park"],
+    materialType: "none",
     title: "Clap the Beat",
     titleZh: "跟着节拍拍拍手",
     ageRanges: ["0–2", "2–3"],
@@ -56,13 +64,13 @@ export const musicActivities: MusicActivity[] = [
     descriptionZh: "拍手、拍膝盖、点点脚尖，一起感受稳定的节拍。再小的孩子也喜欢参与。",
     howToPlay: [
       "Sit together, with your little one on your lap or facing you.",
-      "Clap gently along with the beat.",
+      "Clap gently along with the beat of the recording, or of a song you sing together.",
       "Switch to patting knees, then tapping toes.",
       "Slow down and finish with a quiet hug.",
     ],
     howToPlayZh: [
       "和孩子坐在一起，可以抱在腿上，也可以面对面。",
-      "跟着节拍轻轻拍手。",
+      "跟着音频或你们一起唱的歌的节拍，轻轻拍手。",
       "换成拍膝盖，再换成点脚尖。",
       "慢慢放缓，最后给孩子一个安静的拥抱。",
     ],
@@ -71,21 +79,23 @@ export const musicActivities: MusicActivity[] = [
   },
   {
     id: "music-animal-walks",
+    settings: ["home", "park"],
+    materialType: "none",
     title: "Animal Walks",
     titleZh: "小动物走路",
     ageRanges: ["2–3", "3–4"],
     duration: 10,
     coverImage: coverAnimalWalks,
-    description: "Move like different animals as the recording guides you: stomp like an elephant, hop like a frog, tiptoe like a mouse.",
-    descriptionZh: "跟着音频的引导，学各种小动物走路：像大象一样跺脚，像青蛙一样跳，像小老鼠一样踮脚走。",
+    description: "Move like different animals as the recording guides you, or as you call them out: stomp like an elephant, hop like a frog, tiptoe like a mouse.",
+    descriptionZh: "跟着音频的引导，或听你喊出动物名，学各种小动物走路：像大象一样跺脚，像青蛙一样跳，像小老鼠一样踮脚走。",
     howToPlay: [
-      "Listen for which animal comes next.",
+      "Listen for which animal comes next, or call one out yourself.",
       "Move across the room like that animal, together.",
       "Talk about it: is it big or small, fast or slow?",
       "Let your child invent the last animal.",
     ],
     howToPlayZh: [
-      "仔细听下一个出场的是什么动物。",
+      "仔细听下一个出场的是什么动物，或由你来喊出一个。",
       "和孩子一起，学着它的样子穿过房间。",
       "聊一聊：它是大还是小，是快还是慢？",
       "最后一个动物由孩子来发明。",
@@ -95,6 +105,8 @@ export const musicActivities: MusicActivity[] = [
   },
   {
     id: "music-fast-and-slow",
+    settings: ["home", "park"],
+    materialType: "everyday",
     title: "Fast and Slow",
     titleZh: "快快慢慢",
     ageRanges: ["3–4", "4–6", "6+"],
@@ -119,6 +131,8 @@ export const musicActivities: MusicActivity[] = [
   },
   {
     id: "music-echo-song",
+    settings: ["home", "walking", "park"],
+    materialType: "none",
     title: "Echo Song",
     titleZh: "你唱我学",
     ageRanges: ["0–2", "2–3", "3–4"],

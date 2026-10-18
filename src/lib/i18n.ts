@@ -1,7 +1,7 @@
 // English and Chinese UI strings. Add a new key to both `en` and `zh` to introduce new copy.
 export const copy = {
   en: {
-    myChildren: "My Children", discover: "Discover", observations: "My Moments", momentsNav: "Moments", profile: "Profile", myWeek: "My Week", saved: "Saved", weeklyPlan: "Weekly Plan", completed: "Completed", language: "Language", appearance: "Appearance", settings: "Settings", light: "Light", dark: "Dark", system: "System Default", practical: "Everyday Life", sensorial: "Senses", mathematics: "Math", addWeek: "Add to My Week", addObservation: "Capture a Moment", saveMoment: "Save Moment", save: "Save", cancel: "Cancel", back: "Back", search: "Search", reset: "Reset", all: "All", profileSubtitle: "Your family's space", weekSubtitle: "Plan, save, and revisit meaningful ideas.", discoverSubtitle: "Meaningful activities for curious minds", observationSubtitle: "Capture and revisit your child’s special moments.", childSubtitle: "Follow each child's own path.", popular: "Popular This Week", exploreActivities: "Explore Activities", materials: "What You'll Need", how: "How to Do It", age: "Age", topic: "Topic", area: "Area", noResults: "No results found.", preferences: "Preferences", account: "Account", myActivities: "My Activities", savedActivities: "Saved Activities", myNotes: "My Notes", notifications: "Notification Preferences", personal: "Personal Information", privacy: "Privacy & Data", help: "Help & Support", addChild: "Add Child", showResults: "Show Results", filterChildren: "Filter", markAll: "Mark all as read", add: "Add", share: "Share", details: "View Activity", remove: "Remove", markComplete: "Mark completed", selectChildren: "Choose children", planningNote: "Planning note (optional)", date: "Date",
+    myChildren: "My Children", discover: "Discover", observations: "My Moments", momentsNav: "Moments", profile: "Profile", myWeek: "My Week", saved: "Saved", weeklyPlan: "Weekly Plan", completed: "Completed", language: "Language", appearance: "Appearance", settings: "Settings", light: "Light", dark: "Dark", system: "System Default", practical: "Everyday Life", sensorial: "Senses", mathematics: "Math", addWeek: "Add to My Week", addObservation: "Capture a Moment", saveMoment: "Save Moment", save: "Save", cancel: "Cancel", back: "Back", search: "Search", reset: "Reset", all: "All", profileSubtitle: "Your family's space", weekSubtitle: "Plan, save, and revisit meaningful ideas.", discoverSubtitle: "Meaningful activities for curious minds", observationSubtitle: "Capture and revisit your child’s special moments.", childSubtitle: "Follow each child's own path.", popular: "Popular This Week", exploreActivities: "Explore Activities", materials: "What You'll Need", how: "How to Do It", age: "Age", noResults: "No results found.", preferences: "Preferences", account: "Account", myActivities: "My Activities", savedActivities: "Saved Activities", myNotes: "My Notes", notifications: "Notification Preferences", personal: "Personal Information", privacy: "Privacy & Data", help: "Help & Support", addChild: "Add Child", showResults: "Show Results", filterChildren: "Filter", markAll: "Mark all as read", add: "Add", share: "Share", details: "View Activity", remove: "Remove", markComplete: "Mark completed", selectChildren: "Choose children", planningNote: "Planning note (optional)", date: "Date",
     lessonsTab: "Activities", observationsTab: "Moments", notesTab: "Notes", classroom: "Updates", backToChildren: "My Children", edit: "Edit", enrolledSince: "Enrolled since", lessonHistory: "Activity history", noGeneralNotes: "No general notes have been added.",
     introduced: "First try", practicing: "Practicing", independent: "On their own",
     learningArea: "Category", lessonActivityLabel: "Activity", notesLabel: "Notes", activitySkills: "Skills",
@@ -14,6 +14,10 @@ export const copy = {
     childFullName: "Child's full name", dateOfBirth: "Date of birth", childPhotoLabel: "Photo (optional)", notesOptional: "Notes (optional)", associatedLesson: "Related activity (optional)", nextStepsOptional: "Next steps (optional)", followUpDateOptional: "Follow-up date (optional)", observationNotesPlaceholder: "What made today special? Capture something your child did, said, or discovered.", observationNotesField: "This moment", childLabel: "Child",
     allChildren: "All Children", noChildAssigned: "No child assigned", noActivitiesPlanned: "No activities planned yet.", completedActivitiesEmpty: "Completed activities will appear here.", unassigned: "Unassigned", repeat: "Repeat",
     ageAll: "All Ages", natureTopic: "Nature", seasonsTopic: "Seasons", everydayLifeTopic: "At Home", foodPrepTopic: "Food Prep", creativityTopic: "Creativity", sensoryExplorationTopic: "Sensory Exploration", languageDevelopmentTopic: "Language Development",
+    setting: "Setting", allSettings: "All Settings", settingHome: "Home", settingRestaurant: "Restaurant", settingWaiting: "Waiting in Line", settingAirplane: "Airplane", settingTrain: "Train", settingWalking: "Walking", settingPark: "Park", settingGrocery: "Grocery Store",
+    category: "Category", categoryPracticalLife: "Practical Life", categoryLanguage: "Language", categoryMath: "Math", categoryArtCreativity: "Art & Creativity", categoryNatureCulture: "Nature & Culture", categorySensoryMovement: "Sensory & Movement",
+    materialsFilter: "Materials", materialsNone: "Nothing Needed", materialsEveryday: "Everyday Items",
+    noMatchingActivities: "No activities match. Try fewer filters or a different search.", clearFilters: "Clear filters",
     activitiesCount: "activities", lessonsWord: "activities", noRecentObservation: "No recent moment", independentObservation: "A little moment", interestedInLabel: "Interested in:", lastObservationLabel: "Last moment:", notAddedYet: "Not added yet", noObservationsYet: "No moments yet",
     art: "Art", science: "Science", math: "Math", music: "Music", movement: "Movement", culture: "Culture", culturalStudies: "Culture",
     followUpWord: "Follow-up", followUpReminders: "Follow-up reminders", weeklyPlanningReminders: "Weekly planning reminders", classroomUpdates: "Family updates",
@@ -47,7 +51,7 @@ export const copy = {
     navToday: "Today", navDiscover: "Discover", navKids: "Kids", navProfile: "Profile", todayTitle: "Today", todayInspiration: "Today's Inspiration", exploreActivity: "Explore Activity", lookingBack: "Looking Back", revisitMoment: "Revisit This Moment", momentWith: "A moment with {name}", rememberActivity: "Remember this activity?", triedBy: "{name} tried it {when}", triedWhen: "Tried {when}", thoughtForParents: "A Thought for Parents",
     todayIdeasFor: "Ideas for", todayForChild: "For {name} · {age}", todayMoreIdeas: "More ideas in Discover", viewRecord: "See this record",
     recapTitle: "Your week in moments", recapLastWeek: "Last Week", recapThisWeek: "This Week So Far", recapOpen: "Revisit the week", recapPageTitle: "Week in Moments", recapSubtitle: "A few moments worth remembering.", recapPrevious: "Previous week", recapNext: "Next week", recapEmpty: "No moments were saved this week. That's okay — some weeks are simply for living.", recapEarlier: "See an earlier week", recapAlso: "Also this week", recapFromMoments: "Look back week by week",
-    tabActivities: "Activities", tabBooks: "Books", tabMusic: "Music", booksSubtitle: "Beautiful books to share together", musicSubtitle: "Songs and games to enjoy together", searchBooks: "Search by title or author…", searchMusic: "Search music activities…", booksSection: "Books to Share", booksCount: "books", musicSection: "Play Together", recommendedAges: "Recommended ages", recommendedAge: "Recommended age", whyWeRecommend: "Why We Recommend It", coverPlaceholder: "Cover coming soon", wishlist: "Wishlist", onWishlist: "On Wishlist", addedToWishlist: "Added to Wishlist", emptyWishlist: "Your wishlist is empty. Save the books you'd love to read together next.", exploreBooks: "Explore Books", howToPlay: "How to Play", whatChildrenExplore: "What Children Explore", audioComingSoon: "Recording coming soon", audioComingSoonHint: "You can still play along using the steps below.", audioPlay: "Play", audioPause: "Pause", audioProgress: "Playback position", audioGuide: "Audio guide",
+    tabActivities: "Activities", tabBooks: "Books", booksSubtitle: "Beautiful books to share together", searchBooks: "Search by title or author…", booksSection: "Books to Share", booksCount: "books", recommendedAges: "Recommended ages", recommendedAge: "Recommended age", whyWeRecommend: "Why We Recommend It", coverPlaceholder: "Cover coming soon", wishlist: "Wishlist", onWishlist: "On Wishlist", addedToWishlist: "Added to Wishlist", emptyWishlist: "Your wishlist is empty. Save the books you'd love to read together next.", exploreBooks: "Explore Books", howToPlay: "How to Play", whatChildrenExplore: "What Children Explore", audioComingSoon: "Recording coming soon", audioComingSoonHint: "You can still play along using the steps below.", audioPlay: "Play", audioPause: "Pause", audioProgress: "Playback position", audioGuide: "Audio guide",
     recordUpdated: "Changes saved.", planCompletedRecorded: "Done! Added to the activity history.", planCompleted: "Marked as done.", planRepeated: "Planned again for today.", chooseChildForPlan: "Choose at least one child.", childNameRequired: "Please enter your child's name.", childDobRequired: "Please enter your child's date of birth.", childDobFuture: "The date of birth can't be in the future.", editRecord: "Edit", editRecordTitle: "Edit activity",
     deleteChildLabel: "Remove {name}'s profile",
     markDoneLabel: "Mark {title} as done", removePlanLabel: "Remove {title} from the plan",
@@ -62,7 +66,7 @@ export const copy = {
     code: "en",
   },
   zh: {
-    myChildren: "我的孩子们", discover: "发现活动", observations: "成长点滴", momentsNav: "成长", profile: "个人中心", myWeek: "我的计划", saved: "已收藏", weeklyPlan: "每周计划", completed: "已完成", language: "语言", appearance: "外观", settings: "设置", light: "浅色模式", dark: "深色模式", system: "跟随系统", practical: "日常生活", sensorial: "感官", mathematics: "数学", addWeek: "添加到计划", addObservation: "记录这一刻", saveMoment: "保存记录", save: "保存", cancel: "取消", back: "返回", search: "搜索", reset: "重置", all: "全部", profileSubtitle: "家庭空间", weekSubtitle: "规划、收藏并实现灵感。", discoverSubtitle: "为好奇心准备的有意义活动", observationSubtitle: "记录并回顾孩子成长中的小点滴。", childSubtitle: "陪伴每个孩子按自己的节奏成长。", popular: "本周热门", exploreActivities: "探索活动", materials: "所需材料", how: "活动步骤", age: "年龄", topic: "主题", area: "领域", noResults: "未找到结果。", preferences: "偏好设置", account: "账户", myActivities: "我的活动", savedActivities: "已收藏活动", myNotes: "我的笔记", notifications: "通知偏好", personal: "个人信息", privacy: "隐私与数据", help: "帮助与支持", addChild: "添加孩子", showResults: "显示结果", filterChildren: "筛选孩子", markAll: "全部标为已读", add: "添加", share: "分享", details: "查看活动", remove: "移除", markComplete: "标记完成", selectChildren: "选择孩子", planningNote: "计划备注（可选）", date: "日期",
+    myChildren: "我的孩子们", discover: "发现活动", observations: "成长点滴", momentsNav: "成长", profile: "个人中心", myWeek: "我的计划", saved: "已收藏", weeklyPlan: "每周计划", completed: "已完成", language: "语言", appearance: "外观", settings: "设置", light: "浅色模式", dark: "深色模式", system: "跟随系统", practical: "日常生活", sensorial: "感官", mathematics: "数学", addWeek: "添加到计划", addObservation: "记录这一刻", saveMoment: "保存记录", save: "保存", cancel: "取消", back: "返回", search: "搜索", reset: "重置", all: "全部", profileSubtitle: "家庭空间", weekSubtitle: "规划、收藏并实现灵感。", discoverSubtitle: "为好奇心准备的有意义活动", observationSubtitle: "记录并回顾孩子成长中的小点滴。", childSubtitle: "陪伴每个孩子按自己的节奏成长。", popular: "本周热门", exploreActivities: "探索活动", materials: "所需材料", how: "活动步骤", age: "年龄", noResults: "未找到结果。", preferences: "偏好设置", account: "账户", myActivities: "我的活动", savedActivities: "已收藏活动", myNotes: "我的笔记", notifications: "通知偏好", personal: "个人信息", privacy: "隐私与数据", help: "帮助与支持", addChild: "添加孩子", showResults: "显示结果", filterChildren: "筛选孩子", markAll: "全部标为已读", add: "添加", share: "分享", details: "查看活动", remove: "移除", markComplete: "标记完成", selectChildren: "选择孩子", planningNote: "计划备注（可选）", date: "日期",
     lessonsTab: "活动记录", observationsTab: "成长", notesTab: "笔记", classroom: "更新", backToChildren: "我的孩子们", edit: "编辑", enrolledSince: "入学时间", lessonHistory: "活动记录", noGeneralNotes: "尚未添加任何笔记。",
     introduced: "初次尝试", practicing: "练习中", independent: "能独立完成",
     learningArea: "类别", lessonActivityLabel: "活动", notesLabel: "随手记", activitySkills: "探索技能",
@@ -75,6 +79,10 @@ export const copy = {
     childFullName: "孩子的全名", dateOfBirth: "出生日期", childPhotoLabel: "照片（可选）", notesOptional: "随手记（可选）", associatedLesson: "相关活动（可选）", nextStepsOptional: "下一步计划（可选）", followUpDateOptional: "跟进日期（可选）", observationNotesPlaceholder: "今天有什么值得记录的？写下孩子做了什么、说了什么，或者让你印象深刻的小发现。", observationNotesField: "这个成长点滴", childLabel: "孩子",
     allChildren: "所有孩子", noChildAssigned: "未指定孩子", noActivitiesPlanned: "尚未计划任何活动。", completedActivitiesEmpty: "已完成的活动将显示在这里。", unassigned: "未分配", repeat: "重复",
     ageAll: "所有年龄", natureTopic: "自然", seasonsTopic: "季节", everydayLifeTopic: "居家", foodPrepTopic: "食物准备", creativityTopic: "创造力", sensoryExplorationTopic: "感官探索", languageDevelopmentTopic: "语言发展",
+    setting: "场景", allSettings: "全部场景", settingHome: "家里", settingRestaurant: "餐厅", settingWaiting: "排队等候", settingAirplane: "飞机上", settingTrain: "火车上", settingWalking: "散步途中", settingPark: "公园", settingGrocery: "超市",
+    category: "类别", categoryPracticalLife: "日常生活", categoryLanguage: "语言", categoryMath: "数学", categoryArtCreativity: "艺术与创造", categoryNatureCulture: "自然与文化", categorySensoryMovement: "感官与运动",
+    materialsFilter: "所需材料", materialsNone: "无需材料", materialsEveryday: "日常物品",
+    noMatchingActivities: "没有符合条件的活动。试试减少筛选条件或换个关键词。", clearFilters: "清除筛选",
     activitiesCount: "个活动", lessonsWord: "个活动", noRecentObservation: "暂无最近的成长点滴", independentObservation: "一个小点滴", interestedInLabel: "感兴趣的内容：", lastObservationLabel: "最近的点滴：", notAddedYet: "尚未添加", noObservationsYet: "还没有成长点滴",
     art: "艺术", science: "科学", math: "数学", music: "音乐", movement: "运动", culture: "文化", culturalStudies: "文化",
     followUpWord: "跟进", followUpReminders: "跟进提醒", weeklyPlanningReminders: "每周计划提醒", classroomUpdates: "家庭动态更新",
@@ -108,7 +116,7 @@ export const copy = {
     navToday: "今日", navDiscover: "活动", navKids: "孩子", navProfile: "我的", todayTitle: "今日", todayInspiration: "今日灵感", exploreActivity: "看看这个活动", lookingBack: "往日回顾", revisitMoment: "重温这一刻", momentWith: "和{name}在一起的时光", rememberActivity: "还记得这个活动吗？", triedBy: "{name}{when}尝试过", triedWhen: "{when}尝试过", thoughtForParents: "写给父母的一点思考",
     todayIdeasFor: "为谁推荐", todayForChild: "适合{name} · {age}", todayMoreIdeas: "在发现中查看更多活动", viewRecord: "查看这条记录",
     recapTitle: "这一周的成长点滴", recapLastWeek: "上周", recapThisWeek: "本周至今", recapOpen: "回顾这一周", recapPageTitle: "一周回顾", recapSubtitle: "这一周值得记住的几个瞬间。", recapPrevious: "上一周", recapNext: "下一周", recapEmpty: "这一周没有保存记录。没关系，有些日子只是用来好好生活的。", recapEarlier: "看看更早的一周", recapAlso: "这一周还有", recapFromMoments: "按周回顾",
-    tabActivities: "活动", tabBooks: "绘本", tabMusic: "音乐", booksSubtitle: "值得和孩子一起读的好书", musicSubtitle: "和孩子一起唱唱跳跳", searchBooks: "搜索书名或作者…", searchMusic: "搜索音乐活动…", booksSection: "亲子共读", booksCount: "本", musicSection: "一起玩音乐", recommendedAges: "适读年龄", recommendedAge: "适合年龄", whyWeRecommend: "推荐理由", coverPlaceholder: "封面即将上线", wishlist: "心愿书单", onWishlist: "已在心愿书单", addedToWishlist: "已加入心愿书单", emptyWishlist: "心愿书单还是空的。把想和孩子一起读的书先存在这里吧。", exploreBooks: "去看看绘本", howToPlay: "玩法介绍", whatChildrenExplore: "孩子在探索什么", audioComingSoon: "音频即将上线", audioComingSoonHint: "你仍然可以按照下面的玩法和孩子一起玩。", audioPlay: "播放", audioPause: "暂停", audioProgress: "播放进度", audioGuide: "音频引导",
+    tabActivities: "活动", tabBooks: "绘本", booksSubtitle: "值得和孩子一起读的好书", searchBooks: "搜索书名或作者…", booksSection: "亲子共读", booksCount: "本", recommendedAges: "适读年龄", recommendedAge: "适合年龄", whyWeRecommend: "推荐理由", coverPlaceholder: "封面即将上线", wishlist: "心愿书单", onWishlist: "已在心愿书单", addedToWishlist: "已加入心愿书单", emptyWishlist: "心愿书单还是空的。把想和孩子一起读的书先存在这里吧。", exploreBooks: "去看看绘本", howToPlay: "玩法介绍", whatChildrenExplore: "孩子在探索什么", audioComingSoon: "音频即将上线", audioComingSoonHint: "你仍然可以按照下面的玩法和孩子一起玩。", audioPlay: "播放", audioPause: "暂停", audioProgress: "播放进度", audioGuide: "音频引导",
     recordUpdated: "已保存修改。", planCompletedRecorded: "完成啦！已记入活动记录。", planCompleted: "已标记为完成。", planRepeated: "已重新安排在今天。", chooseChildForPlan: "请至少选择一个孩子。", childNameRequired: "请填写孩子的名字。", childDobRequired: "请填写孩子的出生日期。", childDobFuture: "出生日期不能晚于今天。", editRecord: "编辑", editRecordTitle: "编辑活动记录",
     deleteChildLabel: "删除{name}的档案",
     markDoneLabel: "将“{title}”标记为完成", removePlanLabel: "从计划中移除“{title}”",
@@ -151,9 +159,12 @@ export function recordAreaLabel(area: string, t: Copy): string {
     : area;
 }
 
-// Label for any learning area a record or activity carries: a Discover category, or one of the five areas of the
-// first Record form (kept on older records). Unknown values are shown as stored.
+// Label for any learning area a record carries: a parent-facing category id (custom activities from now on), an
+// earlier Discover area, or one of the five areas of the first Record form (kept on older records). Unknown values
+// are shown as stored.
 export function learningAreaLabel(area: string, t: Copy): string {
+  const category = area === "All" ? area : categoryOptionLabel(area, t);
+  if (category !== area) return category;
   const label = discoverCategoryLabel(area, t);
   return label !== area ? label : recordAreaLabel(area, t);
 }
@@ -189,6 +200,31 @@ export function topicOptionLabel(v: string, t: Copy): string {
     : v;
 }
 
+export function settingOptionLabel(v: string, t: Copy): string {
+  return v === "All" ? t.allSettings
+    : v === "home" ? t.settingHome
+    : v === "restaurant" ? t.settingRestaurant
+    : v === "waiting" ? t.settingWaiting
+    : v === "airplane" ? t.settingAirplane
+    : v === "train" ? t.settingTrain
+    : v === "walking" ? t.settingWalking
+    : v === "park" ? t.settingPark
+    : v === "grocery" ? t.settingGrocery
+    : v;
+}
+export function categoryOptionLabel(v: string, t: Copy): string {
+  return v === "All" ? t.all
+    : v === "practical-life" ? t.categoryPracticalLife
+    : v === "language" ? t.categoryLanguage
+    : v === "math" ? t.categoryMath
+    : v === "art-creativity" ? t.categoryArtCreativity
+    : v === "nature-culture" ? t.categoryNatureCulture
+    : v === "sensory-movement" ? t.categorySensoryMovement
+    : v;
+}
+export function materialsOptionLabel(v: string, t: Copy): string {
+  return v === "All" ? t.all : v === "none" ? t.materialsNone : v === "everyday" ? t.materialsEveryday : v;
+}
 export function groupOptionLabel(v: string, t: Copy): string {
   return v === "All Groups" ? t.allGroups
     : v === "Toddler" ? t.toddler

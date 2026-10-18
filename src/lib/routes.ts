@@ -6,7 +6,7 @@ import type { Screen } from "../types";
 //
 // Pure: App turns its navigation state into a route (`formatRoute`) and back (`parseRoute`).
 
-export type DiscoverTabRoute = "activities" | "books" | "music";
+export type DiscoverTabRoute = "activities" | "books";
 export type ChildTabRoute = "Journal" | "Activities";
 
 export type Route = {
@@ -90,10 +90,11 @@ export function parseRoute(hash: string): Route | null {
   const [head, id, extra] = parts;
   switch (head) {
     case "discover":
-      return { screen: "discover", discoverTab: id === "books" || id === "music" ? id : "activities" };
+      // "#/discover/music" (the former Music tab) opens Activities, where music is listed now.
+      return { screen: "discover", discoverTab: id === "books" ? "books" : "activities" };
     case "activity":
     case "music":
-      return id ? { screen: head, activity: id } : { screen: "discover", discoverTab: head === "music" ? "music" : "activities" };
+      return id ? { screen: head, activity: id } : { screen: "discover", discoverTab: "activities" };
     case "book":
       return id ? { screen: "book", book: id } : { screen: "discover", discoverTab: "books" };
     case "child":

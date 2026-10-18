@@ -114,7 +114,7 @@ test("My Week: completing a plan records it for each planned child once, never f
 test("routes: every page has an address that opens it again; unknown addresses open nothing", () => {
   const routes: Route[] = [
     { screen: "today" }, { screen: "children" }, { screen: "profile" }, { screen: "week" }, { screen: "observations" },
-    { screen: "discover", discoverTab: "activities" }, { screen: "discover", discoverTab: "books" }, { screen: "discover", discoverTab: "music" },
+    { screen: "discover", discoverTab: "activities" }, { screen: "discover", discoverTab: "books" },
     { screen: "activity", activity: "water-pouring" }, { screen: "music", activity: "music-freeze-dance" }, { screen: "book", book: "guess-how-much" },
     { screen: "child", child: "c-1", childTab: "Journal" }, { screen: "child", child: "c-1", childTab: "Activities" },
     { screen: "entry", entry: "m-1" }, { screen: "entryEdit", entry: "m-1" }, { screen: "entryEdit", child: "c-1" }, { screen: "record", child: "c-1" }, { screen: "record" },
@@ -130,4 +130,11 @@ test("routes: every page has an address that opens it again; unknown addresses o
   assert.equal(parseRoute("#/activity/a%20b%2Fc")!.activity, "a b/c");
   assert.equal(parseRoute(""), null);
   assert.equal(parseRoute("#/no-such-page"), null);
+});
+
+test("routes: links to the former Music tab open Discover > Activities; a music activity's link still opens its page", () => {
+  assert.deepEqual(parseRoute("#/discover/music"), { screen: "discover", discoverTab: "activities" });
+  assert.deepEqual(parseRoute("#/music"), { screen: "discover", discoverTab: "activities" });
+  assert.deepEqual(parseRoute("#/music/music-freeze-dance"), { screen: "music", activity: "music-freeze-dance" });
+  assert.equal(formatRoute({ screen: "music", activity: "music-freeze-dance" }), "#/music/music-freeze-dance");
 });

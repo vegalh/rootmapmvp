@@ -5,7 +5,7 @@ import { findActivity } from "../lib/catalog";
 import { childOptionLabel, childShortName } from "../lib/children";
 import { fmt, fmtWeekday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
-import { discoverCategoryLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { categoryOptionLabel, localizeActivity, type Copy } from "../lib/i18n";
 
 export function MyWeekPage({ saved, plans, setPlans, completePlan, repeatPlan, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: {
   saved: string[];
@@ -104,7 +104,7 @@ export function ActivityRow({ a: rawActivity, subtitle, action, t }: { a: Activi
   return (
     <div className="activity-row">
       <img src={a.image} alt="" />
-      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${discoverCategoryLabel(a.area, t)}`}</small><em><Icon name="clock" size={12} />{a.minutes} {t.min} · {a.materialsLabel}</em></span>
+      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${categoryOptionLabel(a.category, t)}`}</small><em><Icon name="clock" size={12} />{a.minutes} {t.min} · {a.materialsLabel}</em></span>
       {action}
     </div>
   );

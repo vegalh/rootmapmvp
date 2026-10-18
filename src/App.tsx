@@ -492,7 +492,7 @@ export default function App() {
   useEffect(() => {
     if (screen === "child" && !child) setScreen("children");
     else if (screen === "entry" && !entry) setScreen("observations");
-    else if ((screen === "activity" || screen === "music") && !findActivity(selectedActivity)) { setDiscoverTab(screen === "music" ? "music" : "activities"); setScreen("discover"); }
+    else if ((screen === "activity" || screen === "music") && !findActivity(selectedActivity)) { setDiscoverTab("activities"); setScreen("discover"); }
     else if (screen === "activity" && isMusicId(selectedActivity)) setScreen("music");
     else if (screen === "music" && !isMusicId(selectedActivity)) setScreen("activity");
     else if (screen === "book" && !books.some(b => b.id === selectedBook)) { setDiscoverTab("books"); setScreen("discover"); }
