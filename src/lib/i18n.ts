@@ -13,7 +13,7 @@ export const copy = {
     nameAZ: "Name A–Z", nameZA: "Name Z–A", mostRecentlyObserved: "Most Recently Observed",
     childFullName: "Child's full name", dateOfBirth: "Date of birth", childPhotoLabel: "Photo (optional)", notesOptional: "Notes (optional)", associatedLesson: "Related activity (optional)", nextStepsOptional: "Next steps (optional)", followUpDateOptional: "Follow-up date (optional)", observationNotesPlaceholder: "What made today special? Capture something your child did, said, or discovered.", observationNotesField: "This moment", childLabel: "Child",
     allChildren: "All Children", noChildAssigned: "No child assigned", noActivitiesPlanned: "No activities planned yet.", completedActivitiesEmpty: "Completed activities will appear here.", unassigned: "Unassigned", repeat: "Repeat",
-    ageAll: "All Ages", natureTopic: "Nature", seasonsTopic: "Seasons", everydayLifeTopic: "At Home", creativityTopic: "Creativity", sensoryExplorationTopic: "Sensory Exploration", languageDevelopmentTopic: "Language Development",
+    ageAll: "All Ages", natureTopic: "Nature", seasonsTopic: "Seasons", everydayLifeTopic: "At Home", foodPrepTopic: "Food Prep", creativityTopic: "Creativity", sensoryExplorationTopic: "Sensory Exploration", languageDevelopmentTopic: "Language Development",
     activitiesCount: "activities", lessonsWord: "activities", noRecentObservation: "No recent moment", independentObservation: "A little moment", interestedInLabel: "Interested in:", lastObservationLabel: "Last moment:", notAddedYet: "Not added yet", noObservationsYet: "No moments yet",
     art: "Art", science: "Science", math: "Math", music: "Music", movement: "Movement", culture: "Culture", culturalStudies: "Culture",
     followUpWord: "Follow-up", followUpReminders: "Follow-up reminders", weeklyPlanningReminders: "Weekly planning reminders", classroomUpdates: "Family updates",
@@ -74,7 +74,7 @@ export const copy = {
     nameAZ: "姓名 A–Z", nameZA: "姓名 Z–A", mostRecentlyObserved: "最近观察",
     childFullName: "孩子的全名", dateOfBirth: "出生日期", childPhotoLabel: "照片（可选）", notesOptional: "随手记（可选）", associatedLesson: "相关活动（可选）", nextStepsOptional: "下一步计划（可选）", followUpDateOptional: "跟进日期（可选）", observationNotesPlaceholder: "今天有什么值得记录的？写下孩子做了什么、说了什么，或者让你印象深刻的小发现。", observationNotesField: "这个成长点滴", childLabel: "孩子",
     allChildren: "所有孩子", noChildAssigned: "未指定孩子", noActivitiesPlanned: "尚未计划任何活动。", completedActivitiesEmpty: "已完成的活动将显示在这里。", unassigned: "未分配", repeat: "重复",
-    ageAll: "所有年龄", natureTopic: "自然", seasonsTopic: "季节", everydayLifeTopic: "居家", creativityTopic: "创造力", sensoryExplorationTopic: "感官探索", languageDevelopmentTopic: "语言发展",
+    ageAll: "所有年龄", natureTopic: "自然", seasonsTopic: "季节", everydayLifeTopic: "居家", foodPrepTopic: "食物准备", creativityTopic: "创造力", sensoryExplorationTopic: "感官探索", languageDevelopmentTopic: "语言发展",
     activitiesCount: "个活动", lessonsWord: "个活动", noRecentObservation: "暂无最近的成长点滴", independentObservation: "一个小点滴", interestedInLabel: "感兴趣的内容：", lastObservationLabel: "最近的点滴：", notAddedYet: "尚未添加", noObservationsYet: "还没有成长点滴",
     art: "艺术", science: "科学", math: "数学", music: "音乐", movement: "运动", culture: "文化", culturalStudies: "文化",
     followUpWord: "跟进", followUpReminders: "跟进提醒", weeklyPlanningReminders: "每周计划提醒", classroomUpdates: "家庭动态更新",
@@ -181,6 +181,7 @@ export function topicOptionLabel(v: string, t: Copy): string {
     : v === "Nature" ? t.natureTopic
     : v === "Seasons" ? t.seasonsTopic
     : v === "Everyday Life" ? t.everydayLifeTopic
+    : v === "Food Preparation" ? t.foodPrepTopic
     : v === "Creativity" ? t.creativityTopic
     : v === "Sensory Exploration" ? t.sensoryExplorationTopic
     : v === "Independence" ? t.independence

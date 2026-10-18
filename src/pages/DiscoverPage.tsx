@@ -43,7 +43,7 @@ export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, 
 }
 
 // Filter options that have activities, in the usual order (a topic or area with nothing in it isn't offered).
-const TOPICS = ["Nature", "Seasons", "Everyday Life", "Creativity", "Sensory Exploration", "Independence", "Language Development"];
+const TOPICS = ["Nature", "Seasons", "Everyday Life", "Food Preparation", "Creativity", "Sensory Exploration", "Independence", "Language Development"];
 const topicOptions = ["All", ...TOPICS.filter(x => activities.some(a => a.topic === x)), ...[...new Set(activities.map(a => a.topic))].filter(x => x && !TOPICS.includes(x))];
 const areaOptions = ["All", ...categories.map(c => c[0]).filter(x => activities.some(a => a.area === x))];
 const ageOptions = ageOptionsFor(activities.map(activityAgeRanges));
