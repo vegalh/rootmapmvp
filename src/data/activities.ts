@@ -9,6 +9,7 @@ import dotting from "../assets/activities/dotting.jpg";
 import paperCollage from "../assets/activities/paper-collage.jpg";
 import waterPouring from "../assets/activities/water-pouring.jpg";
 import orangeJuicing from "../assets/activities/orange-juicing.jpg";
+import orangePeeling from "../assets/activities/orange-peeling.jpg";
 import bokChoyPeeling from "../assets/activities/bok-choy-peeling.jpg";
 import eggPeelingCutting from "../assets/activities/egg-peeling-cutting.jpg";
 import readingAboutMyself from "../assets/activities/reading-about-myself.jpg";
@@ -298,6 +299,32 @@ export const activities: Activity[] = [
       materials: ["半个橙子", "儿童专用榨汁器", "小杯子"],
       steps: ["邀请孩子一起试试榨橙汁，并说出材料的名称。", "示范将半个橙子放在榨汁器上。", "展示按压和旋转以榨出果汁。", "一起将果汁倒入杯中。", "让孩子尝试剩余的橙子。"],
       safety: "孩子喝之前，请检查果汁里有没有籽。",
+    },
+  },
+  {
+    id: "orange-peeling",
+    title: "Orange Peeling",
+    age: "2–4 years",
+    ageKey: "2–3",
+    area: "Practical Life",
+    topic: "Everyday Life",
+    minutes: 10,
+    materialsLabel: "3 materials",
+    image: orangePeeling,
+    description: "Children practice food preparation and finger strength by peeling a small orange and placing the peel in a basket.",
+    domains: ["Food Preparation", "Fine Motor Coordination", "Concentration"],
+    materials: ["Small orange or mandarin", "Bowl", "Basket for the peel"],
+    steps: ["Invite your child to try peeling an orange, and name the materials together.", "Show how to press a thumb into the top of the orange to start the peel.", "Peel off one small piece at a time and place it in the basket.", "Let your child try, offering a small start in the peel if needed.", "Separate the segments together and enjoy them."],
+    keywords: "orange mandarin peeling food preparation practical life fruit snack",
+    zh: {
+      title: "剥橘子",
+      age: "2–4岁",
+      materialsLabel: "3种材料",
+      description: "孩子们剥开一个小橘子，把橘子皮放进篮子里，练习食物准备能力和手指力量。",
+      domains: ["食物准备", "精细动作协调", "专注力"],
+      materials: ["小橘子或砂糖橘", "碗", "放橘子皮的篮子"],
+      steps: ["邀请孩子一起试试剥橘子，并说出材料的名称。", "示范用拇指按进橘子顶部，开始剥皮。", "一次剥下一小块皮，放进篮子里。", "让孩子尝试，需要时可以先帮孩子剥开一个小口。", "一起把橘子分成一瓣一瓣，享用吧。"],
+      keywords: "剥橘子 橘子 橙子 剥皮 水果 食物准备",
     },
   },
   {
