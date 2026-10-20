@@ -160,3 +160,19 @@ test("Mixing Juice: the step cards are optional, in English and Chinese; materia
   assert.equal(a.materialType, "everyday");
   assert.equal(a.steps.length, a.zh!.steps!.length);
 });
+
+test("discover data: on-the-go activities are complete in both languages", () => {
+  const withSafety = ["statue-game", "setting-my-place", "tape-peeling-tray"];
+  const added = ["i-spy-a-color", "copy-my-hands", "statue-game", "whats-that-sound", "setting-my-place", "menu-picture-hunt", "picture-shopping-list", "grocery-color-hunt", "tape-peeling-tray", "family-photo-stories"];
+  for (const id of added) {
+    const a = activities.find(x => x.id === id);
+    assert.ok(a, id);
+    assert.ok(a.image, `${id}: image`);
+    assert.equal(a.zh?.materials?.length, a.materials.length, `${id}: materials`);
+    assert.equal(a.zh?.steps?.length, a.steps.length, `${id}: steps`);
+    assert.equal(a.zh?.domains?.length, a.domains.length, `${id}: domains`);
+    assert.equal(Boolean(a.safety), withSafety.includes(id), `${id}: safety`);
+    assert.equal(Boolean(a.zh?.safety), withSafety.includes(id), `${id}: zh safety`);
+  }
+  for (const s of ["waiting", "restaurant", "grocery", "airplane", "train"]) assert.ok(filter({ setting: s }, activities).length >= 5, s);
+});

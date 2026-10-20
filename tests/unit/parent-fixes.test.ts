@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildActivityRecord, planCompletionRecords } from "../../src/lib/activityRecords";
-import { activityAgeRanges, ageOptionsFor, ageRangeForYears, spanAgeRanges } from "../../src/lib/catalog";
+import { activityAgeRanges, ageOptionsFor, ageRangeForYears, catalogItems, spanAgeRanges } from "../../src/lib/catalog";
 import { childOptionLabel, childShortName, defaultChildId, isActiveChild } from "../../src/lib/children";
 import { localIsoDate, localIsoToday } from "../../src/lib/dates";
 import { EMPTY_DEFAULTS, NO_DEMO_KEY, defaults, defaultsFor } from "../../src/lib/data/store";
@@ -85,17 +85,34 @@ test("dates: 'today' is the local calendar date in any time zone, never the UTC 
 
 test("age filters: overlapping ranges, and only filters that have activities", () => {
   assert.deepEqual(spanAgeRanges(1, 3), ["0–2", "2–3"]);
-  const reading = activities.find(a => a.id === "reading-about-myself")!; // ages 1–3
-  assert.ok(activityAgeRanges(reading).includes("0–2"), "1–3 shows under 0–2");
-  assert.ok(activityAgeRanges(reading).includes("2–3"));
-  const juicing = activities.find(a => a.id === "orange-juicing")!; // ages 3–5
-  assert.deepEqual(activityAgeRanges(juicing), ["3–4", "4–6"]);
-  assert.deepEqual(activityAgeRanges({ age: "4+ years", ageKey: "4–6" }), ["4–6", "6+"]);
+  const reading = activities.find(a => a.id === "reading-about-myself")!; // ages 2–3
+  assert.deepEqual(activityAgeRanges(reading), ["2–3"]);
+  assert.deepEqual(activityAgeRanges(activities.find(a => a.id === "rescuing-animals")!), ["3–6"]);
+  const juicing = activities.find(a => a.id === "orange-juicing")!; // ages 3–6
+  assert.deepEqual(activityAgeRanges(juicing), ["3–6"]);
+  assert.deepEqual(activityAgeRanges({ age: "2–6 years", ageKey: "2–3" }), ["2–3", "3–6"]);
+  assert.deepEqual(activityAgeRanges({ age: "3+ years", ageKey: "3–6" }), ["3–6", "6+"]);
   const offered = ageOptionsFor(activities.map(activityAgeRanges));
   for (const range of offered.slice(1)) assert.ok(activities.some(a => activityAgeRanges(a).includes(range as never)), range);
   assert.ok(!offered.includes("6+"), "no activity for 6+, so no 6+ filter");
+  assert.ok(!offered.includes("0–2"), "no activity for 0–2 yet, so no 0–2 filter");
+  assert.ok(!ageOptionsFor(catalogItems().map(activityAgeRanges)).includes("0–2"), "nor music");
+  assert.equal(ageRangeForYears(0.5), "0–2");
   assert.equal(ageRangeForYears(1.5), "0–2");
-  assert.equal(ageRangeForYears(3.2), "3–4");
+  assert.equal(ageRangeForYears(2.5), "2–3");
+  assert.equal(ageRangeForYears(3.2), "3–6");
+  assert.equal(ageRangeForYears(5.9), "3–6");
+  assert.equal(ageRangeForYears(6), "6+");
+});
+
+test("age filters: every activity's age is made of whole filters (2–3, 3–6, 6+)", () => {
+  const edges = /^([236])–([36]) years$|^([236])\+ years$/;
+  for (const a of activities) {
+    const m = a.age.match(edges);
+    assert.ok(m, `${a.id}: "${a.age}"`);
+    assert.equal(a.zh?.age, a.age.replace(/ years$/, "").replace(/^(\d)\+$/, "$1岁+").replace(/^(\d–\d)$/, "$1岁"), `${a.id}: zh age`);
+    assert.equal(a.ageKey, activityAgeRanges(a)[0], `${a.id}: ageKey is its first filter`);
+  }
 });
 
 test("My Week: completing a plan records it for each planned child once, never for a removed child", () => {

@@ -142,7 +142,7 @@ export type Activity = {
 };
 
 // Age bands shared by the Discover filters. A book or music activity can belong to several.
-export type AgeRange = "0–2" | "2–3" | "3–4" | "4–6" | "6+";
+export type AgeRange = "0–2" | "2–3" | "3–6" | "6+";
 
 // A book in the curated Discover > Books collection (src/data/books.ts). One record per book: its English and
 // Chinese editions share the id (what the Family Bookshelf stores). `*Zh` fields are the Chinese edition's text.

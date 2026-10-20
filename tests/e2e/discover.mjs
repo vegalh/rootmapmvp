@@ -68,7 +68,7 @@ const noOverflow = async label => {
   const w = await page.eval(`document.documentElement.scrollWidth`);
   assert.ok(w <= 390, `${label}: page is ${w}px wide at 390px`);
 };
-const AGES = ["0–2", "2–3", "3–4", "4–6", "6+"];
+const AGES = ["0–2", "2–3", "3–6", "6+"];
 
 await openDemoEraDevice(page, `${BASE}/`);
 await appReady();
@@ -238,7 +238,7 @@ await step("Music in Activities: search, Category, and Setting + Age + Category 
   await pickFilter("Materials", "Nothing Needed");
   const n = await count(".activity-card");
   assert.ok(n > 0 && n === (await count(".music-card")) && n < total, "park + art + nothing needed: the music a parent can sing or call out");
-  await pickFilter("Age", "0–2");
+  await pickFilter("Age", "3–6");
   assert.ok((await count(".music-card")) > 0 && (await count(".music-card")) < n, "age narrows it further");
   await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
   assert.equal(await count(".activity-card"), all);

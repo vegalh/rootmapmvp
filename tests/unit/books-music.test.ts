@@ -61,17 +61,17 @@ test("bookshelf: stored with the existing settings, as an array", () => {
 });
 
 test("catalog: age labels span the ranges in both languages", () => {
-  assert.equal(agesLabel(["2–3", "3–4"], "en"), "2–4 years");
-  assert.equal(agesLabel(["2–3", "3–4"], "zh"), "2–4岁");
+  assert.equal(agesLabel(["2–3", "3–6"], "en"), "2–6 years");
+  assert.equal(agesLabel(["2–3", "3–6"], "zh"), "2–6岁");
   assert.equal(agesLabel(["0–2"], "en"), "0–2 years");
-  assert.equal(agesLabel(["4–6", "6+"], "en"), "4+ years");
+  assert.equal(agesLabel(["3–6", "6+"], "en"), "3+ years");
   assert.equal(agesLabel(["6+"], "zh"), "6岁+");
 });
 
 test("catalog: an item can match several age filters", () => {
-  assert.ok(matchesAge(["2–3", "3–4"], "2–3"));
-  assert.ok(matchesAge(["2–3", "3–4"], "3–4"));
-  assert.ok(!matchesAge(["2–3", "3–4"], "4–6"));
+  assert.ok(matchesAge(["2–3", "3–6"], "2–3"));
+  assert.ok(matchesAge(["2–3", "3–6"], "3–6"));
+  assert.ok(!matchesAge(["2–3", "3–6"], "6+"));
   assert.ok(matchesAge(["6+"], "All Ages"));
 });
 
@@ -156,10 +156,10 @@ test("books: the curated books, one record per book with both editions' titles",
 
 test("books: listed under every age filter the reading age overlaps", () => {
   const ranges = (id: string) => bookAgeRanges(books.find(b => b.id === id)!);
-  assert.deepEqual(ranges("guess-how-much-i-love-you"), ["2–3", "3–4", "4–6"]);
-  assert.deepEqual(ranges("the-carrot-seed"), ["2–3", "3–4", "4–6"]);
-  assert.deepEqual(ranges("a-squash-and-a-squeeze"), ["3–4", "4–6"]);
-  assert.deepEqual(ranges("the-giving-tree"), ["4–6", "6+"]);
+  assert.deepEqual(ranges("guess-how-much-i-love-you"), ["2–3", "3–6"]);
+  assert.deepEqual(ranges("the-carrot-seed"), ["2–3", "3–6"]);
+  assert.deepEqual(ranges("a-squash-and-a-squeeze"), ["3–6"]);
+  assert.deepEqual(ranges("the-giving-tree"), ["3–6", "6+"]);
   const carrot = books.find(b => b.id === "the-carrot-seed")!;
   assert.equal(readingAgeLabel(carrot, "en"), "2–5 years");
   assert.equal(readingAgeLabel(books.find(b => b.id === "the-giving-tree")!, "zh"), "4–6+岁");

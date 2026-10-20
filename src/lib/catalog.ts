@@ -10,7 +10,7 @@ import { categoryOptionLabel, copy, discoverCategoryLabel, topicOptionLabel, typ
 // Nothing else keeps a copy of activity titles or categories: adding an activity to either data file makes it
 // appear everywhere (Discover, Add Activity, Recently Used, history).
 
-export const AGE_RANGES: AgeRange[] = ["0–2", "2–3", "3–4", "4–6", "6+"];
+export const AGE_RANGES: AgeRange[] = ["0–2", "2–3", "3–6", "6+"];
 
 // "2–4 years" / "2–4岁", "4+ years" / "4岁+": the span covered by an item's age ranges.
 export function agesLabel(ranges: AgeRange[], lang: Lang): string {
@@ -33,7 +33,7 @@ export const matchesQuery = (q: string, fields: (string | undefined)[]) => {
 // The cover to show for a music activity (its own image, or the default illustration).
 export const musicCover = (m: MusicActivity) => m.coverImage || defaultMusicCover;
 
-// Age filters an age span overlaps: 1–3 → 0–2 and 2–3; 2–6 → 2–3, 3–4 and 4–6; 4+ → 4–6 and 6+. Spans and filters
+// Age filters an age span overlaps: 1–3 → 0–2 and 2–3; 2–6 → 2–3 and 3–6; 4+ → 3–6 and 6+. Spans and filters
 // are read the same way, so an activity for ages 1–3 is listed under 0–2 as well as 2–3.
 export function spanAgeRanges(from: number, to: number): AgeRange[] {
   return AGE_RANGES.filter(r => {
@@ -42,7 +42,7 @@ export function spanAgeRanges(from: number, to: number): AgeRange[] {
   });
 }
 
-// Age filters a book's recommended reading age overlaps (2–6 → 2–3, 3–4 and 4–6; 4–6+ → 4–6 and 6+).
+// Age filters a book's recommended reading age overlaps (2–5 → 2–3 and 3–6; 4–6+ → 3–6 and 6+).
 export function bookAgeRanges(b: Book): AgeRange[] {
   return spanAgeRanges(b.readingAge.from, b.readingAge.plus ? Infinity : b.readingAge.to);
 }
@@ -64,7 +64,7 @@ export function activityAgeRanges(a: Pick<Activity, "age" | "ageKey">): AgeRange
 
 // The age filter that holds a child's current age (in years, fractional).
 export function ageRangeForYears(years: number): AgeRange {
-  return years < 2 ? "0–2" : years < 3 ? "2–3" : years < 4 ? "3–4" : years < 6 ? "4–6" : "6+";
+  return years < 2 ? "0–2" : years < 3 ? "2–3" : years < 6 ? "3–6" : "6+";
 }
 
 // Only the age filters that have something to show, in their usual order ("All Ages" first).

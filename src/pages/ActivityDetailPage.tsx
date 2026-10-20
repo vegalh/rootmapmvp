@@ -47,14 +47,16 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
             <span key={d}><i><Icon name={i === 0 ? "user" : i === 1 ? "compass" : i === 2 ? "heart" : "globe"} size={18} /></i>{d}</span>
           ))}
         </div>
-        <h2>{t.materials}</h2>
-        <div className="material-list">
-          {a.materials.map((m, i) => (
-            <button className={checked.includes(i) ? "checked" : ""} aria-pressed={checked.includes(i)} onClick={() => setChecked(checked.includes(i) ? checked.filter(x => x !== i) : [...checked, i])} key={m}>
-              <i>{checked.includes(i) && <Icon name="check" size={13} />}</i>{m}
-            </button>
-          ))}
-        </div>
+        {a.materials.length > 0 && <>
+          <h2>{t.materials}</h2>
+          <div className="material-list">
+            {a.materials.map((m, i) => (
+              <button className={checked.includes(i) ? "checked" : ""} aria-pressed={checked.includes(i)} onClick={() => setChecked(checked.includes(i) ? checked.filter(x => x !== i) : [...checked, i])} key={m}>
+                <i>{checked.includes(i) && <Icon name="check" size={13} />}</i>{m}
+              </button>
+            ))}
+          </div>
+        </>}
         <h2>{t.how}</h2>
         <ol>{a.steps.map(s => <li key={s}>{s}</li>)}</ol>
         {a.safety && (
