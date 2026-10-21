@@ -18,7 +18,7 @@ export const done = (tx: IDBTransaction) =>
 
 function upgrade(db: IDBDatabase, oldVersion: number, space: Space) {
   if (oldVersion < 1) {
-    for (const name of COLLECTIONS) {
+    for (const name of COLLECTIONS.filter(n => n !== "savedCollections")) {
       const store = db.createObjectStore(name, { keyPath: "id" });
       if (CHILD_INDEXED.includes(name)) store.createIndex("childId", "childId");
       if (name === "plans") store.createIndex("childIds", "childIds", { multiEntry: true });
@@ -34,6 +34,7 @@ function upgrade(db: IDBDatabase, oldVersion: number, space: Space) {
       db.createObjectStore("syncRecords", { keyPath: "key" });
     }
   }
+  if (oldVersion < 2) db.createObjectStore("savedCollections", { keyPath: "id" });
 }
 
 // Opens (creating or upgrading) a space's database; the guest database by default. Rejects instead of hanging if

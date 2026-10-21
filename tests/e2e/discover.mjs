@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { HELPERS, launch, sleep } from "./cdp.mjs";
 import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
-// Discover > Activities | Books (music activities are listed in Activities), the book Wishlist, and music activities
+// Discover > Activities | Books | Collections (music activities are listed in Activities), the book Wishlist, and music activities
 // in the My Week workflow.
 // Checks are written against whatever books and music the data files hold, so they keep passing as the sample
 // entries are replaced with real ones.
@@ -76,9 +76,9 @@ await page.waitFor(`__t.dbExists()`, 10000, "data stored");
 const plansBefore = await live("plans");
 const savedBefore = await live("saved");
 
-await step("Discover shows Activities | Books, with Activities first and selected", async () => {
+await step("Discover shows Activities | Books | Collections, with Activities first and selected", async () => {
   await nav(NAV.discover);
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["Activities", "Books"]);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["Activities", "Books", "Collections"]);
   assert.equal(await activeTab(), "Activities");
   assert.equal(await page.eval(`document.querySelectorAll(".bottom-nav button").length`), 5, "bottom navigation unchanged");
   assert.ok((await count(".activity-card")) > 0);
@@ -233,7 +233,7 @@ await step("Music in Activities: search, Category, and Setting + Age + Category 
   await pickFilter("Category", "Art & Creativity");
   assert.equal(await count(".music-card"), total, "every music activity is in Art & Creativity");
   assert.ok((await count(".activity-card")) > total, "with the art activities");
-  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-card p")].every(p => p.textContent.includes("Art & Creativity"))`));
+  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-card .activity-image span")].every(s => s.textContent.includes("Art & Creativity"))`));
   await pickFilter("Setting", "Park");
   await pickFilter("Materials", "Nothing Needed");
   const n = await count(".activity-card");
@@ -243,7 +243,7 @@ await step("Music in Activities: search, Category, and Setting + Age + Category 
   await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
   assert.equal(await count(".activity-card"), all);
   assert.deepEqual(await pills(), ["Setting: All Settings", "Age: All Ages", "Category: All", "Materials: All"]);
-  for (const sel of [".music-card img", ".music-card .music-play", ".music-card .heart", ".music-card p", ".music-card small"]) assert.ok((await count(sel)) >= total, sel);
+  for (const sel of [".music-card img", ".music-card .music-play", ".music-card .heart", ".music-card .activity-builds", ".music-card .activity-facts li"]) assert.ok((await count(sel)) >= total, sel);
   await noOverflow("Activities with music");
 });
 
@@ -430,7 +430,7 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.eval(`__t.clickSel(".page-header .icon-button")`); await sleep(150);
   assert.ok(await page.eval(`document.body.innerText.includes("心愿书单")`), "Profile row");
   await nav(NAV.discover);
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本"]);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".discover-tabs button")].map(b => b.textContent.trim())`), ["活动", "绘本", "合集"]);
   await tab("活动");
   assert.deepEqual(await pills(), ["场景: 全部场景", "年龄: 所有年龄", "类别: 全部", "所需材料: 全部"]);
   await tab("绘本");
@@ -444,7 +444,7 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
   await tab("活动");
   await search("你唱我学");
-  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card p")].some(p => p.textContent.includes("艺术与创造"))`), "Chinese music search and category");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-image span")].some(s => s.textContent.includes("艺术与创造"))`), "Chinese music search and category");
   await page.eval(`__t.clickSel(".music-card .activity-image")`);
   await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music");
   for (const text of ["玩法介绍", "孩子在探索什么", "标记已尝试"]) assert.ok(await page.eval(`document.body.innerText.includes(${q(text)})`), text);

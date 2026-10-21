@@ -6,7 +6,7 @@ import type { Screen } from "../types";
 //
 // Pure: App turns its navigation state into a route (`formatRoute`) and back (`parseRoute`).
 
-export type DiscoverTabRoute = "activities" | "books";
+export type DiscoverTabRoute = "activities" | "books" | "collections";
 export type ChildTabRoute = "Journal" | "Activities";
 
 export type Route = {
@@ -14,6 +14,8 @@ export type Route = {
   // activity / music page
   activity?: string;
   book?: string;
+  // collection page (src/data/collections.ts)
+  collection?: string;
   // child page, and the child Add Activity or a new Moment is for
   child?: string;
   // Moment page, or the Moment being edited
@@ -65,6 +67,8 @@ export function formatRoute(r: Route): string {
       return r.activity ? `#/${r.screen}/${enc(r.activity)}` : "#/discover";
     case "book":
       return r.book ? `#/book/${enc(r.book)}` : "#/discover/books";
+    case "collection":
+      return r.collection ? `#/collection/${enc(r.collection)}` : "#/discover";
     case "child":
       return r.child ? `#/child/${enc(r.child)}${r.childTab === "Activities" ? "/activities" : ""}` : "#/kids";
     case "record":
@@ -91,12 +95,14 @@ export function parseRoute(hash: string): Route | null {
   switch (head) {
     case "discover":
       // "#/discover/music" (the former Music tab) opens Activities, where music is listed now.
-      return { screen: "discover", discoverTab: id === "books" ? "books" : "activities" };
+      return { screen: "discover", discoverTab: id === "books" || id === "collections" ? id : "activities" };
     case "activity":
     case "music":
       return id ? { screen: head, activity: id } : { screen: "discover", discoverTab: "activities" };
     case "book":
       return id ? { screen: "book", book: id } : { screen: "discover", discoverTab: "books" };
+    case "collection":
+      return id ? { screen: "collection", collection: id } : { screen: "discover", discoverTab: "collections" };
     case "child":
       return id ? { screen: "child", child: id, childTab: extra === "activities" ? "Activities" : "Journal" } : { screen: "children" };
     case "add-activity":

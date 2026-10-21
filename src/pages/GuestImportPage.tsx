@@ -14,7 +14,7 @@ import type { Lang } from "../types";
 type Phase = "checking" | "offline" | "failed" | "nothing" | "ready" | "saving";
 
 const countLines = (c: ImportCounts, t: Copy) => [
-  [c.entries, t.importMemories], [c.records, t.importActivities], [c.plans, t.importPlans], [c.goals, t.importGoals], [c.saved, t.importSaved], [c.photos, t.importPhotos],
+  [c.entries, t.importMemories], [c.records, t.importActivities], [c.plans, t.importPlans], [c.goals, t.importGoals], [c.saved, t.importSaved], [c.savedCollections, t.importSavedCollections], [c.photos, t.importPhotos],
 ].filter(([n]) => (n as number) > 0).map(([n, text]) => (text as string).replace("{n}", String(n)));
 
 export function GuestImportPage({ userId, back, done, lang, t }: { userId: string; back: () => void; done: (started: boolean) => void; lang: Lang; t: Copy }) {

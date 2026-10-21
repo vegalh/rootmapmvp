@@ -41,6 +41,7 @@ This is the guest space. Builds with cloud features also keep one database per s
 | `plans` | `id` (multi-entry index `childIds`) | My Week plans. |
 | `goals` | `id` | My Goals (belong to the parent, not a child). |
 | `saved` | `id` (= activity id) | Saved Discover activities. |
+| `savedCollections` | `id` (= collection id) | Saved RootMap collections (`src/data/collections.ts`). Added in database version 2. |
 | `photos` | `id` | Photo metadata: type, size, dimensions, timestamps, future `storagePath` / `uploadedAt`. |
 | `photoBlobs` | `id` | The image bytes (Blob), kept apart from metadata. |
 | `drafts` | `key` (`<childId>:<entryId\|new>`) | Unsaved editor state. Device-local by design. |
@@ -181,7 +182,7 @@ anything, so the planner recognises untouched demo content by its content (see t
 - **Onboarding:** Opening animation → Welcome/Login → Add Child → RootMap; skip for a returning signed-in user.
   On first sign-in, upload this device's data (applying the demo-data rules above), then mark it as linked.
 - **Ownership:** `families` (id, created_at), `family_members` (family_id, user_id, role), and a `family_id` column on
-  every table mirroring the stores above (children, records, observations, entries, plans, goals, saved, photos).
+  every table mirroring the stores above (children, records, observations, entries, plans, goals, saved, savedCollections, photos).
   Goals and profile settings belong to a user within the family. Keep the text ids as primary keys so local and
   remote ids match. Multi-parent sharing comes later, but this shape supports it.
 - **Row Level Security** on every table: a row is visible and writable only to members of its `family_id`.

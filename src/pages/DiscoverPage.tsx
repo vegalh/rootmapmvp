@@ -2,19 +2,20 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, FilterPill, Empty } from "../components/ui";
 import BooksBrowser from "../components/BooksBrowser";
-import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageRangeForYears, catalogCategories, catalogItems, filterDiscoverActivities, findMusic } from "../lib/catalog";
+import CollectionCard from "../components/CollectionCard";
+import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, filterDiscoverActivities, findMusic, suitableFirst } from "../lib/catalog";
 import { childShortName } from "../lib/children";
-import { ageFromDob } from "../lib/dates";
+import { collectionImages, shownCollections } from "../lib/collections";
 import type { Activity, Child } from "../types";
 import { ageOptionLabel, categoryOptionLabel, localizeActivity, materialsOptionLabel, settingOptionLabel, type Copy } from "../lib/i18n";
 
 type OpenFilter = "setting" | "age" | "category" | "materials" | null;
 
-export type DiscoverTab = "activities" | "books";
+export type DiscoverTab = "activities" | "books" | "collections";
 
 // Discover: Activities (the default; activities and music together) and Books. Music cards open through `open`
 // like activities do, onto the music page with its audio player.
-export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, childrenData, t }: {
+export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, openCollection, childrenData, t }: {
   tab: DiscoverTab;
   // The family's children: their ages suggest an age filter and put suitable activities first.
   childrenData: Child[];
@@ -23,12 +24,14 @@ export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, 
   toggleSaved: (id: string) => void;
   open: (id: string) => void;
   openBook: (id: string) => void;
+  openCollection: (id: string) => void;
   t: Copy;
 }) {
-  const tabs: [DiscoverTab, string][] = [["activities", t.tabActivities], ["books", t.tabBooks]];
+  const tabs: [DiscoverTab, string][] = [["activities", t.tabActivities], ["books", t.tabBooks], ["collections", t.tabCollections]];
+  const subtitle = tab === "books" ? t.booksSubtitle : tab === "collections" ? t.collectionsSubtitle : t.discoverSubtitle;
   return (
     <main className="page-content discover-page">
-      <PageHeader title={t.discover} subtitle={tab === "books" ? t.booksSubtitle : t.discoverSubtitle} />
+      <PageHeader title={t.discover} subtitle={subtitle} />
       <div className="segmented discover-tabs" role="tablist">
         {tabs.map(([x, l]) => (
           <button role="tab" aria-selected={tab === x} className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{l}</button>
@@ -36,6 +39,12 @@ export function DiscoverPage({ tab, setTab, saved, toggleSaved, open, openBook, 
       </div>
       {tab === "activities" && <ActivitiesBrowser saved={saved} toggleSaved={toggleSaved} open={open} childrenData={childrenData} t={t} />}
       {tab === "books" && <BooksBrowser openBook={openBook} t={t} />}
+      {/* RootMap's collections, one under another. */}
+      {tab === "collections" && (
+        <div className="collection-list" aria-label={t.collectionsHeading}>
+          {collections.map(c => <CollectionCard collection={c} image={collectionPictures.get(c.id)} open={openCollection} t={t} key={c.id} />)}
+        </div>
+      )}
     </main>
   );
 }
@@ -47,6 +56,9 @@ const settingOptions = ["All", ...ACTIVITY_SETTINGS.filter(s => items.some(a => 
 const ageOptions = ageOptionsFor(items.map(activityAgeRanges));
 const categoryOptions = ["All", ...catalogCategories({ inUse: true })];
 const materialsOptions = ["All", ...MATERIAL_TYPES.filter(m => items.some(a => a.materialType === m))];
+// Collections are worked out once per page load (the autumn one depends on the month).
+const collections = shownCollections();
+const collectionPictures = collectionImages(collections);
 
 function ActivitiesBrowser({ saved, toggleSaved, open, childrenData, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; childrenData: Child[]; t: Copy }) {
   const [q, setQ] = useState("");
@@ -56,13 +68,12 @@ function ActivitiesBrowser({ saved, toggleSaved, open, childrenData, t }: { save
   const [materials, setMaterials] = useState("All");
   const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
   // Each child's age filter. Suggestions only: every activity stays a tap away.
-  const childRanges = childrenData.filter(c => c.dob).map(c => ({ child: c, range: ageRangeForYears(ageFromDob(c.dob).totalYears) }));
-  const suits = (a: Activity) => childRanges.some(x => activityAgeRanges(a).includes(x.range));
+  const childRanges = childAgeRanges(childrenData);
   const found = filterDiscoverActivities(items, { q, setting, age, category, materials });
   const filtered = setting !== "All" || age !== "All Ages" || category !== "All" || materials !== "All";
   const resetFilters = () => { setSetting("All"); setAge("All Ages"); setCategory("All"); setMaterials("All"); };
   // Activities that suit one of the children come first; the order is otherwise unchanged.
-  const result = childRanges.length && age === "All Ages" ? [...found.filter(suits), ...found.filter(a => !suits(a))] : found;
+  const result = age === "All Ages" ? suitableFirst(found, childrenData) : found;
   return (
     <>
       <label className="search discover-search"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t.searchActivities} /></label>
@@ -119,6 +130,9 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
   const a = localizeActivity(rawActivity, t);
   const music = findMusic(a.id);
   const category = categoryOptionLabel(a.category, t);
+  const lang = t.code === "zh" ? "zh" : "en";
+  const builds = buildsDomains(rawActivity, lang);
+  const materials = a.materialType === "none" ? t.factNothingNeeded : a.materialType === "everyday" ? t.factAtHome : a.materialsLabel;
   return (
     <article className={`activity-card ${music ? "music-card" : ""}`}>
       <button className="activity-image" onClick={() => open(a.id)}>
@@ -128,8 +142,12 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
       <div>
         <button className="activity-name" onClick={() => open(a.id)}>{a.title}</button>
         <button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(a.id)} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", a.title)}><Icon name="heart" size={18} filled={saved} /></button>
-        <p>{a.age} · {category}</p>
-        <small><span><Icon name="clock" size={13} />{a.minutes} {t.min}</span><span><Icon name="layers" size={13} />{a.materialsLabel}</span></small>
+        {builds.length > 0 && <p className="activity-builds">{t.buildsLabel}{builds.join(" · ")}</p>}
+        <ul className="activity-facts">
+          <li><Icon name="clock" size={12} />{lang === "zh" ? `${a.minutes}${t.min}` : `${a.minutes} ${t.min}`}</li>
+          <li>{ageTagLabel(rawActivity, lang)}</li>
+          <li><Icon name="layers" size={12} />{materials}</li>
+        </ul>
       </div>
     </article>
   );

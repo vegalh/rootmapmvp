@@ -131,6 +131,37 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .heart { position: absolute; top: 7px; right: 7px; padding: 2px; border: 0; background: transparent; color: var(--muted); }.heart.saved { color: var(--orange); }
 .activity-card p { margin: 5px 0 7px; color: var(--muted); font-size: 15px; }
 .activity-card small { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 14px; color: var(--muted); }.activity-card small > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+/* What the activity builds: one quiet line, cut off with an ellipsis. */
+.activity-card p.activity-builds { margin: 5px 0 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Quick facts: time, age, materials. */
+.activity-facts { display: flex; flex-wrap: wrap; gap: 4px; margin: 7px 0 0; padding: 0; list-style: none; }
+.activity-facts li { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px 7px; border-radius: 9px; background: var(--elevated); color: var(--muted); font-size: 12.5px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-facts li svg { flex: 0 0 auto; }
+
+/* RootMap's collections: a row that scrolls on its own, edge to edge, never the page. */
+.collection-strip { margin: 4px 0 12px; }
+.collection-strip h2 { margin: 0 0 8px; font: 600 22px var(--font-heading); color: var(--dark-purple); }
+.collection-row { display: flex; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; margin: 0 -20px; padding: 2px 20px 6px; scroll-padding-inline: 20px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.collection-row::-webkit-scrollbar { display: none; }
+.collection-card { flex: 0 0 196px; min-width: 0; scroll-snap-align: start; display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--card); box-shadow: var(--shadow); text-align: left; color: var(--text); }
+.collection-card-image { display: block; height: 92px; background: var(--elevated); }
+.collection-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.collection-card-text { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px 10px; min-width: 0; }
+.collection-card-text strong { font: 600 19px/1.15 var(--font-heading); color: var(--dark-purple); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.collection-card-text small { color: var(--muted); font-size: 13px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.6em; }
+.collection-card-text em { font-style: normal; color: var(--primary); font-size: 13px; font-weight: 700; }
+/* Discover › Collections: one card under another, full width. */
+.collection-list { display: flex; flex-direction: column; gap: 12px; }
+.collection-list .collection-card { flex: none; width: 100%; }
+.collection-list .collection-card-image { height: 150px; }
+.collection-list .collection-card-text { padding: 10px 13px 12px; }
+.collection-list .collection-card-text strong { font-size: 23px; }
+.collection-list .collection-card-text small { font-size: 14.5px; min-height: 0; }
+.collection-list .collection-card-text em { font-size: 14px; }
+.collection-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 14px; color: var(--muted); font-size: 15px; }
+.collection-save { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 22px; background: var(--card); color: var(--text); font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.collection-save.saved { border-color: var(--orange); color: var(--orange); }
+.saved-filters { margin-bottom: 3px; }
 
 .detail-page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); background: var(--bg); }
 .detail-actions { height: 93px; padding: var(--safe-top) 19px 8px; display: flex; align-items: center; justify-content: space-between; }
@@ -402,7 +433,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 }
 @media (max-width: 359px) {
   .page-content,.week-page,.simple-page,.form-page { padding-left: 15px; padding-right: 15px; }
-  .category-chips { margin-left: -15px; margin-right: -15px; padding-left: 15px; padding-right: 15px; }
+  .category-chips, .collection-row { margin-left: -15px; margin-right: -15px; padding-left: 15px; padding-right: 15px; }
 }
 
 /* Welcome and sign-in (OpeningExperience), full screen above the app; same frame as the development preview. */
@@ -605,7 +636,7 @@ body::before { content: ""; position: fixed; z-index: 75; top: 0; left: 0; right
 button, .photo-upload-button, .journal-add-photo { transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease; }
 button:not(:disabled):active, .photo-upload-button:active, .journal-add-photo:active { opacity: .6; transition-duration: 0s; }
 :is(.wide-primary, .wide-secondary, .modal-primary, .sheet-buttons button, .sticky-action button, .form-bottom button, .small-primary, .square-primary, .journal-save, .goal-form-actions .goal-submit, .round-add, .audio-toggle, .header-add-child, .picker-custom, .deleted-row button, .photo-upload-button):not(:disabled):active { opacity: .88; transform: scale(.97); transition-duration: var(--dur-tap); }
-:is(.today-feature, .today-memory, .today-week, .book-tile, .journal-card, .activity-image, .child-select-card, .recap-row, .picker-row, .lesson-list > button, .recent-activity > button, .notification-item, .quick-actions button, .activity-row, .journal-draft, .entry-child-pick, .goals-legacy):not(:disabled):active { opacity: 1; transform: scale(.985); transition-duration: var(--dur-tap); }
+:is(.today-feature, .collection-card, .today-memory, .today-week, .book-tile, .journal-card, .activity-image, .child-select-card, .recap-row, .picker-row, .lesson-list > button, .recent-activity > button, .notification-item, .quick-actions button, .activity-row, .journal-draft, .entry-child-pick, .goals-legacy):not(:disabled):active { opacity: 1; transform: scale(.985); transition-duration: var(--dur-tap); }
 :is(.menu-section button, .choice-list button, .filter-popover-option):not(:disabled):active { opacity: 1; background-color: color-mix(in srgb, var(--text) 6%, transparent); transition-duration: 0s; }
 .bottom-nav button:active { opacity: .6; }
 /* Positioned by a transform, so it only dims. */

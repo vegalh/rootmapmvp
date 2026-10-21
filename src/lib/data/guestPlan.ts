@@ -98,7 +98,8 @@ export function planGuestMigration(snapshot: GuestSnapshot, demoChildren: Child[
 
   const referenced = new Set<string>();
   for (const name of COLLECTIONS) {
-    for (const r of c[name] as (Collections[CollectionName] & Record<string, unknown>)[]) {
+    // A collection added after the snapshot was taken (e.g. savedCollections) is simply empty.
+    for (const r of (c[name] ?? []) as (Collections[CollectionName] & Record<string, unknown>)[]) {
       const item = { collection: name, id: r.id, deleted: !!r.deletedAt };
       const children = name === "children" ? [r.id] : childOf(r as { childId?: string; childIds?: string[] });
       const attached = children.some(id => ownChildren.has(id));
@@ -127,7 +128,8 @@ export async function readGuestSnapshot(): Promise<GuestSnapshot | null> {
   const db = await openExisting(DB_NAME);
   if (!db) return null;
   try {
-    const collections = Object.fromEntries(await Promise.all(COLLECTIONS.map(async name => [name, await getAll(db, name)]))) as GuestSnapshot["collections"];
+    // A guest database last opened by an earlier version may not have every store yet (it is read, not upgraded).
+    const collections = Object.fromEntries(await Promise.all(COLLECTIONS.map(async name => [name, db.objectStoreNames.contains(name) ? await getAll(db, name) : []]))) as GuestSnapshot["collections"];
     return { collections, photos: await getAll<PhotoMeta>(db, "photos"), drafts: (await getAll(db, "drafts")).length, archive: (await getAll(db, "archive")).length };
   } finally {
     db.close();

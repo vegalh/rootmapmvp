@@ -26,6 +26,7 @@ export const BACKUP_KEYS: Record<string, Shape> = {
   "rootmap-journal-drafts": "object",
   "rootmap-migrated-legacy": "array",
   "rootmap-saved": "array",
+  "rootmap-saved-collections": "array",
   "rootmap-plans": "array",
   "rootmap-goals": "array",
   "rootmap-profile": "object",
@@ -95,6 +96,7 @@ function validData(data: Record<string, unknown>) {
     if (!str(p.name) || !str(p.photo)) return false;
   }
   if ("rootmap-saved" in data && !strs(data["rootmap-saved"])) return false;
+  if ("rootmap-saved-collections" in data && !strs(data["rootmap-saved-collections"])) return false;
   if ("rootmap-language" in data && !["en", "zh"].includes(data["rootmap-language"] as string)) return false;
   return true;
 }

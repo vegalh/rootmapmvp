@@ -263,6 +263,8 @@ export type Screen =
   | "activity"
   | "book"
   | "music"
+  // One of RootMap's collections (pages/CollectionPage.tsx).
+  | "collection"
   | "bookshelf"
   | "observations"
   // The weekly look back over Moments (pages/WeeklyRecapPage.tsx).

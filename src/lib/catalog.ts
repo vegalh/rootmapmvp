@@ -1,7 +1,8 @@
 import { activities } from "../data/activities";
 import { musicActivities } from "../data/music";
 import defaultMusicCover from "../assets/music/cover-sage.svg";
-import type { Activity, ActivitySetting, AgeRange, Book, DiscoverCategory, Lang, MaterialType, MusicActivity } from "../types";
+import type { Activity, ActivitySetting, AgeRange, Book, Child, DiscoverCategory, Lang, MaterialType, MusicActivity } from "../types";
+import { ageFromDob } from "./dates";
 import { categoryOptionLabel, copy, discoverCategoryLabel, topicOptionLabel, type Copy } from "./i18n";
 
 // The one activity catalog: Discover activities (src/data/activities.ts) and Music activities (src/data/music.ts).
@@ -67,10 +68,50 @@ export function ageRangeForYears(years: number): AgeRange {
   return years < 2 ? "0–2" : years < 3 ? "2–3" : years < 6 ? "3–6" : "6+";
 }
 
+// The age filter of each child with a birthdate. Suggestions only: every activity stays a tap away.
+export function childAgeRanges(children: Child[]): { child: Child; range: AgeRange }[] {
+  return children.filter(c => c.dob).map(c => ({ child: c, range: ageRangeForYears(ageFromDob(c.dob).totalYears) }));
+}
+
+// Activities that suit one of the children (by age) first; the order is otherwise unchanged. Discover and the
+// collection pages list activities this way.
+export function suitableFirst<A extends Activity>(list: A[], children: Child[]): A[] {
+  const ranges = childAgeRanges(children).map(x => x.range);
+  if (!ranges.length) return list;
+  const suits = (a: A) => activityAgeRanges(a).some(r => ranges.includes(r));
+  return [...list.filter(suits), ...list.filter(a => !suits(a))];
+}
+
 // Only the age filters that have something to show, in their usual order ("All Ages" first).
 export function ageOptionsFor(rangesOfEach: AgeRange[][]): string[] {
   return ["All Ages", ...AGE_RANGES.filter(r => rangesOfEach.some(x => x.includes(r)))];
 }
+
+// What an activity card says the activity builds: the first two abilities among its `domains` (in Chinese from
+// `zh.domains`, which lists the same entries in the same order). Entries that describe the activity rather than an
+// ability are skipped; an activity with none left has no "Builds" line.
+export const DESCRIPTIVE_DOMAINS = ["Food Preparation", "Nature Awareness", "Creativity", "Sequencing"];
+export function buildsDomains(a: Pick<Activity, "domains" | "zh">, lang: Lang): string[] {
+  const zh = lang === "zh" ? a.zh?.domains : undefined;
+  return a.domains
+    .map((d, i) => ({ d, label: zh?.[i] || d }))
+    .filter(x => !DESCRIPTIVE_DOMAINS.includes(x.d))
+    .slice(0, 2)
+    .map(x => x.label);
+}
+
+// The card's age tag: "2–4 yrs" / "2–4岁", "4+ yrs" / "4岁+".
+export function ageTagLabel(a: Pick<Activity, "age" | "ageKey">, lang: Lang): string {
+  const [from, to] = activityAgeSpan(a);
+  if (to === Infinity) return lang === "zh" ? `${from}岁+` : `${from}+ yrs`;
+  return lang === "zh" ? `${from}–${to}岁` : `${from}–${to} yrs`;
+}
+
+// Time filter (My Week › Saved): up to 10 minutes, 11–15, over 15.
+export type TimeBand = "upTo10" | "10to15" | "over15";
+export const TIME_BANDS: TimeBand[] = ["upTo10", "10to15", "over15"];
+export const timeBand = (minutes: number): TimeBand => (minutes <= 10 ? "upTo10" : minutes <= 15 ? "10to15" : "over15");
+export const matchesTime = (a: Pick<Activity, "minutes">, time: string) => time === "All" || timeBand(a.minutes) === time;
 
 // "2–5 years" / "2–5岁", "4–6+ years" / "4–6+岁".
 export function readingAgeLabel(b: Book, lang: Lang): string {

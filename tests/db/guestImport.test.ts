@@ -44,6 +44,7 @@ function guestSpace(extra: Partial<GuestSnapshot["collections"]> = {}, photos: {
     plans: [],
     goals: [],
     saved: demo ? DEMO_SAVED.map((id, i) => ({ id, ...meta, origin: "demo" as const, position: i })) : [],
+    savedCollections: [],
   };
   for (const [k, list] of Object.entries(extra)) (collections as Record<string, unknown[]>)[k] = [...(collections as Record<string, unknown[]>)[k], ...(list as unknown[])];
   const snapshot: GuestSnapshot = { collections, photos: photos.map(p => p.meta), drafts: 1, archive: 0 };
@@ -105,7 +106,7 @@ const ids = (list: Rec[]) => list.map(r => r.id).sort();
 // ---- Tests -------------------------------------------------------------------------------------------------------
 
 describe("guest import: what is brought in", () => {
-  it("the parent's own children, memories, activities, plans, goals, saved activities and photos reach the account, verified", async () => {
+  it("the parent's own children, memories, activities, plans, goals, saved activities and collections and photos reach the account, verified", async () => {
     const p = await parent("gi-own");
     const a = await p.device();
     const ph = await photo(700);
@@ -116,13 +117,14 @@ describe("guest import: what is brought in", () => {
       plans: [{ id: "p-1", activityId: "dotting", date: "2026-09-03", childIds: ["c-ada"], createdAt: T, updatedAt: T, deletedAt: null, origin: "user", position: 0 }],
       goals: [{ id: "g-1", title: "Read together", completed: false, createdAt: T, updatedAt: T, deletedAt: null, origin: "user", position: 0 }],
       saved: [{ id: "sandpaper-letters", createdAt: T, updatedAt: T, deletedAt: null, origin: "user", position: 5 }],
+      savedCollections: [{ id: "rainy-day", createdAt: T, updatedAt: T, deletedAt: null, origin: "user", position: 0 }],
     }, [ph]);
     const l = local(a, g);
     const prepared = (await prepareGuestImport(a.client, l, ctxFor(p)))!;
     assert.equal(prepared.offer.plan.needsConfirmation, false, "nothing uncertain: one question only");
     assert.deepEqual(prepared.offer.childNames, ["Ada Li"]);
     assert.deepEqual(prepared.offer.demoKept.sort(), ["Leo Hao", "Maya Hao"], "untouched demo children stay");
-    assert.deepEqual({ ...prepared.offer.sure }, { children: 1, entries: 2, records: 1, plans: 1, goals: 1, saved: 1, photos: 1 });
+    assert.deepEqual({ ...prepared.offer.sure }, { children: 1, entries: 2, records: 1, plans: 1, goals: 1, saved: 1, savedCollections: 1, photos: 1 });
 
     const accepted = await acceptGuestImport(a.client, l, ctxFor(p), { includeUncertain: false, sameChild: {} }, prepared);
     assert.equal(accepted.status, "copied");
@@ -137,6 +139,7 @@ describe("guest import: what is brought in", () => {
     assert.deepEqual(ids(await rows("plans", p.familyId)), ["p-1"]);
     assert.deepEqual(ids(await rows("goals", p.familyId)), ["g-1"]);
     assert.deepEqual(ids(await rows("saved_activities", p.familyId)), ["sandpaper-letters"], "default saved activities stay");
+    assert.deepEqual(ids(await rows("saved_collections", p.familyId)), ["rainy-day"]);
     const serverPhoto = (await rows("photos", p.familyId))[0];
     assert.equal(serverPhoto.id, ph.meta.id);
     assert.equal(serverPhoto.server_sha256, ph.meta.sha256);

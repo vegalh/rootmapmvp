@@ -10,7 +10,7 @@ import { buildFromLegacy, readLegacyStorage, type Built, type Defaults } from ".
 import { isMigrated, migrateFromLocalStorage } from "./migrate";
 import { applyChanges, byPosition, outboxEntries } from "./records";
 import {
-  COLLECTIONS, DB_NAME, GUEST, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
+  COLLECTIONS, DB_NAME, GUEST, ID_LIST_COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
   type CollectionName, type Collections, type OutboxCollection, type OutboxEntry, type PhotoBlob, type PhotoMeta, type Space, type SpaceMeta,
   type StoreName, type StoredDraft, type StoredSetting, type SyncRecord,
 } from "./schema";
@@ -454,8 +454,8 @@ function writeLegacy(change: Change): StorageFailure | null {
     if (name === "children") {
       failure = json(LEGACY_KEYS.children, withExtras(LEGACY_KEYS.children, live))
         || json(LEGACY_DELETED_CHILDREN_KEY, withExtras(LEGACY_DELETED_CHILDREN_KEY, all.filter(r => r.deletedAt)));
-    } else if (name === "saved") {
-      failure = json(LEGACY_KEYS.saved, live.map(r => r.id));
+    } else if (ID_LIST_COLLECTIONS.includes(name)) {
+      failure = json(LEGACY_KEYS[name], live.map(r => r.id));
     } else {
       failure = json(LEGACY_KEYS[name], withExtras(LEGACY_KEYS[name], live));
     }
@@ -598,6 +598,7 @@ export async function backupData(): Promise<Record<string, unknown>> {
     [LEGACY_KEYS.plans]: live("plans"),
     [LEGACY_KEYS.goals]: live("goals"),
     [LEGACY_KEYS.saved]: live("saved").map(s => s.id),
+    [LEGACY_KEYS.savedCollections]: live("savedCollections").map(s => s.id),
     [LEGACY_DRAFTS_KEY]: Object.fromEntries(await Promise.all(allDrafts().map(async ([key, d]) => [key, { ...d, photos: await Promise.all(d.photos.map(inline)) }]))),
   };
   for (const key of Object.keys(BACKUP_KEYS)) {

@@ -25,11 +25,11 @@ import { COLLECTION_OF, TABLE, clientRow, fromRow, toRow, type Row, type SyncedC
 
 export type ImportCollection = Exclude<CollectionName, "observations">;
 // Legacy observations stay on the device: each one is already a memory (entries).
-const IMPORTED: ImportCollection[] = ["children", "entries", "records", "plans", "goals", "saved"];
-const PREFIX: Record<ImportCollection, string> = { children: "c", entries: "m", records: "r", plans: "p", goals: "g", saved: "" };
+const IMPORTED: ImportCollection[] = ["children", "entries", "records", "plans", "goals", "saved", "savedCollections"];
+const PREFIX: Record<ImportCollection, string> = { children: "c", entries: "m", records: "r", plans: "p", goals: "g", saved: "", savedCollections: "" };
 
-export type ImportCounts = { children: number; entries: number; records: number; plans: number; goals: number; saved: number; photos: number };
-const noCounts = (): ImportCounts => ({ children: 0, entries: 0, records: 0, plans: 0, goals: 0, saved: 0, photos: 0 });
+export type ImportCounts = { children: number; entries: number; records: number; plans: number; goals: number; saved: number; savedCollections: number; photos: number };
+const noCounts = (): ImportCounts => ({ children: 0, entries: 0, records: 0, plans: 0, goals: 0, saved: 0, savedCollections: 0, photos: 0 });
 
 export type GuestManifest = {
   version: 1;
@@ -184,7 +184,7 @@ export function buildGuestImport(input: {
 }): ImportBuild {
   const { snapshot, offer, answers, account, userId } = input;
   const newId = input.newId ?? (c => (c === "photos" ? newPhotoId() : newRecordId(PREFIX[c] || "s")));
-  const guest = (collection: ImportCollection, id: string) => (snapshot.collections[collection] as unknown as Record<string, unknown>[]).find(r => r.id === id);
+  const guest = (collection: ImportCollection, id: string) => ((snapshot.collections[collection] ?? []) as unknown as Record<string, unknown>[]).find(r => r.id === id);
   const sources: Record<string, string | null> = {};
   const out: ImportBuild = {
     records: [], photos: [], sources, counts: noCounts(), likelyDuplicates: 0, missingPhotos: [], unsendable: [],
@@ -216,7 +216,8 @@ export function buildGuestImport(input: {
   const copyOrMatch = (collection: ImportCollection, rec: Record<string, unknown>): { id: string; copy: boolean } => {
     const existing = account.records.get(keyOf(collection, String(rec.id)));
     if (!existing) return { id: String(rec.id), copy: true };
-    if (collection === "saved" || sameRecord(collection, existing, rec, userId)) return { id: String(rec.id), copy: false };
+    // A saved activity or collection is keyed by what it saves: the same id is the same thing.
+    if (collection === "saved" || collection === "savedCollections" || sameRecord(collection, existing, rec, userId)) return { id: String(rec.id), copy: false };
     return { id: newId(collection), copy: true };
   };
 
@@ -239,7 +240,7 @@ export function buildGuestImport(input: {
 
   // Then everything else, with its child references in account ids.
   for (const collection of IMPORTED.filter(c => c !== "children")) {
-    for (const rec of snapshot.collections[collection] as unknown as Record<string, unknown>[]) {
+    for (const rec of (snapshot.collections[collection] ?? []) as unknown as Record<string, unknown>[]) {
       const id = String(rec.id);
       if (!isChosen(collection, id)) continue;
       const mapped: Record<string, unknown> = { ...rec };
@@ -394,7 +395,7 @@ export async function prepareGuestImport(client: SupabaseClient, local: GuestImp
   // The server's copies of every id the guest uses, and every child (for "the same child?").
   for (const collection of IMPORTED) {
     const table = TABLE[collection];
-    const ids = (snapshot.collections[collection] as { id: string }[]).map(r => r.id);
+    const ids = ((snapshot.collections[collection] ?? []) as { id: string }[]).map(r => r.id);
     const rows = collection === "children"
       ? (check(await client.from("children").select("*").eq("family_id", ctx.familyId).limit(10000)) as Row[])
       : await rowsById(client, ctx.familyId, table, ids);

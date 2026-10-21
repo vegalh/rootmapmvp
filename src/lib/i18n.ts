@@ -63,6 +63,9 @@ export const copy = {
     welcomeFamilyTitle: "Welcome to RootMap", welcomeFamilyText: "Add your child to keep their little moments, try activities that suit their age, and look back on how they grow.",
     noChildrenYet: "No children yet. Tap Add Child above to add your first child.",
     wishlistSubtitle: "Books you'd love to read together", addToWishlist: "Add to Wishlist", removedFromWishlist: "Removed from Wishlist", removeFromWishlistLabel: "Remove {title} from Wishlist",
+    buildsLabel: "Builds: ", factNothingNeeded: "Nothing needed", factAtHome: "At home",
+    collectionsHeading: "Collections", tabCollections: "Collections", collectionsSubtitle: "Ready-made ideas for everyday moments", saveCollection: "Save collection", collectionSaved: "Collection saved", myCollections: "My collections", importSavedCollections: "{n} saved collections",
+    timeFilter: "Time", timeAll: "Any Length", timeUpTo10: "Up to 10 min", time10to15: "10–15 min", timeOver15: "Over 15 min",
     code: "en",
   },
   zh: {
@@ -128,6 +131,9 @@ export const copy = {
     welcomeFamilyTitle: "欢迎来到 RootMap", welcomeFamilyText: "添加您的孩子，记录成长中的点滴，尝试适合孩子年龄的活动，回顾孩子的成长。",
     noChildrenYet: "还没有添加孩子。点击上方的“添加孩子”，添加您的第一个孩子。",
     wishlistSubtitle: "想和孩子一起读的书", addToWishlist: "加入心愿书单", removedFromWishlist: "已从心愿书单移除", removeFromWishlistLabel: "将“{title}”移出心愿书单",
+    buildsLabel: "练的是：", factNothingNeeded: "无需材料", factAtHome: "家里就有",
+    collectionsHeading: "精选合集", tabCollections: "合集", collectionsSubtitle: "为日常时刻准备好的活动合集", saveCollection: "收藏这个合集", collectionSaved: "已收藏合集", myCollections: "我的合集", importSavedCollections: "{n} 个收藏的合集",
+    timeFilter: "时长", timeAll: "不限时长", timeUpTo10: "10分钟内", time10to15: "10–15分钟", timeOver15: "15分钟以上",
     code: "zh",
   },
 };
@@ -224,6 +230,9 @@ export function categoryOptionLabel(v: string, t: Copy): string {
 }
 export function materialsOptionLabel(v: string, t: Copy): string {
   return v === "All" ? t.all : v === "none" ? t.materialsNone : v === "everyday" ? t.materialsEveryday : v;
+}
+export function timeOptionLabel(v: string, t: Copy): string {
+  return v === "All" ? t.timeAll : v === "upTo10" ? t.timeUpTo10 : v === "10to15" ? t.time10to15 : v === "over15" ? t.timeOver15 : v;
 }
 export function groupOptionLabel(v: string, t: Copy): string {
   return v === "All Groups" ? t.allGroups

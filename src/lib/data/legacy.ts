@@ -1,6 +1,6 @@
 import type { Child, EntryDraft, LessonRecord, Observation, SyncMeta } from "../../types";
 import {
-  COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS,
+  COLLECTIONS, ID_LIST_COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS,
   hasShape, settingShape, type ArchiveItem, type CollectionName, type Collections, type PhotoMeta,
 } from "./schema";
 
@@ -194,16 +194,18 @@ export function buildFromLegacy(source: LegacySource, opt: BuildOptions): Built 
   const collections = {} as Built["collections"];
   for (const name of COLLECTIONS) {
     const from = LEGACY_KEYS[name];
-    if (name === "saved") {
+    if (ID_LIST_COLLECTIONS.includes(name)) {
       const ids: string[] = [];
-      for (const id of listFor("saved")) {
+      for (const id of listFor(name)) {
         if (!str(id)) keep(from, "invalid-record", id);
         else if (!ids.includes(id)) ids.push(id);
       }
       const fromDefault = !(from in source.values);
-      collections.saved = ids.map((id, i) => ({
+      // Only saved activities have defaults (the demo's); saved collections are always the parent's.
+      const demo = name === "saved" ? defaults.saved : [];
+      (collections as Record<string, unknown[]>)[name] = ids.map((id, i) => ({
         id, createdAt: null, updatedAt: now, deletedAt: null,
-        origin: fromDefault ? "demo" : defaults.saved.includes(id) ? "unknown" : "user",
+        origin: fromDefault ? "demo" : demo.includes(id) ? "unknown" : "user",
         ...(opt.migratedAt ? { migratedAt: opt.migratedAt } : {}),
         position: i,
       }));

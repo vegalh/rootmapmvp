@@ -8,9 +8,10 @@ import type { Child, Entry, EntryDraft, Goal, LessonRecord, Observation, Plan, S
 // - account: "rootmap-account-<userId>", one per signed-in account on this device. Same stores, plus the outbox
 //            (local changes waiting for sync) and per-record sync state.
 export const DB_NAME = "rootmap";
-export const DB_VERSION = 1;
+// Version 2 adds the `savedCollections` store (idb.ts upgrades older databases in place).
+export const DB_VERSION = 2;
 export const ACCOUNT_DB_PREFIX = "rootmap-account-";
-export const ACCOUNT_DB_VERSION = 1;
+export const ACCOUNT_DB_VERSION = 2;
 
 export type Space = { kind: "guest" } | { kind: "account"; userId: string };
 export const GUEST: Space = { kind: "guest" };
@@ -26,6 +27,8 @@ export function databaseName(space: Space): string {
 
 // A saved Discover activity; the record id is the activity id.
 export type SavedActivity = SyncMeta & { id: string };
+// A saved RootMap collection (src/data/collections.ts); the record id is the collection id.
+export type SavedCollection = SyncMeta & { id: string };
 
 // Record collections: one IndexedDB object store each, one record per item, keyed by `id`.
 export type Collections = {
@@ -36,11 +39,14 @@ export type Collections = {
   plans: Plan;
   goals: Goal;
   saved: SavedActivity;
+  savedCollections: SavedCollection;
 };
 export type CollectionName = keyof Collections;
 export type AnyRecord = Collections[CollectionName];
 
-export const COLLECTIONS: CollectionName[] = ["children", "records", "observations", "entries", "plans", "goals", "saved"];
+export const COLLECTIONS: CollectionName[] = ["children", "records", "observations", "entries", "plans", "goals", "saved", "savedCollections"];
+// Collections stored as a plain list of ids in the legacy (localStorage and backup file) format.
+export const ID_LIST_COLLECTIONS: CollectionName[] = ["saved", "savedCollections"];
 // Collections whose records belong to one child, indexed by `childId` for per-child queries.
 export const CHILD_INDEXED: CollectionName[] = ["records", "observations", "entries"];
 
@@ -53,6 +59,7 @@ export const LEGACY_KEYS: Record<CollectionName, string> = {
   plans: "rootmap-plans",
   goals: "rootmap-goals",
   saved: "rootmap-saved",
+  savedCollections: "rootmap-saved-collections",
 };
 // Legacy list of removed profiles; now soft-deleted records in `children`.
 export const LEGACY_DELETED_CHILDREN_KEY = "rootmap-deleted-children";

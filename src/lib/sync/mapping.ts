@@ -1,5 +1,5 @@
 import type { Child, Entry, Goal, LessonRecord, Plan } from "../../types";
-import { isPhotoId, type PhotoMeta, type SavedActivity } from "../data/schema";
+import { isPhotoId, type PhotoMeta, type SavedActivity, type SavedCollection } from "../data/schema";
 
 // Local records ↔ server rows (Phase 2B-2 M4; docs/data-architecture-phase2.md, section 3). Pure.
 //
@@ -8,16 +8,16 @@ import { isPhotoId, type PhotoMeta, type SavedActivity } from "../data/schema";
 // both sides agreed on (`syncBase`). Converting a row back merges it onto the local record, so local-only fields
 // survive a round trip.
 
-export type SyncedCollection = "children" | "records" | "entries" | "plans" | "goals" | "saved" | "photos";
-export type Table = "children" | "activity_records" | "entries" | "plans" | "goals" | "saved_activities" | "photos";
+export type SyncedCollection = "children" | "records" | "entries" | "plans" | "goals" | "saved" | "savedCollections" | "photos";
+export type Table = "children" | "activity_records" | "entries" | "plans" | "goals" | "saved_activities" | "saved_collections" | "photos";
 export type Row = Record<string, unknown>;
 
 export const TABLE: Record<SyncedCollection, Table> = {
-  children: "children", records: "activity_records", entries: "entries", plans: "plans", goals: "goals", saved: "saved_activities", photos: "photos",
+  children: "children", records: "activity_records", entries: "entries", plans: "plans", goals: "goals", saved: "saved_activities", savedCollections: "saved_collections", photos: "photos",
 };
 export const COLLECTION_OF = Object.fromEntries(Object.entries(TABLE).map(([c, t]) => [t, c])) as Record<Table, SyncedCollection>;
 // Parents before the records that refer to them (photos ← children ← entries, records, plans).
-export const SYNC_ORDER: SyncedCollection[] = ["photos", "children", "entries", "records", "plans", "goals", "saved"];
+export const SYNC_ORDER: SyncedCollection[] = ["photos", "children", "entries", "records", "plans", "goals", "saved", "savedCollections"];
 export const isSyncedCollection = (c: string): c is SyncedCollection => c in TABLE;
 
 // Columns that can't change after insert (sent on insert only).
@@ -88,6 +88,7 @@ export function toRow(collection: SyncedCollection, r: Record<string, unknown>, 
       return { ...base, owner_user_id: ctx.userId, title: g.title ?? "", description: opt(g.description), completed: !!g.completed, completed_at: g.completedAt ?? null };
     }
     case "saved":
+    case "savedCollections":
       return base;
     case "photos": {
       const p = r as PhotoMeta & { sha256?: string };
@@ -116,6 +117,7 @@ export function fromRow(collection: SyncedCollection, row: Row, local: Record<st
     case "goals":
       return { ...base, title: row.title, description: und(row.description), completed: !!row.completed, completedAt: und(iso(row.completed_at)) };
     case "saved":
+    case "savedCollections":
       return base;
     case "photos":
       return { ...base, mimeType: row.mime_type, byteSize: Number(row.byte_size), width: row.width ?? null, height: row.height ?? null, sha256: row.sha256, uploadedAt: iso(row.uploaded_at), verifiedAt: iso(row.verified_at), source: (local?.source as string) ?? "upload", storagePath: (row.storage_path as string) ?? null };
@@ -145,6 +147,7 @@ const SAMPLE_COLUMNS: Record<SyncedCollection, string[]> = {
   plans: [...META_COLUMNS, "activity_id", "date", "child_ids", "note", "completed", "completed_date", "observation"],
   goals: [...META_COLUMNS, "owner_user_id", "title", "description", "completed", "completed_at"],
   saved: META_COLUMNS,
+  savedCollections: META_COLUMNS,
   photos: [...META_COLUMNS, "mime_type", "byte_size", "width", "height", "sha256", "uploaded_at"],
 };
 
@@ -165,4 +168,4 @@ export function photoRefs(collection: SyncedCollection, row: Row): string[] {
   return [];
 }
 
-export type { Child, Entry, Goal, LessonRecord, Plan, PhotoMeta, SavedActivity };
+export type { Child, Entry, Goal, LessonRecord, Plan, PhotoMeta, SavedActivity, SavedCollection };

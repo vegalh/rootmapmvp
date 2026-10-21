@@ -11,7 +11,7 @@ let A: Parent;
 let B: Parent;
 const aPhoto = newPhotoId();
 
-const FAMILY_TABLES = ["children", "entries", "activity_records", "plans", "goals", "saved_activities", "photos", "record_versions", "cloud_migrations"];
+const FAMILY_TABLES = ["children", "entries", "activity_records", "plans", "goals", "saved_activities", "saved_collections", "photos", "record_versions", "cloud_migrations"];
 
 before(async () => {
   [A, B] = await Promise.all([newParent("sec-a"), newParent("sec-b")]);
@@ -25,6 +25,7 @@ before(async () => {
   must(await A.client.from("plans").insert({ family_id: f, id: "a-plan", activity_id: "dotting", date: "2026-10-04", child_ids: ["a-child"] }));
   must(await A.client.from("goals").insert({ family_id: f, id: "a-goal", owner_user_id: A.id, title: "Read together" }));
   must(await A.client.from("saved_activities").insert({ family_id: f, id: "water-pouring" }));
+  must(await A.client.from("saved_collections").insert({ family_id: f, id: "rainy-day" }));
   must(await A.client.from("profiles").insert({ user_id: A.id, display_name: "A" }));
   must(await A.client.from("user_settings").insert({ user_id: A.id, key: "language", value: "zh" }));
 });
@@ -61,7 +62,7 @@ describe("cross-family isolation", () => {
   });
 
   it("5. B cannot insert into A's family", async () => {
-    for (const t of ["children", "saved_activities"]) {
+    for (const t of ["children", "saved_activities", "saved_collections"]) {
       const { error } = await B.client.from(t).insert({ family_id: A.familyId, id: "intruder" });
       assert.ok(error, `${t}: insert into another family was accepted`);
     }

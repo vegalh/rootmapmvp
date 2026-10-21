@@ -47,6 +47,23 @@ describe("record sync: one account, two devices", () => {
     assert.deepEqual(await versions(p.familyId), []);
   });
 
+  it("a saved collection reaches the other device, and so does unsaving it", async () => {
+    const p = await parent("sync-collections");
+    const a = await p.device(), b = await p.device();
+    a.edit("savedCollections", { id: "after-work" });
+    a.edit("savedCollections", { id: "autumn" });
+    assert.equal((await a.sync()).pushed, 2);
+    await b.sync();
+    assert.deepEqual(b.live("savedCollections").map(r => r.id).sort(), ["after-work", "autumn"]);
+    b.remove("savedCollections", "after-work");
+    await b.sync();
+    await a.sync();
+    assert.deepEqual(a.live("savedCollections").map(r => r.id), ["autumn"]);
+    // Unsaving is a soft delete: the server keeps the row as a tombstone.
+    const rows = await serverRows("saved_collections", p.familyId);
+    assert.deepEqual(rows.map(r => [r.id, !!r.deleted_at]), [["after-work", true], ["autumn", false]]);
+  });
+
   it("syncing again changes nothing (no repeated uploads, no new revisions)", async () => {
     const p = await parent("sync-idem");
     const a = await p.device();

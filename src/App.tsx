@@ -10,7 +10,7 @@ import { ActivityDetailPage } from "./pages/ActivityDetailPage";
 import { MomentsPage } from "./pages/MomentsPage";
 import { ChildProfilePage } from "./pages/ChildProfilePage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { MyWeekPage, ActivityRow } from "./pages/MyWeekPage";
+import { MyWeekPage, ActivityRow, type WeekTab } from "./pages/MyWeekPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
@@ -25,6 +25,7 @@ import { GuestImportPage } from "./pages/GuestImportPage";
 import BookDetailPage from "./pages/BookDetailPage";
 import MusicDetailPage from "./pages/MusicDetailPage";
 import BookshelfPage from "./pages/BookshelfPage";
+import CollectionPage from "./pages/CollectionPage";
 import OpeningExperience from "./components/OpeningExperience";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
@@ -48,6 +49,8 @@ import { activities } from "./data/activities";
 import { books } from "./data/books";
 import { musicActivities } from "./data/music";
 import { findActivity, findMusic, isMusicId } from "./lib/catalog";
+import { findShownCollection } from "./lib/collections";
+import type { Collection } from "./data/collections";
 import { buildActivityRecord, planCompletionRecords, problemMessage, type RecordInput } from "./lib/activityRecords";
 import { defaultChildId, isActiveChild } from "./lib/children";
 import { localIsoToday } from "./lib/dates";
@@ -159,6 +162,10 @@ export default function App() {
   const [selectedActivity, setSelectedActivity] = useState(start.activity ?? "water-pouring");
   const [selectedBook, setSelectedBook] = useState(start.book ?? books[0]?.id ?? "");
   const [discoverTab, setDiscoverTab] = useState<DiscoverTab>(start.discoverTab ?? "activities");
+  // The collection page open (or last open), and the page it was opened from (its back button returns there).
+  const [selectedCollection, setSelectedCollection] = useState(start.collection ?? "");
+  const [collectionFrom, setCollectionFrom] = useState<"discover" | "week">("discover");
+  const [weekTab, setWeekTab] = useState<WeekTab>("plan");
   const [childTab, setChildTab] = useState<string>(start.childTab ?? "Journal");
   // Where Add Activity was opened: a child's Activities tab (child already known) or Quick Add (child chosen in the form).
   const [recordFrom, setRecordFrom] = useState<"child" | "quick">(start.screen === "record" && start.child ? "child" : "quick");
@@ -206,6 +213,14 @@ export default function App() {
     const ids = typeof next === "function" ? next(current.map(s => s.id)) : next;
     return ids.map(id => current.find(s => s.id === id) || { id });
   }), [setSavedRecords]);
+  // Saved collections, stored like saved activities: records keyed by collection id.
+  const savedCollectionRecords = useCollection("savedCollections");
+  const savedCollectionIds = useMemo(() => savedCollectionRecords.items.map(s => s.id), [savedCollectionRecords.items]);
+  const setSavedCollectionRecords = savedCollectionRecords.set;
+  const toggleCollectionSaved = (id: string) => {
+    haptic("light");
+    setSavedCollectionRecords(current => (current.some(s => s.id === id) ? current.filter(s => s.id !== id) : [...current, { id }]));
+  };
   const { items: plans, set: setPlans, commit: commitPlans } = useCollection("plans");
   // Moments/Journal entries (per child) and goals (per parent) are never part of the seed merge.
   const { items: entries, commit: commitEntries } = useCollection("entries");
@@ -406,6 +421,7 @@ export default function App() {
     screen,
     activity: selectedActivity,
     book: selectedBook,
+    collection: selectedCollection,
     child: screen === "record" ? (recordFrom === "child" ? selectedChild : undefined) : screen === "entryEdit" ? editorChild : screen === "recap" ? recapChild || undefined : selectedChild,
     week: recapWeek || undefined,
     entry: selectedEntry,
@@ -474,6 +490,7 @@ export default function App() {
       setPrevious(screen);
       if (r.activity) setSelectedActivity(r.activity);
       if (r.book) setSelectedBook(r.book);
+      if (r.collection) setSelectedCollection(r.collection);
       if (r.discoverTab) setDiscoverTab(r.discoverTab);
       if (r.childTab) setChildTab(r.childTab);
       if (r.screen === "child" || r.screen === "record") setSelectedChild(r.child ?? "");
@@ -496,14 +513,16 @@ export default function App() {
     else if (screen === "activity" && isMusicId(selectedActivity)) setScreen("music");
     else if (screen === "music" && !isMusicId(selectedActivity)) setScreen("activity");
     else if (screen === "book" && !books.some(b => b.id === selectedBook)) { setDiscoverTab("books"); setScreen("discover"); }
+    else if (screen === "collection" && !findShownCollection(selectedCollection)) { setDiscoverTab("collections"); setScreen("discover"); }
     else if (screen === "entryEdit" && selectedEntry && !entry) setScreen("observations");
-  }, [screen, child, entry, selectedActivity, selectedBook, selectedEntry]);
+  }, [screen, child, entry, selectedActivity, selectedBook, selectedCollection, selectedEntry]);
   // Moments is no longer a tab, but keeps the bottom bar (it opens after saving a memory from Quick Add).
   const topLevel = ["today", "children", "discover", "observations", "profile"].includes(screen);
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
   // An activity or music activity page (whichever is selected) opens through the same route.
   const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
   const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
+  const openCollection = (id: string, from: "discover" | "week") => { setSelectedCollection(id); setCollectionFrom(from); go("collection"); };
   const toggleSaved = (id: string) => { haptic("light"); setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]); };
   const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : entryOrigin === "recap" ? "recap" : "observations";
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
@@ -647,7 +666,24 @@ export default function App() {
       );
     }
     if (screen === "discover") {
-      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} childrenData={childrenData} t={t} />;
+      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} openCollection={id => openCollection(id, "discover")} childrenData={childrenData} t={t} />;
+    }
+    if (screen === "collection") {
+      const collection = findShownCollection(selectedCollection);
+      if (!collection) return null;
+      return (
+        <CollectionPage
+          collection={collection}
+          saved={saved}
+          toggleSaved={toggleSaved}
+          isCollectionSaved={savedCollectionIds.includes(collection.id)}
+          toggleCollectionSaved={() => toggleCollectionSaved(collection.id)}
+          open={openActivity}
+          childrenData={childrenData}
+          back={() => goBack(collectionFrom)}
+          t={t}
+        />
+      );
     }
     if (screen === "music") {
       if (!music) return null;
@@ -656,7 +692,7 @@ export default function App() {
           music={music}
           saved={saved.includes(music.id)}
           toggleSaved={() => toggleSaved(music.id)}
-          back={() => goBack(previous === "week" || previous === "today" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
           t={t}
@@ -693,7 +729,7 @@ export default function App() {
           activity={activity}
           saved={saved.includes(activity.id)}
           toggleSaved={() => toggleSaved(activity.id)}
-          back={() => goBack(previous === "week" || previous === "today" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
           openPlan={() => setModal("plan")}
           openTried={() => setModal("tried")}
           notify={setToast}
@@ -844,7 +880,11 @@ export default function App() {
     if (screen === "week") {
       return (
         <MyWeekPage
+          tab={weekTab}
+          setTab={setWeekTab}
           saved={saved}
+          savedCollections={savedCollectionIds.map(id => findShownCollection(id)).filter((c): c is Collection => !!c)}
+          openCollection={id => openCollection(id, "week")}
           plans={plans}
           setPlans={setPlans}
           completePlan={plan => void completePlan(plan)}

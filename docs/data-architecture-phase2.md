@@ -138,6 +138,7 @@ The schema has 13 application tables, all in `public`. Every family-data table u
 | `plans` | `(family_id, id)` | My Week plans | `plans` |
 | `goals` | `(family_id, id)` | A single parent's goals (`owner_user_id`) | `goals` |
 | `saved_activities` | `(family_id, id)` | Saved Discover activities (id = activity id) | `saved` |
+| `saved_collections` | `(family_id, id)` | Saved RootMap collections (id = collection id) | `savedCollections` |
 | `photos` | `(family_id, id)` | Photo metadata and integrity state | `photos` (+ `photoBlobs` → Storage) |
 | `record_versions` | `(family_id, id)` | Versions that lost a conflict, kept for recovery | none |
 | `cloud_migrations` | `(family_id, id)` | First-login upload attempts and their manifest | none |
@@ -180,6 +181,7 @@ The Discover activity catalog stays bundled in `src/data/activities.ts`.
 | `plans` | activity_id, date date, child_ids text[], note, completed bool, completed_date date, observation |
 | `goals` | owner_user_id uuid, title, description, completed bool, completed_at timestamptz |
 | `saved_activities` | (id = activity id; no extra columns) |
+| `saved_collections` | (id = collection id; no extra columns) |
 | `photos` | mime_type, byte_size bigint, width, height, sha256 char(64), storage_path, uploaded_at, server_sha256, verified_at |
 | `record_versions` | table_name, record_id, version jsonb, base_rev bigint, reason, created_by, resolved_at |
 | `cloud_migrations` | device_id, manifest jsonb, status (`started`/`complete`), completed_at |
@@ -847,7 +849,7 @@ Records already on the device are never uploaded before M6 has checked them.
 **M4 implementation notes** (`src/lib/sync/`).
 
 - **Mapping** (`mapping.ts`): local records ↔ the client-owned columns of each table (`records` → `activity_records`,
-  `saved` → `saved_activities`; legacy `observations` stay local, already folded into entries). Server columns are
+  `saved` → `saved_activities`, `savedCollections` → `saved_collections`; legacy `observations` stay local, already folded into entries). Server columns are
   never sent; `id`, `goals.owner_user_id` and the photo identity columns are never updated. A download is merged onto
   the local record, so local-only fields survive. A child's default picture travels as `bundled:default-child`; other
   local pictures the server can't hold (e.g. demo assets) stay on the device.
