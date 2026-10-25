@@ -156,7 +156,7 @@ test("Mixing Juice: the step cards are optional, in English and Chinese; materia
   const a = activities.find(x => x.id === "mixing-juice")!;
   assert.match(a.steps[0], /step cards together if you have them/);
   assert.match(a.zh!.steps![0], /如果有步骤卡片/);
-  assert.deepEqual(a.materials, ["Pitcher of juice", "Pitcher of water", "Small pitcher", "Cups"]);
+  assert.deepEqual(a.materials, ["Pitcher of juice", "Pitcher of water", "Small measuring cup", "Cups", "Tray"]);
   assert.equal(a.materialType, "everyday");
   assert.equal(a.steps.length, a.zh!.steps!.length);
 });

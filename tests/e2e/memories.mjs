@@ -102,7 +102,9 @@ await step("A tried activity from weeks ago opens that record on its child's Act
 });
 
 await step("Several children: each gets an idea for their own age, and the parent can switch", async () => {
-  ben = await addChild("Ben", `${new Date().getFullYear() - 1}-01-15`);
+  // ~2.5 years old (well clear of either age-bracket boundary, whatever day this runs): a different bracket from
+  // Ada's ~3 years, and one the catalog actually has activities for (the 0-2 bracket has none yet).
+  ben = await addChild("Ben", daysAgo(912));
   await go("#/today");
   await page.waitFor(`document.querySelectorAll(".today-for button").length === 2`, 3000, "a chip per child");
   await page.eval(`[...document.querySelectorAll(".today-for button")].find(b => b.innerText.includes("Ben")).click()`);
