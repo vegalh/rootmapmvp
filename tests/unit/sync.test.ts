@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_CHILD_PHOTO, clientRow, fromRow, insertPayload, toRow, updatePayload, type SyncedCollection } from "../../src/lib/sync/mapping.ts";
+import { fromProfileRow, nextProfileAction, toProfileRow, type ProfileRow } from "../../src/lib/sync/profile.ts";
 import { resolve } from "../../src/lib/sync/resolver.ts";
 import { computeStatus } from "../../src/lib/sync/status.ts";
 
@@ -138,4 +139,39 @@ test("photos: a failed upload counts as waiting (and failed), never backed up; t
   // Same as photos.storage_path (generated column): <family>/<photo id>.<ext from the type>.
   assert.equal(storagePath("f-1", { id: photo, mimeType: "image/png" }), `f-1/${photo}.png`);
   assert.equal(storagePath("f-1", { id: photo, mimeType: "image/heic" }), `f-1/${photo}.heic`);
+});
+
+// ---- Profile (the parent's own name/photo/contact; a user-scoped singleton, not a SyncedCollection) ---------
+
+test("profile: local ↔ row round trip; a photo the server can't hold (no valid id) is dropped, not sent", () => {
+  const photo = "photo-11111111-1111-4111-8111-111111111111";
+  const row = toProfileRow({ name: "Alex", photo, contact: "alex@example.com" });
+  assert.deepEqual(row, { display_name: "Alex", photo_ref: photo, contact: "alex@example.com" });
+  assert.deepEqual(fromProfileRow(row), { name: "Alex", photo, contact: "alex@example.com" });
+  assert.equal(toProfileRow({ name: "Alex", photo: "/assets/alex.png", contact: "" }).photo_ref, null);
+});
+
+test("profile: first sync on a device (nothing known yet) always adopts whatever the server already holds", () => {
+  const remote: ProfileRow = { display_name: "Alex", photo_ref: null, contact: "" };
+  const current: ProfileRow = { display_name: "", photo_ref: null, contact: "" };
+  assert.deepEqual(nextProfileAction(remote, null, current), { kind: "adopt", row: remote });
+});
+
+test("profile: nothing changed on either side since the last sync does nothing", () => {
+  const row: ProfileRow = { display_name: "Alex", photo_ref: null, contact: "c" };
+  assert.deepEqual(nextProfileAction(row, row, row), { kind: "none" });
+});
+
+test("profile: only this device changed (the server still matches what was last known) pushes", () => {
+  const known: ProfileRow = { display_name: "Alex", photo_ref: null, contact: "" };
+  const current: ProfileRow = { display_name: "Alexandra", photo_ref: null, contact: "" };
+  assert.deepEqual(nextProfileAction(known, known, current), { kind: "push", row: current });
+});
+
+test("profile: the server changed (another device) adopts it, even if this device also made local-only edits not yet seen as 'current' here", () => {
+  const known: ProfileRow = { display_name: "Alex", photo_ref: null, contact: "" };
+  const remote: ProfileRow = { display_name: "Alexandra", photo_ref: null, contact: "" }; // pushed by another device
+  const current: ProfileRow = { display_name: "Alex W.", photo_ref: null, contact: "" }; // this device's unsynced edit
+  // Last write wins by "whichever reached the server first": the remote is adopted, not overwritten.
+  assert.deepEqual(nextProfileAction(remote, known, current), { kind: "adopt", row: remote });
 });

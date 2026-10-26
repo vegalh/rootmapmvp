@@ -7,7 +7,7 @@ import { initialObservations, initialRecords } from "../../data/progress";
 import { readGuestSnapshot } from "../data/guestPlan";
 import {
   DEFAULT_SAVED, activeSpace, allPhotoMetas, commitSync, getCollection, guestImportState, guestPhotoBytes, hasPhotoBytes, importGuestCopy, pendingOutbox, photoBytes,
-  photoChecksum, photoMeta, refreshFromDisk, saveGuestImportState, storePhotoBytes, subscribe, syncMeta, syncRecordFor, syncRecordValue,
+  photoChecksum, photoMeta, readSetting, refreshFromDisk, saveGuestImportState, storePhotoBytes, subscribe, syncMeta, syncRecordFor, syncRecordValue, write,
 } from "../data/store";
 import {
   acceptGuestImport, advanceGuestImport, dismissGuestImport, importProgress, prepareGuestImport, type AcceptResult, type GuestImportLocal, type ImportAnswers,
@@ -15,8 +15,10 @@ import {
 } from "./guestImport";
 import { SyncOffline, sha256Hex, syncRound, type RoundResult, type SyncLocal } from "./engine";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
+import { EMPTY_PROFILE, syncProfile, type ProfileLocal, type ProfileRow } from "./profile";
 import type { SyncedCollection } from "./mapping";
 import { computeStatus, type SyncPhase, type SyncStatus } from "./status";
+import type { ProfileInfo } from "../../types";
 
 // When sync runs, for the signed-in account's own space (Phase 2B-2 M4): at start, a moment after each local
 // change, when the device comes back online or the app comes back to the screen, and every 30 seconds while it
@@ -40,6 +42,16 @@ const photoLocal: PhotoLocal = {
   storeBytes: storePhotoBytes,
   syncRecord: syncRecordFor,
   commit: batch => commitSync(batch),
+};
+
+// Bookkeeping only (never shown): the profile row this device last knew the server to hold, kept as a plain
+// setting alongside `rootmap-profile` so a reload doesn't lose track of it.
+const PROFILE_KNOWN_KEY = "rootmap-profile-known-server";
+const profileLocal: ProfileLocal = {
+  get: () => readSetting<ProfileInfo>("rootmap-profile", EMPTY_PROFILE),
+  set: next => void write({ settings: [["rootmap-profile", next]] }),
+  known: () => readSetting<ProfileRow | null>(PROFILE_KNOWN_KEY, null),
+  setKnown: row => void write({ settings: [[PROFILE_KNOWN_KEY, row]] }),
 };
 
 // Bringing the guest data into the account (guestImport.ts), on this device's stores.
@@ -164,6 +176,9 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       phase = "syncing"; update();
       const result = await syncRound(client, local, { familyId, userId });
       notSent = result.notSent;
+      // The parent's own profile (name/photo/contact): a user-scoped singleton, so it syncs on its own, not
+      // through the record-sync engine above.
+      await syncProfile(client, userId, profileLocal);
       // Then the files of photos whose details are on the server (and downloads of others' photos).
       if (cloudConfig.enabled) {
         const photos = await syncPhotos(client, photoLocal, { familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
