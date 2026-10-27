@@ -5,8 +5,11 @@ import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 // Screens follow the data store: a change written outside any screen (as a restore or a future cloud sync does)
 // appears without a reload. Also checks the collision-resistant ids for goals and repeated plans.
 //
-// The test writes through the app's own store module: the Vite dev server serves it at one URL, so importing it
-// here gives the same instance the running app uses. No test hook exists in the app itself.
+// The test writes through the app's own store module. Vite's dev server can serve it with a cache-busting
+// `?t=...` query (added after an HMR update) that differs run to run; importing the bare path would then create
+// a second, disconnected module instance instead of reaching the one the running app uses. Resource Timing
+// already lists whatever URL the page actually fetched, so that is the one re-imported here (the browser's
+// module cache then returns the same instance, no second network request). No test hook exists in the app itself.
 
 const page = await launch(tempProfile("reactive"), 9341);
 await page.send("Page.addScriptToEvaluateOnNewDocument", { source: HELPERS });
@@ -34,7 +37,13 @@ const nav = async label => {
   await sleep(150);
 };
 // Runs `body` in the page with `S` bound to the app's store module.
-const withStore = body => page.eval(`import("/src/lib/data/store.ts").then(async S => { ${body} })`);
+const storeUrl = () => page.eval(`
+  (() => {
+    const loaded = performance.getEntriesByType("resource").map(e => e.name).find(u => u.includes("/src/lib/data/store.ts"));
+    return loaded || "/src/lib/data/store.ts";
+  })()
+`);
+const withStore = async body => page.eval(`import(${JSON.stringify(await storeUrl())}).then(async S => { ${body} })`);
 const loads = () => page.eval(`performance.getEntriesByType("navigation").length + ":" + performance.timeOrigin`);
 const now = new Date().toISOString();
 const child = { id: "c-external-1", first: "Ext", last: "Child", dob: "2022-05-01", enrolled: "Sep 2025", lessons: 0, group: "Primary", photo: "", createdAt: now, updatedAt: now, deletedAt: null, origin: "user" };

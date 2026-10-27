@@ -146,6 +146,9 @@ function SavedList({ saved, savedCollections, openCollection, openActivity, t }:
           <button className="reset-link" onClick={clear}>{t.clearFilters}</button>
         </Empty>
       )}
+      {/* Nothing saved at all yet (no collections, no activities): unlike Weekly Plan and Completed, this tab had no
+          message of its own and looked like a loading or broken page. */}
+      {!savedCollections.length && !activities.length && <Empty text={t.noSavedActivities} />}
     </>
   );
 }

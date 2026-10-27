@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { ConfirmProvider, CopyContext, EXIT_MS, Shell, PageHeader } from "./components/ui";
+import { ConfirmProvider, CopyContext, EXIT_MS, Shell, PageHeader, Empty } from "./components/ui";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Icon } from "./components/Icon";
 import { TodayPage } from "./pages/TodayPage";
@@ -56,7 +56,7 @@ import { defaultChildId, isActiveChild } from "./lib/children";
 import { localIsoToday } from "./lib/dates";
 import { shelfOf, useBookshelf } from "./lib/bookshelf";
 import { SEED_VERSION } from "./data/seedVersion";
-import type { DeletedChild, Entry, Lang, LessonRecord, ModalKind, Plan, ProfileInfo, Screen } from "./types";
+import type { Activity, DeletedChild, Entry, Lang, LessonRecord, ModalKind, Plan, ProfileInfo, Screen } from "./types";
 import alexPhoto from "./assets/profile/alex.svg";
 
 type ChildFilters = { age: string; group: string; recent: string; sort: string };
@@ -900,16 +900,17 @@ export default function App() {
       );
     }
     if (screen === "saved") {
+      const savedActivities = saved.map(id => findActivity(id)).filter((a): a is Activity => !!a);
       return (
         <main className="simple-page">
           <PageHeader title={t.savedActivities} back={() => goBack("profile")} />
-          <div className="week-list">
-            {saved.map(id => {
-              const a = findActivity(id);
-              if (!a) return null;
-              return <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(id)} aria-label={localizeActivity(a, t).title}><Icon name="chevron" /></button>} key={id} />;
-            })}
-          </div>
+          {savedActivities.length ? (
+            <div className="week-list">
+              {savedActivities.map(a => <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)} aria-label={localizeActivity(a, t).title}><Icon name="chevron" /></button>} key={a.id} />)}
+            </div>
+          ) : (
+            <Empty text={t.noSavedActivities} />
+          )}
         </main>
       );
     }

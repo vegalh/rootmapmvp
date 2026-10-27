@@ -33,7 +33,11 @@ const go = async h => { await page.eval(`location.hash = ${q(h)}`); await sleep(
 const has = sel => page.eval(`!!document.querySelector(${q(sel)})`);
 const textOf = sel => page.eval(`document.querySelector(${q(sel)})?.innerText ?? ""`);
 const noModal = () => page.waitFor(`!document.querySelector(".overlay")`, 3000, "sheet closed");
-const write = collections => page.eval(`import("/src/lib/data/store.ts").then(S => S.write({ collections: ${q(collections)} }))`);
+// Vite can serve this module with a cache-busting `?t=...` query (added after an HMR update); importing the bare
+// path would then create a second, disconnected module instance instead of reaching the one the app uses. Resource
+// Timing already lists whatever URL the page actually fetched, so that is the one re-imported here.
+const storeUrl = () => page.eval(`performance.getEntriesByType("resource").map(e => e.name).find(u => u.includes("/src/lib/data/store.ts")) || "/src/lib/data/store.ts"`);
+const write = async collections => page.eval(`import(${q(await storeUrl())}).then(S => S.write({ collections: ${q(collections)} }))`);
 const live = async store => (await page.eval(`__t.all(${q(store)})`)).filter(r => !r.deletedAt);
 
 // Local calendar dates, as the app sees them.
