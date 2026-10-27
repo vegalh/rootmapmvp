@@ -287,6 +287,8 @@ export type Screen =
   | "deletedChildren"
   | "account"
   | "guestImport"
-  | "signIn";
+  | "signIn"
+  // Usage analytics, admins only (pages/AdminPage.tsx).
+  | "admin";
 
 export type ModalKind = "quick" | "filters" | "addChild" | "editChild" | "plan" | "weekAdd" | "tried" | null;

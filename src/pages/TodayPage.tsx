@@ -6,6 +6,7 @@ import { ageFromDob, fmtLong, localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
 import { entryText } from "../lib/entries";
 import { childShortName } from "../lib/children";
+import { trackClick, useImpression } from "../lib/analytics/tracker";
 import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../lib/i18n";
 import { activities } from "../data/activities";
 import { activityAgeRanges, ageRangeForYears, findActivity } from "../lib/catalog";
@@ -57,6 +58,7 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
   const recapWeek = recapWeekForToday(recapEntries(entries, childIds), today);
   const thought = thoughts[dayHash(today, "thought") % thoughts.length];
   const childOf = (id: string) => childrenData.find(c => c.id === id);
+  useImpression("today.lookingBack", !!memory);
   const dateLine = new Date(`${today}T12:00:00`).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
@@ -84,7 +86,7 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
               ))}
             </div>
           )}
-          <button className="today-feature" onClick={() => openActivity(featured.id)}>
+          <button className="today-feature" onClick={() => { trackClick("today.inspiration"); openActivity(featured.id); }}>
             <span className="today-feature-image">
               <img src={featured.image} alt="" />
               <span className="today-feature-caption">
@@ -108,9 +110,9 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
           <section className="today-section" aria-labelledby="today-looking-back">
             <h2 className="today-eyebrow" id="today-looking-back">{t.lookingBack}</h2>
             {memory.kind === "tried" ? (
-              <TriedMemory memory={memory} child={childOf(memory.record.childId)} when={relativeDay(memory.record.date, today, lang)} open={() => openRecord(memory.record.childId, memory.record.id)} t={t} />
+              <TriedMemory memory={memory} child={childOf(memory.record.childId)} when={relativeDay(memory.record.date, today, lang)} open={() => { trackClick("today.lookingBack"); openRecord(memory.record.childId, memory.record.id); }} t={t} />
             ) : (
-              <MomentMemory memory={memory} child={childOf(memory.entry.childId)} lang={lang} open={() => openEntry(memory.entry.id)} t={t} />
+              <MomentMemory memory={memory} child={childOf(memory.entry.childId)} lang={lang} open={() => { trackClick("today.lookingBack"); openEntry(memory.entry.id); }} t={t} />
             )}
           </section>
         )}

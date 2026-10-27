@@ -674,6 +674,45 @@ html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="
 @keyframes page-out { to { transform: translateX(100%); } }
 @keyframes page-return { from { transform: translateX(-26%); filter: brightness(.96); } }
 
+/* Privacy & Data: "Share anonymous usage statistics" (lib/analytics). */
+.usage-switch { display: flex; gap: 14px; align-items: flex-start; margin-top: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 17px; background: var(--card); }
+.usage-switch > span { flex: 1; display: grid; gap: 6px; }
+.usage-switch strong { font-size: 16px; }
+.usage-switch small { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.usage-switch button { flex: none; width: 52px; height: 32px; border: 0; border-radius: 16px; background: var(--silver); position: relative; cursor: pointer; transition: background var(--dur-fast) var(--ease-out); }
+.usage-switch button i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); transition: transform var(--dur-fast) var(--ease-out); }
+.usage-switch button.on { background: var(--primary); }
+.usage-switch button.on i { transform: translateX(20px); }
+
+/* Usage Analytics (admins only, pages/AdminPage.tsx). */
+.admin-page .segmented button { font-size: 14px; }
+.admin-section { margin-top: 22px; }
+.admin-section h2 { font: 600 20px var(--font-heading); margin: 0 0 10px; }
+.admin-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+.admin-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.admin-tile { display: grid; gap: 3px; padding: 14px; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
+.admin-tile small { color: var(--muted); font-size: 13px; }
+.admin-tile strong { font-size: 24px; font-variant-numeric: tabular-nums; color: var(--text); }
+.admin-tile span { color: var(--muted); font-size: 12.5px; }
+.admin-bars { margin: 12px 0 0; padding: 14px; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
+.admin-bars figcaption { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+.admin-bars-plot { display: flex; align-items: flex-end; gap: 2px; height: 110px; border-bottom: 1px solid var(--border); }
+.admin-bars-plot span { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 0; }
+.admin-bars-plot span:hover { background: var(--elevated); }
+.admin-bars-plot b { display: block; width: 100%; background: var(--primary); border-radius: 4px 4px 0 0; }
+.admin-bars-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.admin-ages { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
+.admin-age { display: grid; grid-template-columns: 56px 1fr 40px; align-items: center; gap: 10px; font-size: 14px; }
+.admin-age i { height: 12px; border-radius: 6px; background: var(--elevated); overflow: hidden; }
+.admin-age b { display: block; height: 100%; background: var(--primary); border-radius: 0 4px 4px 0; }
+.admin-age strong { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-table th, .admin-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-table thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.admin-table th[scope="row"], .admin-table thead th:first-child { text-align: left; font-weight: 500; white-space: normal; }
+.admin-table tr:last-child > * { border-bottom: 0; }
+
 /* Reduce Motion: things appear and disappear without sliding (the JavaScript skips its animations too). */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

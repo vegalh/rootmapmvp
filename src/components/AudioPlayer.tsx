@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import type { Copy } from "../lib/i18n";
+import { trackClick, useImpression } from "../lib/analytics/tracker";
 
 // Only one recording plays at a time: starting one pauses whichever was playing.
 let current: HTMLAudioElement | null = null;
@@ -28,6 +29,7 @@ export default function AudioPlayer({ src, t }: { src?: string; t: Copy }) {
       if (current === audio) current = null;
     };
   }, []);
+  useImpression("music.play", !!src && !failed);
 
   if (!src || failed) {
     return (
@@ -44,6 +46,7 @@ export default function AudioPlayer({ src, t }: { src?: string; t: Copy }) {
     if (!audio.paused) { audio.pause(); return; }
     if (current && current !== audio) current.pause();
     current = audio;
+    trackClick("music.play");
     audio.play().catch(() => setPlaying(false));
   };
   const known = Number.isFinite(duration) && duration > 0;

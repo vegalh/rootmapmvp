@@ -5,7 +5,7 @@ import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 import type { CloudState } from "../lib/cloud/session";
 
-export function ProfilePage({ go, lang, appearance, profile, deletedCount, bookshelfCount, cloud, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; profile: ProfileInfo; deletedCount: number; bookshelfCount: number; cloud: CloudState; t: Copy }) {
+export function ProfilePage({ go, lang, appearance, profile, deletedCount, bookshelfCount, cloud, isAdmin = false, t }: { go: (s: Screen) => void; lang: Lang; appearance: string; profile: ProfileInfo; deletedCount: number; bookshelfCount: number; cloud: CloudState; isAdmin?: boolean; t: Copy }) {
   // The RootMap account row exists only in builds with cloud features (never on the public website).
   const accountRow: [string, string, string, string?][] =
     cloud.status === "signed-in" ? [["account", "user", t.accountTitle, cloud.user.email ?? t.accountSignedIn]]
@@ -14,7 +14,7 @@ export function ProfilePage({ go, lang, appearance, profile, deletedCount, books
   const groups: [string, [string, string, string, string?][]][] = [
     [t.myActivities, [["week", "calendar", t.myWeek], ["saved", "heart", t.savedActivities], ["bookshelf", "heart", t.wishlist, bookshelfCount ? String(bookshelfCount) : undefined], ["goals", "target", t.myGoals]]],
     [t.preferences, [["language", "globe", t.language, lang === "en" ? "English" : "简体中文"], ["appearance", "moon", t.appearance, appearance === "dark" ? t.dark : appearance === "system" ? t.system : t.light], ["notificationPrefs", "bell", t.notifications, t.comingSoon]]],
-    [t.account, [...accountRow, ["personal", "user", t.personal], ["deletedChildren", "clock", t.recentlyDeleted, deletedCount ? String(deletedCount) : undefined], ["privacy", "shield", t.privacy], ["help", "help", t.help]]],
+    [t.account, [...accountRow, ["personal", "user", t.personal], ["deletedChildren", "clock", t.recentlyDeleted, deletedCount ? String(deletedCount) : undefined], ["privacy", "shield", t.privacy], ["help", "help", t.help], ...(isAdmin ? [["admin", "chart", t.adminEntry] as [string, string, string]] : [])]],
   ];
   return (
     <main className="page-content profile-page">

@@ -26,6 +26,7 @@ import BookDetailPage from "./pages/BookDetailPage";
 import MusicDetailPage from "./pages/MusicDetailPage";
 import BookshelfPage from "./pages/BookshelfPage";
 import CollectionPage from "./pages/CollectionPage";
+import AdminPage from "./pages/AdminPage";
 import OpeningExperience from "./components/OpeningExperience";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
@@ -43,6 +44,9 @@ import { prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { formatRoute, parseRoute, type Route } from "./lib/routes";
 import { haptic, prefersReducedMotion, setNativeAppearance } from "./lib/native";
+import { newPageVisit, startUsageTracking, trackClick, trackImpression } from "./lib/analytics/tracker";
+import { amIAdmin } from "./lib/analytics/admin";
+import type { Feature } from "./lib/analytics/catalog";
 import { initialChildren } from "./data/children";
 import { initialRecords, initialObservations } from "./data/progress";
 import { activities } from "./data/activities";
@@ -121,6 +125,22 @@ function reloadIntoSpace() {
 // at phone width and never with Reduce Motion; otherwise the page simply changes, as before.
 type PageMotion = "push" | "back" | "tab";
 const TAB_SCREENS: Screen[] = ["today", "children", "discover", "observations", "profile"];
+
+// Usage analytics: the features a page shows whenever it is open (lib/analytics/catalog.ts). Parts that aren't
+// always shown (Today's Looking Back, a playable recording) record their own impression.
+const DETAIL_FEATURES: Feature[] = ["activity.detail", "activity.save", "activity.addToWeek", "activity.markTried"];
+function pageFeatures(screen: Screen, discoverTab: DiscoverTab): Feature[] {
+  switch (screen) {
+    case "today": return ["today.inspiration"];
+    case "discover": return [discoverTab === "books" ? "discover.books" : discoverTab === "collections" ? "discover.collections" : "discover.activities"];
+    case "activity":
+    case "music": return DETAIL_FEATURES;
+    case "collection": return ["collection.save"];
+    case "week": return ["myWeek.saved"];
+    case "observations": return ["moments.add"];
+    default: return [];
+  }
+}
 type ViewTransitionDoc = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> } };
 function changePage(motion: PageMotion, update: () => void) {
   const doc = document as ViewTransitionDoc;
@@ -429,6 +449,36 @@ export default function App() {
     childTab: childTab === "Activities" ? "Activities" : "Journal",
   });
   shownHash.current = hash;
+  // Usage analytics (lib/analytics): a new page address is a new page visit, so its impressions may count again.
+  // Decided here, during render, before any page's own effects record theirs.
+  const visitHash = useRef("");
+  if (visitHash.current !== hash) {
+    visitHash.current = hash;
+    newPageVisit();
+  }
+  useEffect(() => { startUsageTracking(); }, []);
+  // Whether to show Profile's Admin Dashboard row. Only a convenience: the server refuses the data to anyone else.
+  // Asked again each time Profile or the dashboard opens and when the app returns to the foreground, so a grant or
+  // a revocation shows without signing out; the answer belongs to the account it was asked for.
+  const adminUser = cloud.status === "signed-in" ? cloud.user.userId : "";
+  const [adminAnswer, setAdminAnswer] = useState({ user: "", yes: false });
+  const isAdmin = !!adminUser && adminAnswer.user === adminUser && adminAnswer.yes;
+  const [adminAsk, setAdminAsk] = useState(0);
+  useEffect(() => {
+    const onShow = () => { if (document.visibilityState === "visible") setAdminAsk(n => n + 1); };
+    document.addEventListener("visibilitychange", onShow);
+    return () => document.removeEventListener("visibilitychange", onShow);
+  }, []);
+  const adminScreen = screen === "profile" || screen === "admin";
+  useEffect(() => {
+    if (!adminUser || !adminScreen) return;
+    let live = true;
+    void amIAdmin().then(yes => { if (live) setAdminAnswer({ user: adminUser, yes }); });
+    return () => { live = false; };
+  }, [adminUser, adminScreen, adminAsk]);
+  useEffect(() => {
+    for (const feature of pageFeatures(screen, discoverTab)) trackImpression(feature);
+  }, [hash, screen, discoverTab]);
   // Scroll position after a page change, applied before the new page is painted (and before a page transition
   // takes its picture of it).
   useLayoutEffect(() => {
@@ -521,9 +571,25 @@ export default function App() {
   const goChild = (id: string) => { setSelectedChild(id); setChildTab("Journal"); go("child"); };
   // An activity or music activity page (whichever is selected) opens through the same route.
   const activityScreen: Screen = isMusicId(selectedActivity) ? "music" : "activity";
-  const openActivity = (id: string) => { setSelectedActivity(id); go(isMusicId(id) ? "music" : "activity"); };
-  const openCollection = (id: string, from: "discover" | "week") => { setSelectedCollection(id); setCollectionFrom(from); go("collection"); };
+  const openActivity = (id: string) => {
+    if (screen === "discover") trackClick("discover.activities");
+    else if (screen === "week") trackClick("myWeek.saved");
+    setSelectedActivity(id);
+    go(isMusicId(id) ? "music" : "activity");
+  };
+  const openCollection = (id: string, from: "discover" | "week") => {
+    trackClick(from === "discover" ? "discover.collections" : "myWeek.saved");
+    setSelectedCollection(id);
+    setCollectionFrom(from);
+    go("collection");
+  };
   const toggleSaved = (id: string) => { haptic("light"); setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]); };
+  // The actions on an activity or music page, for usage analytics: each also counts as using the page.
+  const detailAction = (feature: Feature, action: () => void) => () => {
+    trackClick("activity.detail");
+    trackClick(feature);
+    action();
+  };
   const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : entryOrigin === "recap" ? "recap" : "observations";
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
@@ -666,7 +732,7 @@ export default function App() {
       );
     }
     if (screen === "discover") {
-      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { setSelectedBook(id); go("book"); }} openCollection={id => openCollection(id, "discover")} childrenData={childrenData} t={t} />;
+      return <DiscoverPage tab={discoverTab} setTab={setDiscoverTab} saved={saved} toggleSaved={toggleSaved} open={openActivity} openBook={id => { trackClick("discover.books"); setSelectedBook(id); go("book"); }} openCollection={id => openCollection(id, "discover")} childrenData={childrenData} t={t} />;
     }
     if (screen === "collection") {
       const collection = findShownCollection(selectedCollection);
@@ -677,7 +743,7 @@ export default function App() {
           saved={saved}
           toggleSaved={toggleSaved}
           isCollectionSaved={savedCollectionIds.includes(collection.id)}
-          toggleCollectionSaved={() => toggleCollectionSaved(collection.id)}
+          toggleCollectionSaved={() => { if (!savedCollectionIds.includes(collection.id)) trackClick("collection.save"); toggleCollectionSaved(collection.id); }}
           open={openActivity}
           childrenData={childrenData}
           back={() => goBack(collectionFrom)}
@@ -691,10 +757,10 @@ export default function App() {
         <MusicDetailPage
           music={music}
           saved={saved.includes(music.id)}
-          toggleSaved={() => toggleSaved(music.id)}
+          toggleSaved={() => { trackClick("activity.detail"); if (!saved.includes(music.id)) trackClick("activity.save"); toggleSaved(music.id); }}
           back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
-          openPlan={() => setModal("plan")}
-          openTried={() => setModal("tried")}
+          openPlan={detailAction("activity.addToWeek", () => setModal("plan"))}
+          openTried={detailAction("activity.markTried", () => setModal("tried"))}
           t={t}
         />
       );
@@ -728,10 +794,10 @@ export default function App() {
         <ActivityDetailPage
           activity={activity}
           saved={saved.includes(activity.id)}
-          toggleSaved={() => toggleSaved(activity.id)}
+          toggleSaved={() => { trackClick("activity.detail"); if (!saved.includes(activity.id)) trackClick("activity.save"); toggleSaved(activity.id); }}
           back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
-          openPlan={() => setModal("plan")}
-          openTried={() => setModal("tried")}
+          openPlan={detailAction("activity.addToWeek", () => setModal("plan"))}
+          openTried={detailAction("activity.markTried", () => setModal("tried"))}
           notify={setToast}
           t={t}
         />
@@ -746,14 +812,15 @@ export default function App() {
           setChildFilter={setMomentsFilter}
           lang={lang}
           open={id => openEntry(id, "moments")}
-          write={childId => startEntry("moments", childId)}
+          write={childId => { trackClick("moments.add"); startEntry("moments", childId); }}
           openRecap={childId => { setRecapWeek(""); setRecapChild(childId ?? ""); go("recap"); }}
           back={() => goBack("children")}
           t={t}
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
+    if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
       return <GuestImportPage userId={syncUser} back={() => goBack(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;

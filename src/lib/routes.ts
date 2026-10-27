@@ -49,6 +49,7 @@ const NAMED: Partial<Record<Screen, string>> = {
   account: "account",
   guestImport: "bring-memories",
   signIn: "sign-in",
+  admin: "admin",
 };
 const BY_NAME = Object.fromEntries(Object.entries(NAMED).map(([screen, name]) => [name, screen as Screen]));
 

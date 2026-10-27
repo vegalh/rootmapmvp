@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { PageHeader, Field } from "../components/ui";
 import { cloudConfig } from "../lib/cloud/config";
+import { setUsageSharing, usageSharingAvailable, useUsageSharing } from "../lib/analytics/tracker";
 import type { Lang, ProfileInfo, Screen } from "../types";
 import type { Copy } from "../lib/i18n";
 import { saveSetting } from "../lib/data/hooks";
@@ -115,6 +116,23 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
             : t.helpText}
         </p>
       </div>
+      {screen === "privacy" && usageSharingAvailable() && <UsageSharingSwitch t={t} />}
     </main>
+  );
+}
+
+// Usage analytics (lib/analytics), off by default. Turning it off deletes what hasn't been sent.
+function UsageSharingSwitch({ t }: { t: Copy }) {
+  const on = useUsageSharing();
+  return (
+    <div className="usage-switch">
+      <span>
+        <strong id="usage-sharing-label">{t.usageSharing}</strong>
+        <small>{t.usageSharingHint}</small>
+      </span>
+      <button role="switch" aria-checked={on} aria-labelledby="usage-sharing-label" className={on ? "on" : ""} onClick={() => setUsageSharing(!on)}>
+        <i />
+      </button>
+    </div>
   );
 }

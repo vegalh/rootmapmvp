@@ -91,6 +91,21 @@ export function resolveCloudConfig(env: CloudEnv): CloudConfig {
   return { enabled: true, environment, supabaseUrl: url.origin, publishableKey: key };
 }
 
+// Usage analytics (src/lib/analytics): off unless VITE_ROOTMAP_ANALYTICS is exactly "on". It needs the project's
+// URL and publishable key (the same rules as above) but not the cloud features, so a guest-only build can count
+// anonymously. Locked off in "production", like the cloud: the public website has no production project yet.
+export type AnalyticsEnv = CloudEnv & { VITE_ROOTMAP_ANALYTICS?: string };
+export type AnalyticsConfig =
+  | { enabled: false; reason: CloudOffReason }
+  | { enabled: true; supabaseUrl: string; publishableKey: string };
+
+export function resolveAnalyticsConfig(env: AnalyticsEnv): AnalyticsConfig {
+  if (env.VITE_ROOTMAP_ANALYTICS !== "on") return { enabled: false, reason: "not-enabled" };
+  const backend = resolveCloudConfig({ ...env, VITE_ROOTMAP_CLOUD: "on" });
+  if (!backend.enabled) return { enabled: false, reason: backend.reason };
+  return { enabled: true, supabaseUrl: backend.supabaseUrl, publishableKey: backend.publishableKey };
+}
+
 // Build-time guard, run by vite.config.ts for every dev server and build. Everything prefixed VITE_ is copied
 // into the browser bundle, so:
 // - no VITE_ variable may hold a secret key, in any mode;
@@ -103,5 +118,8 @@ export function assertSafeClientEnv(env: Record<string, string | undefined>, { m
   }
   if (env.VITE_ROOTMAP_CLOUD === "on" && (publicSite || environmentForMode(mode) === "production")) {
     throw new Error("VITE_ROOTMAP_CLOUD=on is not allowed for the public website or a production build yet. Use `--mode staging` for a staging preview.");
+  }
+  if (env.VITE_ROOTMAP_ANALYTICS === "on" && (publicSite || environmentForMode(mode) === "production")) {
+    throw new Error("VITE_ROOTMAP_ANALYTICS=on is not allowed for the public website or a production build yet. Use `--mode staging`.");
   }
 }

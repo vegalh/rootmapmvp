@@ -399,6 +399,8 @@ Deleted records keep the same select policy, so they stay exactly as protected a
 - Privileged functions live in the `private` schema, which is not exposed through the API. Each one is
   `security definer` with `set search_path = ''`.
 - `execute` is revoked from `public` and `anon`. Each function is granted to `authenticated` only where needed.
+  The one exception is `public.record_usage()` (section 20): a fixed, validated, rate-limited write of anonymous
+  usage totals that `anon` may execute.
 - No function takes a `user_id` argument. Every function uses `auth.uid()`.
 - `create_family()` creates the family and the caller's `owner` membership in one transaction. It refuses if the
   caller already belongs to a family. It is the one privileged function in `public`, because the app calls it
@@ -673,7 +675,8 @@ Requirements for that method:
   - English and Simplified Chinese copy for every new screen.
   - Names stored exactly as entered.
   - Time zone stored on the profile.
-  - No ads, no trackers, no sale of data.
+  - No ads, no trackers, no sale of data. RootMap's own usage analytics (section 20) are first-party aggregate totals,
+    off by default for each parent, and not enabled on the public website.
 - **No compliance claims** until counsel confirms. The review must finish before any real family onboards.
 
 ---
@@ -1013,6 +1016,8 @@ with M6 / M7.)
 | `20261012000500_storage.sql` | Private `family-photos` bucket (15 MB; JPEG, PNG, WebP, HEIC); `private.photo_object_allowed()`; storage select and insert policies |
 | `20261012000600_grants.sql` | Nothing for `anon`; column-level insert/update for `authenticated`; no automatic grants on future objects |
 | `20261012000700_complete_migration.sql` (M6) | `public.complete_migration()`; the `cloud_migrations` status guard lets only that function complete an attempt |
+| `20261027000100_usage_analytics.sql` (not on staging) | Usage analytics: `private.admins`, aggregate usage tables, `public.record_usage()`, `public.am_i_admin()`, `public.admin_usage_summary()` (section 20) |
+| `20261027000200_admin_grants.sql` (not on staging) | Owner-only `private.grant_admin(email)`, `private.revoke_admin(email)`, `private.list_admins()` (section 20.6) |
 
 Every database change is a new migration file. An applied migration is never edited.
 
@@ -1056,6 +1061,168 @@ The test suite refuses to run against any non-local database, so it has never ru
   2 minutes, with no credentials.
 - Not yet built: the purge job, account deletion, and the WeChat identity table.
 - Staging is on the Free plan: it pauses after 7 days of inactivity and has no backups. Test data only.
+
+---
+
+## 20. Usage analytics (admin only)
+
+Added 2026-10-27. **Not applied to staging** (migration `20261027000100_usage_analytics.sql`); it is applied only with
+the owner's approval, like every migration (see "Changing the database"). The same applies to `20261027000200_admin_grants.sql`.
+
+### 20.1 What is counted
+
+Four measures, all as totals:
+
+| Measure | Source | New collection? |
+|---|---|---|
+| Registered accounts | `auth.users` with a confirmed email | No |
+| Active people per day, last 7 / 30 days (accounts and guests apart) | `private.account_days` / `private.guest_days`: one row per person per active day | Yes: a day on which the app sent usage |
+| Children by age (completed years) | `public.children.dob`, computed on the server on its current date; deleted children (`deleted_at`) and demo children (`origin = 'demo'`) are left out | No |
+| Time in the app; feature impressions, clicks and click rate | `private.usage_time`, `private.usage_counts` | Yes |
+
+Features (`src/lib/analytics/catalog.ts`, mirrored by the whitelist in `record_usage()`; a unit test compares them):
+
+| Feature | Impression | Click |
+|---|---|---|
+| `today.inspiration` | Today shown | Today's Inspiration opened |
+| `today.lookingBack` | Looking Back shown on Today | A memory opened from it |
+| `discover.activities` / `.books` / `.collections` | That Discover tab shown | An activity / book / collection opened from it |
+| `activity.detail` | Activity or music page shown | Any of its actions (save or unsave, Add to My Week, Mark as Tried) |
+| `activity.save` | Activity or music page shown | Saved (not unsaved) |
+| `activity.addToWeek` | Activity or music page shown | Add to My Week |
+| `activity.markTried` | Activity or music page shown | Mark as Tried |
+| `music.play` | A playable recording shown | Play |
+| `collection.save` | Collection page shown | Collection saved |
+| `myWeek.saved` | My Week shown | A saved activity or collection opened |
+| `moments.add` | Moments shown | Capture a Moment |
+
+Rules:
+
+- **Impressions:** at most one per feature per page visit. A visit starts when the page address changes, so
+  re-renders, a language switch or a list refreshing in place never add one. Switching Discover tabs is a new visit
+  of that tab. A reload is a new visit.
+- **Click rate** = clicks ÷ impressions; "—" when there were no impressions, or when either number is hidden.
+- **Active time:** only while the app is visible and the parent did something (tap, key, scroll) within the last
+  60 seconds. Going to the background pauses at once. Coming back, or the next action, resumes. A gap of more than
+  60 seconds adds only those 60 seconds. A device asleep without a visibility event, or a clock jump, adds at most
+  60 seconds. A clock going backwards adds nothing. Each device and each person is capped at 12 hours a day.
+  Only seconds per day are sent, never sessions or times.
+- **Per person per day** = total seconds ÷ active person-days in the range.
+- Days are the device's local date. Ages are on the server's date (UTC). A child born on 29 February turns one year
+  older on 1 March in other years (`private.whole_years`).
+
+### 20.2 Data boundaries
+
+- Email is used only to count registered accounts. Ages are computed from children in families. The summary returns
+  only "age → number of children".
+- **The behaviour tables have no identity.** `usage_counts` is `(day, audience, feature, kind) → count` and
+  `usage_time` is `(day, audience) → seconds`. They have no user id, family id, email, device id, guest id, batch id
+  or timestamp. Each batch is added into the day's totals, so one family's activity can't be read back from them.
+- Who was active is kept apart, only to count distinct people. `account_days` holds `(user_id, day)`. `guest_days`
+  holds `(sha256("rootmap-guest:" + guest id), day)`. Both hold only per-day counters for rate limiting, no
+  behaviour. A signed-in batch must not carry a guest id (refused), so a guest id is never linked to an account.
+- Never sent or stored: names, children's ids or names, birthdates, activity ids, text, photos, exact times.
+  `record_usage()` refuses any field outside its whitelist.
+- **Small numbers:** the server returns every count from 1 to 2 as `null` (shown as "<3"). It hides a day's time
+  when that day had fewer than 3 active people. The page can't show an exact small number because it never receives
+  one.
+- The admin page has no per-family, per-person or per-day-per-person view.
+- Retention: retried-batch ids (`usage_batches`) are kept 14 days. The other tables are kept until a purge job
+  exists (not built yet).
+
+### 20.3 Write path and limits
+
+`public.record_usage(batch jsonb)` (security definer, `search_path = ''`):
+
+- It is the only function `anon` can execute. It needs no session, so a guest can count without signing in,
+  entering an email or using a code. `anon` still has no table grants.
+- It accepts exactly `{ v: 1, batch_id, day, guest_id (guests only), events: [{ feature, kind, count }], seconds }`.
+  Anything else is refused with `22023` and writes nothing.
+- Limits:
+  - the payload is at most 8 KB;
+  - each count is 1–500;
+  - seconds are at most 12 hours;
+  - the day is within the last week (or tomorrow, for time zones ahead of the server);
+  - per person per day: 100 batches and 5,000 events (`54000`), and 12 hours (extra time is dropped);
+  - server-wide per day: 10,000 new guests and 100,000 guest batches (`54000`).
+- A retried `batch_id` is accepted without counting twice.
+
+Abuse that remains possible: someone can invent guest ids and add plausible-looking counts within these limits.
+The numbers are product signals, not billing figures. The guest/account split in `daily` shows guest traffic
+separately.
+
+### 20.4 Guests and their limits
+
+- A guest device makes a random UUID (`rootmap.usage-guest-id` in localStorage) the first time it sends. The id is
+  used only for this, and only its hash reaches the database.
+- Clearing site data, a private window, another browser or another device means a new guest. Guest counts are
+  therefore upper bounds of real people.
+- Turning sharing off deletes the guest id. Turning it on again makes a new guest.
+
+### 20.5 Switches
+
+- **Build:** `VITE_ROOTMAP_ANALYTICS=on` (default off). It needs `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_PUBLISHABLE_KEY`, with the same rules as the cloud, but not `VITE_ROOTMAP_CLOUD`. A guest-only
+  staging build can therefore count anonymously.
+- **Not allowed for production or the public website** (`assertSafeClientEnv`, `resolveAnalyticsConfig`), for the
+  same reason as the cloud (section 14): no production project exists and the legal review isn't done. Enabling it
+  there is a deliberate code change after both.
+- In a production build, the analytics code is in the bundle but never runs.
+- **Parent:** Profile › Privacy & Data › "Share anonymous usage statistics" (`rootmap.usage-sharing`, device-wide,
+  outside the spaces and backups). It is **off by default**. Turning it off stops counting and sending at once, and
+  deletes the queue (`rootmap.usage-pending`) and the guest id.
+- **Turning analytics off entirely:** build without `VITE_ROOTMAP_ANALYTICS` (devices then keep at most a leftover
+  queue of under 50 batches, never sent). On the server, `revoke execute on function public.record_usage(jsonb) from
+  anon, authenticated;` in a new migration stops all writes.
+
+### 20.6 Admins
+
+**Where:** Profile › Account › **Admin Dashboard** (管理后台), at `#/admin`. The row appears only for admins, and only
+in a cloud build with a signed-in account. The public website and guest-only builds have no dashboard.
+
+**The security boundary is the database.** Hiding the row is only a convenience.
+
+- Admins are rows in `private.admins(user_id)`. No client role (`anon`, `authenticated`, `service_role`) can read or
+  change that table. `private` is not in the API.
+- `public.am_i_admin()` takes no arguments. `public.admin_usage_summary(p_days)` takes only the range (7, 30 or 90).
+  Both decide from `auth.uid()` alone, through `private.is_admin()`. No user id, email or role from the client is
+  ever used.
+- The summary checks on **every** call and refuses everyone else with `42501`. That includes a signed-in parent who
+  opens `#/admin` directly or calls the RPC by hand.
+- The app asks `am_i_admin()` again whenever Profile or the dashboard opens and when the app returns to the
+  foreground. When the dashboard is refused, the row is hidden at once.
+
+**Granting and revoking** (migration `20261027000200_admin_grants.sql`). These are owner-only functions: their
+execute grant is revoked from every client role, including `service_role`. Run them in the Supabase SQL editor of
+the project concerned (staging now; production later). The editor runs as the database owner.
+
+1. The person signs in to RootMap once with their email (in a cloud build of that project), so their account exists.
+2. The owner runs:
+
+```sql
+-- Give access (case-insensitive). Fails with "no RootMap account signs in with …" if the account doesn't exist yet.
+select private.grant_admin('their-login@example.com');
+
+-- Take it away. Returns true if they were an admin. Takes effect on their very next request; no sign-out needed.
+select private.revoke_admin('their-login@example.com');
+
+-- Who has access now.
+select * from private.list_admins();
+```
+
+3. They open Profile (or bring the app back to the foreground). "Admin Dashboard" appears, or disappears after a
+   revocation.
+
+Rules:
+
+- Never write an email into the repository, a migration or the front end. Run the statements in the SQL editor
+  only.
+- An admin account must be a real RootMap login. Deleting the auth user removes the admin row too.
+- A grant through a migration (for example for a fresh environment) uses the same function, with the email
+  supplied when the migration is written for that environment, never committed. The SQL editor is the normal
+  path.
+
+The dashboard needs a cloud build with a signed-in admin. It never uses the service-role key.
 
 ---
 

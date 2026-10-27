@@ -17,12 +17,12 @@ export const KEY = status.PUBLISHABLE_KEY ?? status.ANON_KEY;
 export const SERVICE = status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;
 for (const u of [API, MAIL, DB_URL]) if (!["127.0.0.1", "localhost"].includes(new URL(u).hostname)) throw new Error(`refusing non-local stack ${u}`);
 
-// A dev server with cloud features on (environment "local").
-export async function startServer() {
+// A dev server with cloud features on (environment "local"). `env` adds or overrides variables (analytics.mjs).
+export async function startServer(env = {}) {
   const port = 5100 + Math.floor(Math.random() * 800);
   const server = spawn(path.join(ROOT, "node_modules/.bin/vite"), ["--port", String(port), "--strictPort"], {
     cwd: ROOT, stdio: "ignore",
-    env: { ...process.env, VITE_ROOTMAP_CLOUD: "on", VITE_SUPABASE_URL: API, VITE_SUPABASE_PUBLISHABLE_KEY: KEY },
+    env: { ...process.env, VITE_ROOTMAP_CLOUD: "on", VITE_SUPABASE_URL: API, VITE_SUPABASE_PUBLISHABLE_KEY: KEY, ...env },
   });
   const base = `http://localhost:${port}`;
   for (let i = 0; i < 100; i++) {
