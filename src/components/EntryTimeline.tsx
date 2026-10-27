@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { ChildPhoto } from "./ui";
 import { entryText, groupByMonth } from "../lib/entries";
@@ -43,8 +44,18 @@ export function SearchField({ query, setQuery, t }: { query: string; setQuery: (
   );
 }
 
+// Revealed up front, then grown by this many as the parent scrolls near the end (see the sentinel below). Kept
+// well above a screenful so nothing above the fold ever shows a visible "loading" gap.
+const INITIAL_REVEAL = 60;
+const REVEAL_STEP = 60;
+
 // Reverse-chronological, month-grouped list of entries. Moments shows every child (`childrenData` given,
 // so each card names its child); a child's Journal passes only that child's entries and omits it.
+//
+// A family with years of memories can have thousands of entries; rendering every card up front (and keeping it
+// all in the DOM) is the slowest part of opening Moments/Journal and the main cost of scrolling through it.
+// Instead only the first `INITIAL_REVEAL` cards are rendered, growing by `REVEAL_STEP` as an off-screen sentinel
+// scrolls into view — same cards, same order, same look, just built incrementally.
 export function EntryTimeline({ entries, childrenData, lang, open }: {
   // Already filtered and sorted newest first.
   entries: Entry[];
@@ -52,9 +63,26 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
   lang: Lang;
   open: (id: string) => void;
 }) {
+  const [revealed, setRevealed] = useState(INITIAL_REVEAL);
+  // A new filter/search/child selection is a fresh list; start over from the top instead of keeping a stale count.
+  // Scrolling back to the top too (before paint, so it isn't seen mid-scroll) matters here: without it, a parent
+  // already scrolled deep into a long list would stay there as the page shrinks under them, and the browser's own
+  // scroll clamping can land the sentinel right in view and silently reveal further batches at once.
+  useLayoutEffect(() => { setRevealed(INITIAL_REVEAL); window.scrollTo(0, 0); }, [entries]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = revealed < entries.length;
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) setRevealed(n => n + REVEAL_STEP); }, { rootMargin: "600px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore]);
+  const visible = entries.length > revealed ? entries.slice(0, revealed) : entries;
+
   return (
     <>
-      {groupByMonth(entries).map(([month, list]) => (
+      {groupByMonth(visible).map(([month, list]) => (
         <section className="journal-month" key={month}>
           <h3>{fmtMonthYear(`${month}-01`, lang)}</h3>
           {list.map(e => {
@@ -78,6 +106,7 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
           })}
         </section>
       ))}
+      {hasMore && <div ref={sentinelRef} aria-hidden="true" className="journal-timeline-sentinel" />}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
@@ -42,8 +42,12 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
   focusedRecord?: () => void;
   t: Copy;
 }) {
-  // Several attempts on the same day keep the order they were recorded in (newest first).
-  const lessons = records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""));
+  // Several attempts on the same day keep the order they were recorded in (newest first). Memoized so a family
+  // with years of activity records doesn't re-filter/re-sort the whole list on every unrelated re-render.
+  const lessons = useMemo(
+    () => records.filter(r => r.childId === child.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || "")),
+    [records, child.id],
+  );
   const confirm = useConfirm();
   const latestRemove = useLatest(remove);
   // The profile is soft-deleted: its Moments and activity records stay, so the question says how many come back
@@ -111,8 +115,8 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
 }) {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const mine = entries.filter(e => e.childId === child.id).sort(newestFirst);
-  const shown = mine.filter(e => matchesQuery(e, query));
+  const mine = useMemo(() => entries.filter(e => e.childId === child.id).sort(newestFirst), [entries, child.id]);
+  const shown = useMemo(() => mine.filter(e => matchesQuery(e, query)), [mine, query]);
   const legacyNotes = pendingNotes ? child.notes?.trim() : "";
 
   return (
@@ -142,6 +146,10 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
   );
 }
 
+// Revealed up front, then grown by this many as the parent scrolls near the end (mirrors EntryTimeline.tsx).
+const LESSON_INITIAL_REVEAL = 80;
+const LESSON_REVEAL_STEP = 80;
+
 function LessonList({ records, childrenData, lang, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
   records: LessonRecord[];
   childrenData: Child[];
@@ -161,9 +169,27 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, foc
   const latestDelete = useLatest(deleteRecord);
   const view = open && recordView(open, t);
   const close = () => { setOpen(undefined); setEditing(false); };
+
+  // A child with years of activity records can have hundreds of rows; render only as many as have scrolled into
+  // view (same rows, same order) instead of all of them up front.
+  const [revealed, setRevealed] = useState(LESSON_INITIAL_REVEAL);
+  // Mirrors EntryTimeline.tsx's reset: scroll back to the top before paint too, or a parent scrolled deep into a
+  // long history stays there as the page shrinks under them (and can silently reveal extra batches at once).
+  useLayoutEffect(() => { setRevealed(LESSON_INITIAL_REVEAL); window.scrollTo(0, 0); }, [records]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = revealed < records.length;
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) setRevealed(n => n + LESSON_REVEAL_STEP); }, { rootMargin: "600px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore]);
+  const visible = records.length > revealed ? records.slice(0, revealed) : records;
+
   return (
     <div className="lesson-list">
-      {records.map(r => {
+      {visible.map(r => {
         const v = recordView(r, t);
         if (r.kind === "tried") {
           // Parent-friendly: just the activity and when it was tried, no learning stage.
@@ -185,6 +211,7 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, foc
           </button>
         );
       })}
+      {hasMore && <div ref={sentinelRef} aria-hidden="true" className="journal-timeline-sentinel" />}
       {open && view && editing && (
         <RecordEditSheet record={open} title={view.title} childrenData={childrenData} save={patch => editRecord(open.id, patch)} close={close} t={t} />
       )}

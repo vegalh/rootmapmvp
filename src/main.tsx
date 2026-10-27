@@ -19,7 +19,13 @@ const root = ReactDOM.createRoot(document.getElementById('root')!)
 // Saved data is loaded (and, once per device, moved from localStorage to IndexedDB) before the first render,
 // so every screen reads it synchronously as before. A signed-in parent's own space opens instead of the guest
 // space (only in builds with cloud features).
-startSpace().then(initData).then(status => {
+startSpace().then(initData).then(async status => {
+  // Local performance testing only (`?seedPerf=1`, dev server only): writes a large synthetic dataset before the
+  // first render, so a cold load can be measured against years of accumulated family data. See src/dev/perfSeed.ts.
+  if (import.meta.env.DEV && status.mode !== 'unavailable' && new URLSearchParams(window.location.search).has('seedPerf')) {
+    const { maybeSeedPerfData } = await import('./dev/perfSeed')
+    await maybeSeedPerfData()
+  }
   root.render(
     <React.StrictMode>
       {status.mode === 'unavailable' ? <DataUnavailable /> : <App />}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { ChildFilter, EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
@@ -25,10 +25,15 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
 }) {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const known = childrenData.map(c => c.id);
+  // childrenData.map/includes is cheap, but re-filtering and re-sorting every entry on each keystroke or
+  // unrelated re-render adds up once a family has years of Moments; only recompute when the real inputs change.
+  const known = useMemo(() => childrenData.map(c => c.id), [childrenData]);
   const filter = childFilter === "All" || known.includes(childFilter) ? childFilter : "All";
-  const mine = entries.filter(e => (filter === "All" ? known.includes(e.childId) : e.childId === filter)).sort(newestFirst);
-  const shown = mine.filter(e => matchesQuery(e, query));
+  const mine = useMemo(
+    () => entries.filter(e => (filter === "All" ? known.includes(e.childId) : e.childId === filter)).sort(newestFirst),
+    [entries, known, filter],
+  );
+  const shown = useMemo(() => mine.filter(e => matchesQuery(e, query)), [mine, query]);
   const pending = latestNewDraft(filter === "All" ? known : [filter]);
 
   return (

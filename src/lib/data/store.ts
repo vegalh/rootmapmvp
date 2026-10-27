@@ -221,23 +221,47 @@ function readHint() {
 }
 
 async function hydrate(source: IDBDatabase) {
-  for (const name of COLLECTIONS) (cache.collections as Record<string, unknown[]>)[name] = (await getAll<Collections[typeof name]>(source, name)).sort(byPosition);
-  cache.settings = new Map((await getAll<StoredSetting>(source, "settings")).map(s => [s.key, s.value]));
-  cache.drafts = new Map((await getAll<StoredDraft>(source, "drafts")).map(({ key, ...draft }) => [key, draft]));
+  // Every read below is its own independent readonly IndexedDB transaction (see idb.ts's getAll/request), so they
+  // can all run concurrently instead of one after another; this noticeably shortens cold start once a device has
+  // years of accumulated data across many object stores.
+  const hasOutbox = source.objectStoreNames.contains("outbox");
+  const [collectionRows, settingRows, draftRows, outboxRows, syncRows, photoMetaRows, importStateRow, photoBlobRows] = await Promise.all([
+    Promise.all(COLLECTIONS.map(name => getAll<Collections[typeof name]>(source, name))),
+    getAll<StoredSetting>(source, "settings"),
+    getAll<StoredDraft>(source, "drafts"),
+    hasOutbox ? getAll<OutboxEntry>(source, "outbox") : Promise.resolve([] as OutboxEntry[]),
+    hasOutbox ? getAll<SyncRecord>(source, "syncRecords") : Promise.resolve([] as SyncRecord[]),
+    hasOutbox ? getAll<PhotoMeta>(source, "photos") : Promise.resolve([] as PhotoMeta[]),
+    hasOutbox ? request<GuestImportState | undefined>(source.transaction("meta").objectStore("meta").get("guestImport")) : Promise.resolve(undefined),
+    getAll<PhotoBlob>(source, "photoBlobs"),
+  ]);
+
+  COLLECTIONS.forEach((name, i) => { (cache.collections as Record<string, unknown[]>)[name] = collectionRows[i].sort(byPosition); });
+  cache.settings = new Map(settingRows.map(s => [s.key, s.value]));
+  cache.drafts = new Map(draftRows.map(({ key, ...draft }) => [key, draft]));
   outbox.clear();
   syncRecords.clear();
   photoMetas.clear();
-  if (source.objectStoreNames.contains("outbox")) {
-    for (const entry of await getAll<OutboxEntry>(source, "outbox")) outbox.set(entry.key, entry);
+  if (hasOutbox) {
+    for (const entry of outboxRows) outbox.set(entry.key, entry);
     outboxSeq = Math.max(outboxSeq, 0, ...[...outbox.values()].map(e => e.seq));
-    for (const r of await getAll<SyncRecord>(source, "syncRecords")) syncRecords.set(r.key, r);
-    for (const p of await getAll<PhotoMeta>(source, "photos")) photoMetas.set(p.id, p);
-    importState = (await request<GuestImportState | undefined>(source.transaction("meta").objectStore("meta").get("guestImport"))) ?? null;
+    for (const r of syncRows) syncRecords.set(r.key, r);
+    for (const p of photoMetaRows) photoMetas.set(p.id, p);
+    importState = importStateRow ?? null;
   }
   for (const url of photoUrls.values()) URL.revokeObjectURL(url);
   photoUrls.clear();
-  for (const p of await getAll<PhotoBlob>(source, "photoBlobs")) photoUrls.set(p.id, URL.createObjectURL(p.blob));
+  for (const p of photoBlobRows) photoUrls.set(p.id, URL.createObjectURL(p.blob));
   publish();
+}
+
+// Dev-only escape hatch for local performance testing (src/dev/perfSeed.ts): writes directly into the open
+// database, then re-runs the normal hydrate so the in-memory cache and every screen reflect it. Never reachable
+// in a production or staging build (`import.meta.env.DEV` is compiled to `false` there, and dead-code eliminated).
+export async function devBulkWrite(run: (source: IDBDatabase) => Promise<void>): Promise<void> {
+  if (!import.meta.env.DEV || mode !== "indexeddb" || !db) return;
+  await run(db);
+  await hydrate(db);
 }
 
 // Runs on the original localStorage data, interpreted exactly as before (same defaults for missing values).
