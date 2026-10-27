@@ -513,8 +513,9 @@ required; later sign-ins use email and password.
   at least 6 characters, typed twice, no tabs. This covers new accounts, accounts from before passwords, and a parent
   who quit halfway. It is shown only once the server has confirmed the account, so being offline never locks a
   parent out of their data.
-- **Forgot your password:** sign in with a code, then Profile › RootMap Account › **Change password**. The old
-  password stops working.
+- **Forgot your password:** the **Forgot password?** link under the password field emails a confirmation code. The
+  code screen says "Reset your password". Once the code is accepted, the app opens on Set a new password (`#/password`).
+  The old password stops working. Profile › RootMap Account › **Change password** works the same way at any time.
 - A wrong password, an unknown email and an account without a password all give the same message. Nobody can tell
   which emails have accounts.
 - "Has a password" is the `rootmap_password: true` mark in the user's metadata, set together with the password

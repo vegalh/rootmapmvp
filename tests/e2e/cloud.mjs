@@ -7,7 +7,7 @@
 // The guest database is compared before and after every step: signing in or out uploads and changes nothing in it.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { PASSWORD, admin, expireCodes, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
+import { PASSWORD, admin, expireCodes, latestCode, mailCount, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
 
 const server = await startServer();
 const BASE = server.base;
@@ -198,6 +198,40 @@ try {
     assert.equal((await admin(`/rest/v1/family_members?user_id=eq.${userId}&select=family_id`)).length, 1, "still one family");
     assert.equal(await guestDump(), guestBefore);
   }, /status of 400 .*\/auth\/v1\/token\?grant_type=password/); // the refused wrong password
+
+  await step("Forgot password: the link emails a code, the code opens Set a new password, and the new password signs in", async () => {
+    await u.signOut();
+    await u.openProfile();
+    await u.click("Sign in or create an account");
+    await u.welcomeShown();
+    await u.click("Continue with Email");
+    await page.waitFor(`document.querySelector("input[name=email]")`, 5000, "email step");
+    await u.click("Forgot password?");
+    assert.equal(await u.errorShown(), "Please enter a valid email address.", "needs the email first");
+    await u.type("input[name=email]", email);
+    await sleep(1100); // one code per address per second (local stack)
+    const before = await mailCount(email);
+    await u.click("Forgot password?");
+    await page.waitFor(`document.querySelector("input[name=code]")`, 10000, "code step");
+    assert.ok(await u.has("Reset your password"));
+    const resetCode = await latestCode(email, before);
+    await u.reloaded(() => u.type("input[name=code]", resetCode));
+    await page.waitFor(`location.hash === "#/password" && document.querySelector(".password-form")`, 15000, "Set a new password");
+    assert.ok(await u.has("Code confirmed. Choose a new password."));
+    assert.equal((await u.cloudState()).user.userId, userId, "the same account");
+    const NEW = PASSWORD + "-new";
+    await u.type("input[name=new-password]", NEW);
+    await u.type("input[name=confirm-password]", NEW);
+    await page.eval(`document.querySelector(".password-form button[type=submit]").click(); true`);
+    await page.waitFor(`location.hash === "#/account"`, 15000, "back on Account");
+    assert.ok(await u.has("Password saved"));
+    await u.signOut();
+    await u.openProfile();
+    await u.click("Sign in or create an account");
+    await u.welcomeShown();
+    await u.signInWithPassword(email, NEW);
+    assert.equal((await u.cloudState()).user.userId, userId);
+  });
 
   await step("An expired code (older than 1 hour) is explained and does not sign in", async () => {
     await u.signOut();

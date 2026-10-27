@@ -679,13 +679,14 @@ export default function App() {
   // The sign-in actions the opening screens use. Signing in creates the session and the empty family and profile on
   // the server, then the app reloads into the account's own space; nothing on this device is uploaded, moved or
   // changed. The reload waits until sign-in has finished.
-  const signInWith = <T,>(attempt: () => Promise<AuthResult<T>>, email: string) => async () => {
+  // `then`: the page to open in the account's space (Set a new password, after "Forgot password?").
+  const signInWith = <T,>(attempt: () => Promise<AuthResult<T>>, email: string, then?: { screen: Screen; toast: string }) => async () => {
     holdSwitch.current = true;
     try {
       const result = await attempt();
       if (result.ok) {
         if (welcomeStart === "show") await saveSetting(WELCOME_KEY, "done");
-        afterSwitchTo({ toast: t.signedInAs.replace("{email}", email), screen: screen === "signIn" ? "profile" : undefined });
+        afterSwitchTo(then ?? { toast: t.signedInAs.replace("{email}", email), screen: screen === "signIn" ? "profile" : undefined });
       }
       return result;
     } finally {
@@ -696,7 +697,8 @@ export default function App() {
   const openingAuth = {
     sendCode: sendSignInCode,
     signIn: (email: string, password: string) => signInWith(() => signInWithPasswordHere(email, password), email)(),
-    confirmCode: (email: string, code: string) => signInWith(() => confirmSignInCode(email, code), email)(),
+    confirmCode: (email: string, code: string, reset: boolean) =>
+      signInWith(() => confirmSignInCode(email, code), email, reset ? { screen: "password", toast: t.passwordResetToast } : undefined)(),
   };
   // Signs out of this device only, then reloads into the guest space. Everything stored on the device stays.
   const signOut = async () => {

@@ -17,7 +17,8 @@ import { isValidCode, isValidEmail, normalizeCode, normalizeEmail, type AuthFail
 // The sign-in actions (lib/cloud/session.ts in the app).
 export type OpeningAuth = {
   sendCode: (email: string) => Promise<AuthResult>;
-  confirmCode: (email: string, code: string) => Promise<AuthResult<unknown>>;
+  // `reset`: the parent chose "Forgot password?"; after signing in, the app opens on Set a new password.
+  confirmCode: (email: string, code: string, reset: boolean) => Promise<AuthResult<unknown>>;
   signIn: (email: string, password: string) => Promise<AuthResult<unknown>>;
 };
 
@@ -92,6 +93,8 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [password, setPasswordValue] = useState("");
+  // The code was asked for with "Forgot password?" (rather than "Email me a code").
+  const [resetting, setResetting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<AuthFailure | null>(null);
   const [resendAt, setResendAt] = useState(0);
@@ -249,7 +252,7 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
     if (busy || !auth) return;
     if (!isValidCode(value)) { setFailure("invalid-code"); return; }
     setBusy(true); setFailure(null);
-    const result = await auth.confirmCode(normalizeEmail(email), normalizeCode(value));
+    const result = await auth.confirmCode(normalizeEmail(email), normalizeCode(value), resetting);
     setBusy(false);
     if (result.ok) onSignedIn?.(normalizeEmail(email));
     else setFailure(result.failure);
@@ -423,8 +426,8 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
           ) : view === "code" ? (
             <form onSubmit={submitCode} noValidate style={{ display: "flex", flexDirection: "column", gap: k.gap, flex: 1 }}>
               {backButton("email")}
-              <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{c.openingCodeTitle}</h1>
-              <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f", overflowWrap: "anywhere" }}>{c.openingCodeBody.replace("{email}", normalizeEmail(email))}</p>
+              <h1 ref={headingRef} tabIndex={-1} style={h1Style}>{resetting ? c.openingResetTitle : c.openingCodeTitle}</h1>
+              <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f", overflowWrap: "anywhere" }}>{(resetting ? c.openingResetBody : c.openingCodeBody).replace("{email}", normalizeEmail(email))}</p>
               <label style={labelStyle}>
                 <span>{c.openingCodeLabel}</span>
                 <input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" value={code} onChange={e => typeCode(e.target.value)} aria-invalid={!!failure} style={{ ...inputStyle, fontSize: 22, fontWeight: 700, letterSpacing: 8, textAlign: "center" }} />
@@ -451,9 +454,10 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
                 <span>{c.openingPasswordLabel}</span>
                 <input name="password" type="password" autoComplete="current-password" value={password} onChange={e => { setPasswordValue(e.target.value); setFailure(null); }} aria-invalid={failure === "password-rejected"} style={inputStyle} />
               </label>
+              <button type="button" className="opening-link" disabled={busy} onClick={() => { setResetting(true); void sendCode(false); }} style={{ ...linkBtn, alignSelf: "flex-end", margin: "-6px -6px -4px 0", color: "#4b7c63" }}>{c.openingForgot}</button>
               {errorText}
               <button type="submit" disabled={busy} style={{ ...primaryBtn, marginTop: "auto", opacity: busy ? 0.7 : 1 }}>{busy ? c.openingSigningIn : c.openingSignIn}</button>
-              <button type="button" disabled={busy} onClick={() => void sendCode(false)} style={{ ...primaryBtn, border: "1.5px solid #4b7c63", background: "transparent", color: "#2f4d3d", opacity: busy ? 0.7 : 1 }}>{c.openingCodeInstead}</button>
+              <button type="button" disabled={busy} onClick={() => { setResetting(false); void sendCode(false); }} style={{ ...primaryBtn, border: "1.5px solid #4b7c63", background: "transparent", color: "#2f4d3d", opacity: busy ? 0.7 : 1 }}>{c.openingCodeInstead}</button>
               <p style={{ margin: "-4px 0 0 0", fontSize: 13.5, lineHeight: 1.45, color: "#76654f", textAlign: "center" }}>{c.openingCodeInsteadNote}</p>
             </form>
           )}
