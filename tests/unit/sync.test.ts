@@ -175,3 +175,30 @@ test("profile: the server changed (another device) adopts it, even if this devic
   // Last write wins by "whichever reached the server first": the remote is adopted, not overwritten.
   assert.deepEqual(nextProfileAction(remote, known, current), { kind: "adopt", row: remote });
 });
+
+// Documents a known, intentional limitation (not a bug: there is no per-field merge or record_versions equivalent
+// for this user-scoped singleton, unlike every SyncedCollection, which resolver.ts merges field by field). Two
+// devices offline at once, each changing a *different* field: whichever device's push reaches the server first
+// wins outright, and the other device's own unsynced change to the other field is silently discarded, with
+// nothing kept anywhere to recover it. Family-data collections never lose a concurrent, different-field edit this
+// way (resolver.ts merges them); the parent's own profile can, and does, by design.
+test("profile: two devices change different fields while both offline; the one that reaches the server second loses its change entirely, with nothing kept", () => {
+  const base: ProfileRow = { display_name: "Alex", photo_ref: null, contact: "old@example.com" };
+  const onDeviceA: ProfileRow = { ...base, display_name: "Alexandra" }; // A only changes the name
+  const onDeviceB: ProfileRow = { ...base, contact: "new@example.com" }; // B only changes the contact, concurrently
+
+  // A syncs first: the server still matches what A last knew, so A's change pushes cleanly.
+  const aAction = nextProfileAction(base, base, onDeviceA);
+  assert.deepEqual(aAction, { kind: "push", row: onDeviceA });
+  const serverAfterA = aAction.kind === "push" ? aAction.row : base;
+
+  // B syncs next, still only knowing `base`: the server has moved (A's push), so B adopts it outright...
+  const bAction = nextProfileAction(serverAfterA, base, onDeviceB);
+  assert.deepEqual(bAction, { kind: "adopt", row: serverAfterA });
+  // ...which both brings in A's name change and discards B's own contact change (not merged, not recorded).
+  assert.equal(bAction.kind, "adopt");
+  if (bAction.kind === "adopt") {
+    assert.equal(bAction.row.display_name, "Alexandra", "A's change survives");
+    assert.equal(bAction.row.contact, "old@example.com", "B's own concurrent change to a different field is lost");
+  }
+});
