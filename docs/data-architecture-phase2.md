@@ -494,6 +494,7 @@ A then repeats the key tests against B's data and confirms that A's own access s
 | Sign in with Apple | Native Apple sign-in sheet; raw nonce to Supabase, hashed nonce to Apple; `signInWithIdToken`. The bundle ID is listed in the Apple provider's Client IDs. No secret rotation. | Apple JS or redirect sign-in. The OAuth secret is regenerated every 6 months. |
 | Google | Google Sign-In iOS SDK, then `signInWithIdToken`. Web and iOS client IDs are both configured, and "Skip nonce check" is set as in Supabase's iOS guide. | Redirect sign-in |
 | Email code | A typed 6-digit code (not a magic link, which would open Safari) | Same |
+| Email and password (2026-10-27) | Created with a code, then required | Same |
 | No account | Local-only, as today | Same |
 
 - Apple returns the full name only on the first sign-in, so the app saves it to `profiles` immediately.
@@ -502,6 +503,27 @@ A then repeats the key tests against B's data and confirms that A's own access s
   - an Edge Function deletes the rows, photos, and Auth user;
   - the parent re-confirms with Apple, so the function can revoke the Apple tokens;
   - no Apple tokens are stored.
+
+**Passwords (2026-10-27, the owner's decision).** An account is created with an email code, then a password is
+required; later sign-ins use email and password.
+
+- Welcome › Continue with Email shows email, password, **Sign in**, and **Email me a code**. The code is for a new
+  parent or a forgotten password.
+- After any sign-in, the app checks for a password. If the account has none, the only page is **Create a password**:
+  at least 6 characters, typed twice, no tabs. This covers new accounts, accounts from before passwords, and a parent
+  who quit halfway. It is shown only once the server has confirmed the account, so being offline never locks a
+  parent out of their data.
+- **Forgot your password:** sign in with a code, then Profile › RootMap Account › **Change password**. The old
+  password stops working.
+- A wrong password, an unknown email and an account without a password all give the same message. Nobody can tell
+  which emails have accounts.
+- "Has a password" is the `rootmap_password: true` mark in the user's metadata, set together with the password
+  (`setPassword` in `src/lib/cloud/auth.ts`). Users can edit their metadata, but the mark only decides whether to
+  ask. Supabase checks the password itself.
+- Server settings (each project, Authentication › Providers › Email / Policies): minimum password length **6**
+  (`supabase/config.toml` locally). If "Secure password change" is on, a change long after sign-in asks to sign
+  in again with a code ("reauth-needed").
+- CAPTCHA, when configured (`VITE_TURNSTILE_SITE_KEY`), covers password sign-in as well as codes.
 
 ---
 
@@ -1002,8 +1024,48 @@ with M6 / M7.)
 | Environment | Project | Region | Plan | Schema | Data |
 |---|---|---|---|---|---|
 | Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000700` | Test data only, recreated on every reset |
-| Staging | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 (does not bind production) | Free | Migrations `20261012000100`–`000700`, applied 2026-10-12 with `supabase db push --linked` (`000700` after a dry run showed it was the only one pending) | None: 0 users, 0 objects, 0 app rows |
-| Production | **Not created** | Decided by the region test (section 15) | Pro | — | — |
+| Staging, and the public website since 2026-10-27 | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 | Free | Migrations `20261012000100`–`000700`, applied 2026-10-12 with `supabase db push --linked` (`000700` after a dry run showed it was the only one pending) | None: 0 users, 0 objects, 0 app rows |
+| Production (dedicated) | **Not created**: the website uses rootmap-staging | Decided by the region test (section 15) | Pro | — | — |
+
+### The public website uses rootmap-staging (decided 2026-10-27)
+
+On 2026-10-27 the owner decided that the public website uses sign-in, sync and analytics against the existing
+**rootmap-staging** project. No separate production project exists. The privacy and legal review (section 14) is
+still open; the owner chose to proceed.
+
+Accepted trade-offs:
+
+- **Free plan:** the project pauses after 7 days without activity, and the website's sign-in then fails until
+  someone restores it in the dashboard.
+- **No backups.**
+- **Test data:** accounts and rows created during testing stay, and count in the admin dashboard.
+- **Region:** us-east-2 is far from users in China, and it can't be changed.
+- **No separate place to test:** migrations reach real users the moment they are pushed. Run them locally first
+  (`npm run db:reset && npm run test:db`).
+
+Moving to a dedicated project later: create it, then follow the steps below with its ref. Data does not move by
+itself.
+
+Website set-up:
+
+1. **Schema:** all migrations are applied (`npx supabase db push --linked`); `verify-photo` is deployed.
+2. **Authentication settings** (dashboard):
+   - minimum password length 6;
+   - the "Magic Link" and "Confirm signup" email templates show the code (`{{ .Token }}`);
+   - Site URL `https://vegalh.github.io/rootmapmvp/`.
+3. **Email sending:** custom SMTP (Authentication › SMTP). Without it, only the project team's own addresses get
+   codes.
+4. **GitHub repository variables** (Settings › Secrets and variables › Actions › **Variables**: public values,
+   not secrets):
+   - `VITE_ROOTMAP_CLOUD=on`
+   - optionally `VITE_ROOTMAP_ANALYTICS=on`
+   - `VITE_SUPABASE_URL=https://cbgkkeveprftddrobzao.supabase.co`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…`
+   - optionally `VITE_TURNSTILE_SITE_KEY`
+
+   Never the secret key: the build refuses it. Unset, the website stays local-only.
+5. **Deploy:** push to `main`. Then sign in on the website and set your password.
+6. **Admin:** `select private.grant_admin('<email>');` in the SQL editor (already done for the owner).
 
 ### Phase 2B-1 implementation
 
@@ -1016,8 +1078,8 @@ with M6 / M7.)
 | `20261012000500_storage.sql` | Private `family-photos` bucket (15 MB; JPEG, PNG, WebP, HEIC); `private.photo_object_allowed()`; storage select and insert policies |
 | `20261012000600_grants.sql` | Nothing for `anon`; column-level insert/update for `authenticated`; no automatic grants on future objects |
 | `20261012000700_complete_migration.sql` (M6) | `public.complete_migration()`; the `cloud_migrations` status guard lets only that function complete an attempt |
-| `20261027000100_usage_analytics.sql` (not on staging) | Usage analytics: `private.admins`, aggregate usage tables, `public.record_usage()`, `public.am_i_admin()`, `public.admin_usage_summary()` (section 20) |
-| `20261027000200_admin_grants.sql` (not on staging) | Owner-only `private.grant_admin(email)`, `private.revoke_admin(email)`, `private.list_admins()` (section 20.6) |
+| `20261027000100_usage_analytics.sql` (staging 2026-10-27) | Usage analytics: `private.admins`, aggregate usage tables, `public.record_usage()`, `public.am_i_admin()`, `public.admin_usage_summary()` (section 20) |
+| `20261027000200_admin_grants.sql` (staging 2026-10-27) | Owner-only `private.grant_admin(email)`, `private.revoke_admin(email)`, `private.list_admins()` (section 20.6) |
 
 Every database change is a new migration file. An applied migration is never edited.
 
@@ -1066,8 +1128,11 @@ The test suite refuses to run against any non-local database, so it has never ru
 
 ## 20. Usage analytics (admin only)
 
-Added 2026-10-27. **Not applied to staging** (migration `20261027000100_usage_analytics.sql`); it is applied only with
-the owner's approval, like every migration (see "Changing the database"). The same applies to `20261027000200_admin_grants.sql`.
+Added 2026-10-27. Migrations `20261027000100_usage_analytics.sql` and `20261027000200_admin_grants.sql` were applied
+to staging on 2026-10-27 with the owner's approval (`supabase db push --linked`, after a dry run showed only these
+two pending). Verified there: `anon` can execute only `record_usage`; the grant functions are executable by no
+client role; client roles have no grants on the analytics tables; an anonymous summary request is refused. One
+admin has been granted on staging.
 
 ### 20.1 What is counted
 
@@ -1164,10 +1229,9 @@ separately.
 - **Build:** `VITE_ROOTMAP_ANALYTICS=on` (default off). It needs `VITE_SUPABASE_URL` and
   `VITE_SUPABASE_PUBLISHABLE_KEY`, with the same rules as the cloud, but not `VITE_ROOTMAP_CLOUD`. A guest-only
   staging build can therefore count anonymously.
-- **Not allowed for production or the public website** (`assertSafeClientEnv`, `resolveAnalyticsConfig`), for the
-  same reason as the cloud (section 14): no production project exists and the legal review isn't done. Enabling it
-  there is a deliberate code change after both.
-- In a production build, the analytics code is in the bundle but never runs.
+- **Public website:** allowed since 2026-10-27, by the owner's decision, with the privacy review still open. It
+  uses the rootmap-staging project (section 19, "The public website uses rootmap-staging"). Only a secret key is
+  refused (`assertSafeClientEnv`).
 - **Parent:** Profile › Privacy & Data › "Share anonymous usage statistics" (`rootmap.usage-sharing`, device-wide,
   outside the spaces and backups). It is **off by default**. Turning it off stops counting and sending at once, and
   deletes the queue (`rootmap.usage-pending`) and the guest id.

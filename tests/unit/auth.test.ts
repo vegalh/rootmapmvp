@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authFailure, authOptions, isValidCode, isValidEmail, normalizeCode, normalizeEmail } from "../../src/lib/cloud/auth.ts";
+import { PASSWORD_MIN, authFailure, authOptions, hasPassword, isValidCode, isValidEmail, isValidPassword, normalizeCode, normalizeEmail } from "../../src/lib/cloud/auth.ts";
 
 // The parts of sign-in that need no server. The full flow runs against the local stack in tests/db/auth.test.ts.
 
@@ -48,4 +48,18 @@ test("Welcome: new devices see it until the parent chooses; devices with RootMap
   // A reload in the middle of Welcome still shows it, even though the app has recorded its first run by then.
   assert.equal(welcomeDecision("pending", used), "show");
   assert.equal(welcomeDecision("done", fresh), "skip");
+});
+
+test("passwords: at least 6 characters, at most 72 bytes; failures the screens can explain", () => {
+  for (const ok of ["abcdef", "123456", "密码密码密码", "a".repeat(72)]) assert.ok(isValidPassword(ok), ok);
+  for (const bad of ["", "abcde", "a".repeat(73), "密".repeat(25)]) assert.ok(!isValidPassword(bad), bad);
+  assert.equal(PASSWORD_MIN, 6);
+  assert.equal(authFailure({ status: 400, code: "invalid_credentials" }), "password-rejected");
+  assert.equal(authFailure({ status: 422, code: "weak_password" }), "weak-password");
+  assert.equal(authFailure({ status: 400, code: "reauthentication_needed" }), "reauth-needed");
+});
+
+test("hasPassword reads only the RootMap mark, never guesses", () => {
+  assert.equal(hasPassword({ user_metadata: { rootmap_password: true } }), true);
+  for (const u of [null, undefined, {}, { user_metadata: null }, { user_metadata: {} }, { user_metadata: { rootmap_password: "true" } }]) assert.equal(hasPassword(u), false);
 });

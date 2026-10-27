@@ -256,14 +256,14 @@ test("turning sharing off stops counting and deletes the queue and the guest id"
 
 // ---- Build switch ------------------------------------------------------------------------------------------------
 
-test("analytics are off unless VITE_ROOTMAP_ANALYTICS=on, and locked off for production and the public website", () => {
+test("analytics are off unless VITE_ROOTMAP_ANALYTICS=on; the public website may count when configured", () => {
   const local = { MODE: "development", VITE_SUPABASE_URL: "http://127.0.0.1:54321", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_abc" };
   assert.deepEqual(resolveAnalyticsConfig(local), { enabled: false, reason: "not-enabled" });
   assert.deepEqual(resolveAnalyticsConfig({ ...local, VITE_ROOTMAP_ANALYTICS: "on" }), { enabled: true, supabaseUrl: "http://127.0.0.1:54321", publishableKey: "sb_publishable_abc" });
   assert.equal(resolveAnalyticsConfig({ ...local, VITE_ROOTMAP_ANALYTICS: "on", VITE_ROOTMAP_CLOUD: "off" }).enabled, true, "a guest-only build may count");
-  assert.deepEqual(resolveAnalyticsConfig({ ...local, MODE: "production", VITE_ROOTMAP_ANALYTICS: "on" }), { enabled: false, reason: "production-locked" });
+  assert.equal(resolveAnalyticsConfig({ ...local, MODE: "production", VITE_ROOTMAP_ANALYTICS: "on", VITE_SUPABASE_URL: "https://rootmap-prod.supabase.co" }).enabled, true);
   assert.deepEqual(resolveAnalyticsConfig({ ...local, VITE_ROOTMAP_ANALYTICS: "on", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_secret_x" }), { enabled: false, reason: "secret-key" });
-  assert.throws(() => assertSafeClientEnv({ VITE_ROOTMAP_ANALYTICS: "on" }, { mode: "production", publicSite: false }), /VITE_ROOTMAP_ANALYTICS/);
-  assert.throws(() => assertSafeClientEnv({ VITE_ROOTMAP_ANALYTICS: "on" }, { mode: "staging", publicSite: true }), /VITE_ROOTMAP_ANALYTICS/);
-  assert.doesNotThrow(() => assertSafeClientEnv({ VITE_ROOTMAP_ANALYTICS: "on" }, { mode: "staging", publicSite: false }));
+  const stagingUrl = { VITE_ROOTMAP_ANALYTICS: "on", VITE_SUPABASE_URL: "https://cbgkkeveprftddrobzao.supabase.co" };
+  assert.doesNotThrow(() => assertSafeClientEnv(stagingUrl, { mode: "production", publicSite: true }));
+  assert.equal(resolveAnalyticsConfig({ ...local, MODE: "production", ...stagingUrl }).enabled, true);
 });

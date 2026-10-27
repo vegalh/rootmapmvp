@@ -28,6 +28,7 @@ import BookshelfPage from "./pages/BookshelfPage";
 import CollectionPage from "./pages/CollectionPage";
 import AdminPage from "./pages/AdminPage";
 import OpeningExperience from "./components/OpeningExperience";
+import PasswordForm from "./components/PasswordForm";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
@@ -38,7 +39,8 @@ import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from ".
 import { copy, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
-import { cloudState, confirmSignInCode, sendSignInCode, signOutHere } from "./lib/cloud/session";
+import type { AuthResult } from "./lib/cloud/auth";
+import { cloudState, confirmSignInCode, sendSignInCode, signInWithPasswordHere, signOutHere } from "./lib/cloud/session";
 import { spaceMatches } from "./lib/cloud/space";
 import { prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
@@ -677,22 +679,24 @@ export default function App() {
   // The sign-in actions the opening screens use. Signing in creates the session and the empty family and profile on
   // the server, then the app reloads into the account's own space; nothing on this device is uploaded, moved or
   // changed. The reload waits until sign-in has finished.
+  const signInWith = <T,>(attempt: () => Promise<AuthResult<T>>, email: string) => async () => {
+    holdSwitch.current = true;
+    try {
+      const result = await attempt();
+      if (result.ok) {
+        if (welcomeStart === "show") await saveSetting(WELCOME_KEY, "done");
+        afterSwitchTo({ toast: t.signedInAs.replace("{email}", email), screen: screen === "signIn" ? "profile" : undefined });
+      }
+      return result;
+    } finally {
+      holdSwitch.current = false;
+      if (!spaceMatches(activeSpace(), cloudState())) reloadIntoSpace();
+    }
+  };
   const openingAuth = {
     sendCode: sendSignInCode,
-    confirmCode: async (email: string, code: string) => {
-      holdSwitch.current = true;
-      try {
-        const result = await confirmSignInCode(email, code);
-        if (result.ok) {
-          if (welcomeStart === "show") await saveSetting(WELCOME_KEY, "done");
-          afterSwitchTo({ toast: t.signedInAs.replace("{email}", email), screen: screen === "signIn" ? "profile" : undefined });
-        }
-        return result;
-      } finally {
-        holdSwitch.current = false;
-        if (!spaceMatches(activeSpace(), cloudState())) reloadIntoSpace();
-      }
-    },
+    signIn: (email: string, password: string) => signInWith(() => signInWithPasswordHere(email, password), email)(),
+    confirmCode: (email: string, code: string) => signInWith(() => confirmSignInCode(email, code), email)(),
   };
   // Signs out of this device only, then reloads into the guest space. Everything stored on the device stays.
   const signOut = async () => {
@@ -700,7 +704,14 @@ export default function App() {
     await signOutHere();
   };
 
+  // A signed-in account must have a password (lib/cloud/auth.ts): until it has, this is the only page. Asked only
+  // once the server has confirmed the account, so being offline never locks a parent out of their data.
+  const needsPassword = cloudConfig.enabled && cloud.status === "signed-in" && !!cloud.account && !cloud.user.hasPassword;
   const content = () => {
+    if (needsPassword && cloud.status === "signed-in") return <PasswordForm mode="create" email={cloud.user.email} done={() => setToast(t.passwordSaved)} t={t} />;
+    if (screen === "password" && cloud.status === "signed-in") {
+      return <PasswordForm mode="change" email={cloud.user.email} back={() => goBack("account")} done={() => { setToast(t.passwordSaved); goBack("account"); }} t={t} />;
+    }
     if (screen === "today") {
       return (
         <TodayPage
@@ -821,7 +832,7 @@ export default function App() {
     }
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
-    if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
+    if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
       return <GuestImportPage userId={syncUser} back={() => goBack(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
     }
@@ -1073,7 +1084,7 @@ export default function App() {
     <CopyContext.Provider value={t}>
     <ConfirmProvider>
     <div className="app-shell">
-      <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel}>
+      <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel && !needsPassword}>
         {content()}
       </Shell>
       <ModalOverlay

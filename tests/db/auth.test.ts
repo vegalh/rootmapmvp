@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ensureAccount, ensureFamily, ensureProfile } from "../../src/lib/cloud/account.ts";
-import { SESSION_KEY, authOptions, requestEmailCode, restoreSession, sessionValid, signOut, verifyEmailCode } from "../../src/lib/cloud/auth.ts";
+import { SESSION_KEY, authOptions, requestEmailCode, restoreSession, sessionValid, setPassword, signInWithPassword, signOut, userOf, verifyEmailCode } from "../../src/lib/cloud/auth.ts";
 import type { KeyValueStore } from "../../src/lib/platform/index.ts";
 import { anonClient, dbConnection, localEnv, localMailUrl, must, serviceClient } from "./helpers.ts";
 
@@ -213,7 +213,7 @@ describe("session restore and refresh", () => {
     const p = await signedIn("restore");
     const { familyId } = await ensureAccount(p.client);
     const again = restart(p);
-    assert.deepEqual(await restoreSession(again.client, again.store), { status: "signed-in", user: { userId: p.userId, email: p.email }, offline: false });
+    assert.deepEqual(await restoreSession(again.client, again.store), { status: "signed-in", user: { userId: p.userId, email: p.email, hasPassword: false }, offline: false });
     assert.equal((await ensureAccount(again.client)).familyId, familyId);
   });
 
@@ -236,7 +236,7 @@ describe("session restore and refresh", () => {
     const away = restart(p, OFFLINE_URL);
     expire(away);
     const stored = away.store.m.get(SESSION_KEY);
-    assert.deepEqual(await restoreSession(away.client, away.store), { status: "signed-in", user: { userId: p.userId, email: p.email }, offline: true });
+    assert.deepEqual(await restoreSession(away.client, away.store), { status: "signed-in", user: { userId: p.userId, email: p.email, hasPassword: false }, offline: true });
     assert.equal(away.store.m.get(SESSION_KEY), stored, "the session is kept for when the server is reachable again");
   });
 
@@ -325,5 +325,56 @@ describe("row level security with email-code accounts", () => {
     const anon = anonClient();
     for (const t of ["families", "family_members", "profiles"]) assert.deepEqual((await anon.from(t).select("*")).data ?? [], []);
     assert.ok((await anon.rpc("create_family", { family_name: "" })).error);
+  });
+});
+
+describe("passwords (2026-10-27): created with a code, then required; later sign-ins use the password", () => {
+  it("a new account has no password; once set, the password signs in on another device and the mark is set", async () => {
+    const email = newEmail("pw-new");
+    const a = device();
+    const verified = await verifyEmailCode(a.client, email, await emailedCode(a, email));
+    assert.ok(verified.ok);
+    if (!verified.ok) return;
+    assert.equal(userOf(verified.value).hasPassword, false, "the app asks for a password");
+    assert.deepEqual(await signInWithPassword(device().client, email, "anything"), { ok: false, failure: "password-rejected" }, "no password yet");
+
+    assert.deepEqual(await setPassword(a.client, "abc"), { ok: false, failure: "weak-password" }, "under 6 is refused before sending");
+    assert.deepEqual(await setPassword(a.client, "garden"), { ok: true, value: undefined });
+    assert.equal((await a.client.auth.getUser()).data.user?.user_metadata.rootmap_password, true);
+
+    const b = device();
+    const signed = await signInWithPassword(b.client, email.toUpperCase(), "garden");
+    assert.ok(signed.ok, "email is case-insensitive");
+    if (signed.ok) assert.equal(userOf(signed.value).hasPassword, true);
+    assert.equal(await sessionValid(b.client), true);
+  });
+
+  it("a wrong password and an unknown email give the same answer", async () => {
+    const email = newEmail("pw-wrong");
+    const a = device();
+    await verifyEmailCode(a.client, email, await emailedCode(a, email));
+    must(await setPassword(a.client, "correct-horse").then(r => ({ error: r.ok ? null : r })));
+    const wrong = await signInWithPassword(device().client, email, "wrong-horse");
+    const unknown = await signInWithPassword(device().client, newEmail("pw-nobody"), "wrong-horse");
+    assert.deepEqual(wrong, { ok: false, failure: "password-rejected" });
+    assert.deepEqual(unknown, wrong);
+  });
+
+  it("a forgotten password: sign in with a code, set a new one; the old one stops working", async () => {
+    const email = newEmail("pw-forgot");
+    const a = device();
+    await verifyEmailCode(a.client, email, await emailedCode(a, email));
+    must(await setPassword(a.client, "first-pass").then(r => ({ error: r.ok ? null : r })));
+    const b = device();
+    const again = await verifyEmailCode(b.client, email, await emailedCode(b, email));
+    assert.ok(again.ok && userOf(again.value).hasPassword, "a code sign-in keeps the password");
+    assert.deepEqual(await setPassword(b.client, "second-pass"), { ok: true, value: undefined });
+    assert.deepEqual(await signInWithPassword(device().client, email, "first-pass"), { ok: false, failure: "password-rejected" });
+    assert.ok((await signInWithPassword(device().client, email, "second-pass")).ok);
+    assert.deepEqual(await setPassword(b.client, "second-pass"), { ok: true, value: undefined }, "the same password again is fine");
+  });
+
+  it("signed out, a password can't be set", async () => {
+    assert.equal((await setPassword(anonClient(), "garden")).ok, false);
   });
 });

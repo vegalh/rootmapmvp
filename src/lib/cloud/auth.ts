@@ -1,7 +1,9 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { KeyValueStore } from "../platform";
 
-// Sign-in with a typed 6-digit email code, session restore and sign-out (Phase 2B-2 M1). Every function takes the
+// Sign-in with a typed 6-digit email code or a password, session restore and sign-out (Phase 2B-2 M1; passwords
+// 2026-10-27). An account is always created with a code, then a password is required (set right after, see
+// `hasPassword`); later sign-ins use the password, and a forgotten password is replaced after signing in with a code. Every function takes the
 // Supabase client, so the app (lib/cloud/client.ts) and the database tests use exactly the same code. Only types
 // come from supabase-js here: the library itself is loaded lazily, and only in builds that can use the cloud.
 
@@ -30,6 +32,9 @@ export type AuthFailure =
   | "offline" // the server could not be reached
   | "unavailable" // sign-in is switched off on the server
   | "captcha" // the security check (CAPTCHA) didn't complete or the server refused its token
+  | "password-rejected" // wrong email or password (never says which), or no password set yet
+  | "weak-password" // shorter than PASSWORD_MIN or refused by the server's password rules
+  | "reauth-needed" // the server wants a fresh sign-in before changing the password
   | "unknown";
 
 export type AuthResult<T = undefined> = { ok: true; value: T } | { ok: false; failure: AuthFailure };
@@ -39,6 +44,10 @@ export const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test
 // Codes are often pasted with spaces ("123 456").
 export const normalizeCode = (code: string) => code.replace(/\s+/g, "");
 export const isValidCode = (code: string) => /^\d{6}$/.test(normalizeCode(code));
+// Passwords: at least 6 characters (the projects' Auth setting must match), at most 72 (what the server can check).
+export const PASSWORD_MIN = 6;
+export const PASSWORD_MAX = 72;
+export const isValidPassword = (password: string) => password.length >= PASSWORD_MIN && new TextEncoder().encode(password).length <= PASSWORD_MAX;
 
 type ErrorLike = { name?: string; status?: number; code?: string; message?: string } | null | undefined;
 
@@ -48,6 +57,9 @@ export function authFailure(error: ErrorLike | unknown): AuthFailure {
   if (e.status === 429 || e.code === "over_email_send_rate_limit" || e.code === "over_request_rate_limit") return "rate-limited";
   if (e.code === "otp_expired") return "code-rejected";
   if (e.code === "captcha_failed") return "captcha";
+  if (e.code === "invalid_credentials") return "password-rejected";
+  if (e.code === "weak_password") return "weak-password";
+  if (e.code === "reauthentication_needed" || e.code === "reauthentication_not_valid") return "reauth-needed";
   if (e.code === "signup_disabled" || e.code === "otp_disabled" || e.code === "email_provider_disabled") return "unavailable";
   if (e.code === "email_address_invalid" || e.code === "email_address_not_authorized") return "invalid-email";
   if (e.status === 403 || e.status === 401) return "code-rejected";
@@ -79,8 +91,45 @@ export async function verifyEmailCode(client: SupabaseClient, email: string, cod
   }
 }
 
-// The signed-in parent as last known on this device.
-export type StoredUser = { userId: string; email: string | null };
+// Signs in with email and password. A wrong email, a wrong password and an account without a password all give the
+// same "password-rejected", so nobody can find out which emails have accounts.
+export async function signInWithPassword(client: SupabaseClient, email: string, password: string, captchaToken?: string): Promise<AuthResult<Session>> {
+  if (!isValidEmail(email)) return { ok: false, failure: "invalid-email" };
+  if (!password) return { ok: false, failure: "password-rejected" };
+  try {
+    const { data, error } = await client.auth.signInWithPassword({ email: normalizeEmail(email), password, ...(captchaToken ? { options: { captchaToken } } : {}) });
+    if (error || !data.session) return { ok: false, failure: authFailure(error) };
+    return { ok: true, value: data.session };
+  } catch (e) {
+    return { ok: false, failure: authFailure(e) };
+  }
+}
+
+// Whether the account has set its password. Recorded in user metadata when the password is set; it only decides
+// whether the app asks for one (the server checks the password itself), so it being user-editable is harmless.
+export const PASSWORD_MARK = "rootmap_password";
+type UserLike = { user_metadata?: Record<string, unknown> | null };
+export const hasPassword = (user: UserLike | null | undefined) => user?.user_metadata?.[PASSWORD_MARK] === true;
+
+// Sets (or changes) the signed-in parent's password, and records that it is set.
+export async function setPassword(client: SupabaseClient, password: string): Promise<AuthResult> {
+  if (!isValidPassword(password)) return { ok: false, failure: "weak-password" };
+  try {
+    const { error } = await client.auth.updateUser({ password, data: { [PASSWORD_MARK]: true } });
+    if (!error) return { ok: true, value: undefined };
+    // The same password as before: nothing to change, but it is set.
+    if (error.code === "same_password") {
+      const marked = await client.auth.updateUser({ data: { [PASSWORD_MARK]: true } });
+      return marked.error ? { ok: false, failure: authFailure(marked.error) } : { ok: true, value: undefined };
+    }
+    return { ok: false, failure: authFailure(error) };
+  } catch (e) {
+    return { ok: false, failure: authFailure(e) };
+  }
+}
+
+// The signed-in parent as last known on this device. `hasPassword` is false until the required password is set.
+export type StoredUser = { userId: string; email: string | null; hasPassword: boolean };
 
 export type RestoredSession =
   | { status: "signed-out" }
@@ -107,7 +156,7 @@ export async function restoreSession(client: SupabaseClient, storage: KeyValueSt
   return { status: "signed-out" };
 }
 
-const userOf = (session: Session): StoredUser => ({ userId: session.user.id, email: session.user.email ?? null });
+export const userOf = (session: Session): StoredUser => ({ userId: session.user.id, email: session.user.email ?? null, hasPassword: hasPassword(session.user) });
 
 // The user recorded in the stored session, without contacting the server.
 export async function storedUser(storage: KeyValueStore): Promise<StoredUser | null> {
@@ -115,7 +164,7 @@ export async function storedUser(storage: KeyValueStore): Promise<StoredUser | n
     const raw = await storage.getItem(SESSION_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     const user = parsed?.user;
-    return user && typeof user.id === "string" ? { userId: user.id, email: typeof user.email === "string" ? user.email : null } : null;
+    return user && typeof user.id === "string" ? { userId: user.id, email: typeof user.email === "string" ? user.email : null, hasPassword: hasPassword(user) } : null;
   } catch {
     return null;
   }

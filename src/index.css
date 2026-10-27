@@ -713,6 +713,16 @@ html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="
 .admin-table th[scope="row"], .admin-table thead th:first-child { text-align: left; font-weight: 500; white-space: normal; }
 .admin-table tr:last-child > * { border-bottom: 0; }
 
+/* Create / change password (components/PasswordForm.tsx). */
+.password-form { display: grid; gap: 12px; text-align: left; }
+.password-form > svg { justify-self: center; }
+.password-form > p { margin: 0; text-align: center; overflow-wrap: anywhere; }
+.password-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.password-form input { height: 48px; padding: 0 14px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+.password-form small { color: var(--muted); font-size: 13px; }
+.password-form .password-error { color: var(--danger); font-weight: 600; font-size: 14px; }
+.password-form .wide-primary { margin-top: 4px; }
+
 /* Reduce Motion: things appear and disappear without sliding (the JavaScript skips its animations too). */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

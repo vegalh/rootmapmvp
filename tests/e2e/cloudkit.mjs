@@ -119,21 +119,42 @@ export function ui(page) {
     sessionKeys: () => page.eval(`Object.keys(__t.ls()).filter(k => k.startsWith("rootmap.session:"))`),
     // Waits for the page load that follows signing in or out (the app reloads into the other space).
     reloaded: async (fn) => { const loaded = page.waitEvent("Page.loadEventFired", 20000); await fn(); await loaded; await self.appReady(); },
-    // Requests a code through the screens (Welcome → Continue with Email → email → Send code).
+    // Requests a code through the screens (Welcome → Continue with Email → email → Email me a code).
     requestCode: async (entry, email) => {
       await self.click(entry);
       await page.waitFor(`document.querySelector("input[name=email]")`, 5000, "email step");
       const before = await mailCount(email);
       await self.type("input[name=email]", email);
-      await self.click("Send code");
+      await self.click("Email me a code");
       await page.waitFor(`document.querySelector("input[name=code]")`, 10000, "code step");
       return latestCode(email, before);
     },
-    // From Welcome (or the sign-in screen): signs in with an emailed code and waits for the account's space.
+    // From Welcome (or the sign-in screen): signs in with an emailed code and waits for the account's space. A new
+    // account is then asked for its required password, set here to PASSWORD.
     signIn: async (email, entry = "Continue with Email") => {
       const code = await self.requestCode(entry, email);
       await self.reloaded(() => self.type("input[name=code]", code));
       await page.waitFor(`import("/src/lib/cloud/session.ts").then(C => C.cloudState().status === "signed-in" && C.cloudState().account)`, 15000, "signed in, account ready");
+      await self.createPasswordIfAsked();
+    },
+    // The required "Create a password" page, if this account hasn't set one.
+    createPasswordIfAsked: async (password = PASSWORD) => {
+      const needs = await page.eval(`import("/src/lib/cloud/session.ts").then(C => !C.cloudState().user.hasPassword)`);
+      if (!needs) return;
+      await page.waitFor(`document.querySelector(".password-form")`, 10000, "Create a password");
+      await self.type("input[name=new-password]", password);
+      await self.type("input[name=confirm-password]", password);
+      await page.eval(`document.querySelector(".password-form button[type=submit]").click(); true`);
+      await page.waitFor(`import("/src/lib/cloud/session.ts").then(C => C.cloudState().user.hasPassword) && !document.querySelector(".password-form")`, 15000, "password saved");
+    },
+    // From Welcome (or the sign-in screen): email and password.
+    signInWithPassword: async (email, password = PASSWORD, entry = "Continue with Email") => {
+      await self.click(entry);
+      await page.waitFor(`document.querySelector("input[name=email]")`, 5000, "email step");
+      await self.type("input[name=email]", email);
+      await self.type("input[name=password]", password);
+      await self.reloaded(() => page.eval(`document.querySelector("form button[type=submit]").click(); true`));
+      await page.waitFor(`import("/src/lib/cloud/session.ts").then(C => C.cloudState().status === "signed-in" && C.cloudState().account)`, 15000, "signed in with password");
     },
     // After signing in on a device with guest data, the question about bringing it in (M6) opens; "Not now".
     skipImport: async () => {
@@ -178,6 +199,9 @@ export async function expireCodes(email) {
     await db.end();
   }
 }
+
+// The password the browser suites give every account they create.
+export const PASSWORD = "rootmap-test-pass";
 
 export const admin = path => fetch(`${API}${path}`, { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } }).then(r => r.json());
 export { sleep };

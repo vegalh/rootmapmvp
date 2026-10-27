@@ -9,7 +9,7 @@ import type { Copy } from "../lib/i18n";
 
 // The parent's RootMap account (Phase 2B-2 M2): who is signed in, and Sign out. Signing in and out never changes
 // what is stored on this device.
-export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: CloudState; back: () => void; signOut: () => Promise<void>; openImport?: () => void; t: Copy }) {
+export function AccountPage({ cloud, back, signOut, changePassword, openImport, t }: { cloud: CloudState; back: () => void; signOut: () => Promise<void>; changePassword: () => void; openImport?: () => void; t: Copy }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const signedIn = cloud.status === "signed-in" ? cloud : null;
@@ -39,6 +39,7 @@ export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: Cl
         <SyncSummary sync={sync} t={t} />
         <ImportSummary imported={imported} openImport={openImport} disabled={!signedIn} t={t} />
         <p>{t.accountLocalNote}</p>
+        <button className="wide-secondary" onClick={changePassword} disabled={!signedIn || signedIn.offline}>{t.accountChangePassword}</button>
         <button className="wide-secondary" onClick={() => setConfirming(true)} disabled={!signedIn}>{t.signOut}</button>
       </div>
       {confirming && (

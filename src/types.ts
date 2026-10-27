@@ -289,6 +289,8 @@ export type Screen =
   | "guestImport"
   | "signIn"
   // Usage analytics, admins only (pages/AdminPage.tsx).
-  | "admin";
+  | "admin"
+  // Change the signed-in parent's password (components/PasswordForm.tsx).
+  | "password";
 
 export type ModalKind = "quick" | "filters" | "addChild" | "editChild" | "plan" | "weekAdd" | "tried" | null;

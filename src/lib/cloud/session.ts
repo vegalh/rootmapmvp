@@ -1,7 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { platform } from "../platform";
 import { ensureAccount, type Account } from "./account";
-import { isValidEmail, requestEmailCode, restoreSession, signOut, verifyEmailCode, type AuthResult, type StoredUser } from "./auth";
+import { isValidEmail, requestEmailCode, restoreSession, setPassword, signInWithPassword, signOut, userOf, verifyEmailCode, type AuthResult, type StoredUser } from "./auth";
 import { captchaSiteKey, captchaToken } from "./captcha";
 import { getCloudClient } from "./client";
 
@@ -55,7 +55,8 @@ function onAuthChange(event: string, session: Session | null) {
     if (state.status !== "off") setState({ status: "signed-out" });
     return;
   }
-  const user = { userId: session.user.id, email: session.user.email ?? null };
+  // Also USER_UPDATED, after the password is set: `hasPassword` follows.
+  const user = userOf(session);
   const account = state.status === "signed-in" && state.user.userId === user.userId ? state.account : null;
   setState({ status: "signed-in", user, account, offline: false });
 }
@@ -92,9 +93,32 @@ export async function confirmSignInCode(email: string, code: string): Promise<Au
   if (!client) return cloudOff;
   const result = await verifyEmailCode(client, email, code);
   if (!result.ok) return result;
-  const user = { userId: result.value.user.id, email: result.value.user.email ?? null };
-  setState({ status: "signed-in", user, account: null, offline: false });
+  setState({ status: "signed-in", user: userOf(result.value), account: null, offline: false });
   return { ok: true, value: { account: await completeAccount() } };
+}
+
+// Signing in with email and password (an account that has set its password). The same CAPTCHA rule as codes.
+export async function signInWithPasswordHere(email: string, password: string): Promise<AuthResult<{ account: Account | null }>> {
+  const client = await getCloudClient();
+  if (!client) return cloudOff;
+  let token: string | undefined;
+  if (captchaSiteKey && isValidEmail(email)) {
+    token = (await captchaToken().catch(() => null)) ?? undefined;
+    if (!token) return { ok: false, failure: "captcha" };
+  }
+  const result = await signInWithPassword(client, email, password, token);
+  if (!result.ok) return result;
+  setState({ status: "signed-in", user: userOf(result.value), account: null, offline: false });
+  return { ok: true, value: { account: await completeAccount() } };
+}
+
+// Sets or changes the signed-in parent's password (required once after the account is created).
+export async function setAccountPassword(password: string): Promise<AuthResult> {
+  const client = await getCloudClient();
+  if (!client) return cloudOff;
+  const result = await setPassword(client, password);
+  if (result.ok && state.status === "signed-in") setState({ ...state, user: { ...state.user, hasPassword: true } });
+  return result;
 }
 
 // Signs out of this device only. Local data is not touched here (what happens to it is decided in M3 / M7).

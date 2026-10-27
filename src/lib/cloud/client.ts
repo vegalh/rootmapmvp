@@ -6,8 +6,8 @@ import { cloudConfig } from "./config";
 // The app's one Supabase client, created on first use and only when this build may use the cloud.
 //
 // The library is imported lazily, and only in builds that can enable the cloud: the condition below is decided
-// when Vite builds the app, so the public website's bundle does not contain Supabase at all.
-const loadSupabase = import.meta.env.VITE_ROOTMAP_CLOUD === "on" && import.meta.env.MODE !== "production" ? () => import("@supabase/supabase-js") : null;
+// when Vite builds the app, so a build without cloud features does not contain Supabase at all.
+const loadSupabase = import.meta.env.VITE_ROOTMAP_CLOUD === "on" ? () => import("@supabase/supabase-js") : null;
 
 let client: Promise<SupabaseClient | null> | undefined;
 

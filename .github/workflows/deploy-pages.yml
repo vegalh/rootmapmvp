@@ -24,9 +24,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Sign-in and analytics come from repository variables (Settings › Secrets and variables › Actions ›
+      # Variables): the project's URL and publishable key (rootmap-staging, see docs/data-architecture-phase2.md
+      # section 19), never a secret key (the build refuses it). Unset, the website builds local-only, as before.
       - run: npm run build
         env:
           GITHUB_PAGES: "true"
+          VITE_ROOTMAP_CLOUD: ${{ vars.VITE_ROOTMAP_CLOUD }}
+          VITE_ROOTMAP_ANALYTICS: ${{ vars.VITE_ROOTMAP_ANALYTICS }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

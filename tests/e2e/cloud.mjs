@@ -7,7 +7,7 @@
 // The guest database is compared before and after every step: signing in or out uploads and changes nothing in it.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { admin, expireCodes, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
+import { PASSWORD, admin, expireCodes, newDevice, sleep, startServer, stepper, ui } from "./cloudkit.mjs";
 
 const server = await startServer();
 const BASE = server.base;
@@ -22,7 +22,7 @@ const guestDump = async () => {
 };
 const welcomeSetting = async () => (await u.dump("rootmap"))?.settings.find(s => s.key === "rootmap-welcome")?.value ?? null;
 // Sign-in, account set-up, and sync reading this (empty) account's family. No data is written to the server.
-const AUTH_ONLY = /^((GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))|(GET|OPTIONS) \/rest\/v1\/(children|entries|activity_records|plans|goals|saved_activities|photos|cloud_migrations))$/;
+const AUTH_ONLY = /^((GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))|PUT \/auth\/v1\/user|(GET|OPTIONS) \/rest\/v1\/(children|entries|activity_records|plans|goals|saved_activities|saved_collections|photos|cloud_migrations))$/;
 
 const email = `parent-${randomUUID()}@example.com`;
 let guestBefore, userId, familyId;
@@ -55,9 +55,9 @@ try {
     await page.waitFor(`document.body.innerText.includes("欢迎来到 RootMap")`, 3000, "zh welcome");
     for (const s of ["使用邮箱继续", "以访客身份继续", "无需账户即可体验，数据只会保存在这台设备上。"]) assert.ok(await u.has(s), s);
     await u.click("使用邮箱继续");
-    for (const s of ["第一次使用 RootMap？", "邮箱", "发送验证码"]) assert.ok(await u.has(s), s);
+    for (const s of ["使用邮箱和密码登录。", "第一次使用或忘记密码？", "邮箱", "密码", "登录", "用邮箱验证码登录"]) assert.ok(await u.has(s), s);
     await u.type("input[name=email]", "not-an-email");
-    await u.click("发送验证码");
+    await u.click("用邮箱验证码登录");
     assert.equal(await u.errorShown(), "请输入有效的邮箱地址。");
     await u.click("返回");
     await page.eval(`__t.click("EN")`);
@@ -70,7 +70,7 @@ try {
   await step("Continue with Email: an invalid email is explained and nothing is sent", async () => {
     await u.click("Continue with Email");
     await u.type("input[name=email]", "parent@");
-    await u.click("Send code");
+    await u.click("Email me a code");
     assert.equal(await u.errorShown(), "Please enter a valid email address.");
     assert.deepEqual(page.requests, []);
     await u.click("Back");
@@ -81,7 +81,7 @@ try {
     try {
       await u.click("Continue with Email");
       await u.type("input[name=email]", email);
-      await u.click("Send code");
+      await u.click("Email me a code");
       await page.waitFor(`document.querySelector("[role=alert]")`, 10000, "offline message");
       assert.match(await u.errorShown(), /Can’t connect right now/);
       assert.ok(await page.eval(`!!document.querySelector("input[name=email]")`), "still on the email step");
@@ -94,7 +94,7 @@ try {
   }, /ERR_INTERNET_DISCONNECTED|Failed to fetch/);
 
   let code;
-  await step("Send code opens the code step for that address; a wrong code is explained and does not sign in", async () => {
+  await step("Email me a code opens the code step for that address; a wrong code is explained and does not sign in", async () => {
     code = await u.requestCode("Continue with Email", email);
     assert.ok(await u.has(email));
     assert.ok(await u.has("New code in"), "resend waits");
@@ -126,6 +126,30 @@ try {
     for (const table of ["children", "entries", "photos"]) assert.deepEqual(await admin(`/rest/v1/${table}?family_id=eq.${familyId}&select=id`), [], `no ${table} uploaded`);
   });
 
+  await step("A new account must create a password: the only page (no tabs) until saved; too short and mismatched are explained", async () => {
+    await page.waitFor(`document.querySelector(".password-form")`, 10000, "Create a password");
+    assert.ok(await u.has("Create a password"));
+    assert.ok(await u.has(`Next time, sign in with ${email} and this password.`));
+    assert.equal(await page.eval(`!!document.querySelector(".bottom-nav")`), false, "no way around it");
+    await page.eval(`location.hash = "#/discover"; true`);
+    await page.waitFor(`location.hash === "#/discover"`, 3000, "navigated");
+    assert.ok(await page.eval(`!!document.querySelector(".password-form")`), "still asked on another page");
+    const save = () => page.eval(`document.querySelector(".password-form button[type=submit]").click(); true`);
+    await u.type("input[name=new-password]", "abc");
+    await u.type("input[name=confirm-password]", "abc");
+    await save();
+    assert.equal(await u.errorShown(), "Use at least 6 characters.");
+    await u.type("input[name=new-password]", PASSWORD);
+    await u.type("input[name=confirm-password]", PASSWORD + "x");
+    await save();
+    assert.equal(await u.errorShown(), "The two passwords don’t match.");
+    await u.createPasswordIfAsked();
+    assert.ok(await page.eval(`!!document.querySelector(".bottom-nav")`), "the app opens");
+    assert.ok(await u.has("Password saved"));
+    for (const r of page.requests) assert.match(r, AUTH_ONLY, `unexpected request ${r}`);
+    assert.equal(await guestDump(), guestBefore);
+  });
+
   await step("A reload restores the session in the account's space: no Welcome, Profile shows the account", async () => {
     await page.reload();
     await u.appReady();
@@ -152,12 +176,20 @@ try {
     assert.equal(await page.eval(`!!document.querySelector(".opening")`), false);
   });
 
-  await step("Returning parent: signing in from Profile with the same email opens the same account, family and space", async () => {
+  await step("Returning parent: a wrong password is explained; the right one opens the same account, family and space", async () => {
     await u.openProfile();
     await u.click("Sign in or create an account");
     await u.welcomeShown();
-    await sleep(1100); // one code per address per second (local stack)
-    await u.signIn(email);
+    await u.click("Continue with Email");
+    await u.type("input[name=email]", email);
+    await u.type("input[name=password]", "not-the-password");
+    await page.eval(`document.querySelector("form button[type=submit]").click(); true`);
+    await page.waitFor(`document.querySelector("[role=alert]")`, 10000, "wrong-password message");
+    assert.match(await u.errorShown(), /email and password don’t match/);
+    assert.equal((await u.cloudState()).status, "signed-out");
+    await u.click("Back");
+    await u.signInWithPassword(email);
+    assert.ok(!(await page.eval(`!!document.querySelector(".password-form")`)), "not asked again");
     assert.ok(await page.eval(`document.querySelector(".profile-page") !== null`), "back on Profile");
     const state = await u.cloudState();
     assert.equal(state.user.userId, userId);
@@ -165,7 +197,7 @@ try {
     assert.deepEqual(await u.space(), { kind: "account", userId });
     assert.equal((await admin(`/rest/v1/family_members?user_id=eq.${userId}&select=family_id`)).length, 1, "still one family");
     assert.equal(await guestDump(), guestBefore);
-  });
+  }, /status of 400 .*\/auth\/v1\/token\?grant_type=password/); // the refused wrong password
 
   await step("An expired code (older than 1 hour) is explained and does not sign in", async () => {
     await u.signOut();

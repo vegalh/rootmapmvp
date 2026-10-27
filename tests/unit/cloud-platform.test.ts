@@ -27,8 +27,11 @@ test("cloud is off by default, in every environment", () => {
   }
 });
 
-test("the public production build never enables the cloud, even when asked", () => {
-  assert.deepEqual(resolveCloudConfig({ ...staging, MODE: "production" }), { enabled: false, environment: "production", reason: "production-locked" });
+test("the public production build uses the cloud when configured (HTTPS only), and stays off otherwise", () => {
+  assert.deepEqual(resolveCloudConfig({ ...staging, MODE: "production" }), { enabled: true, environment: "production", supabaseUrl: "https://cbgkkeveprftddrobzao.supabase.co", publishableKey: PUBLISHABLE });
+  assert.equal(resolveCloudConfig({ ...staging, MODE: "production", VITE_SUPABASE_URL: "http://cbgkkeveprftddrobzao.supabase.co" }).enabled, false, "HTTPS only");
+  assert.equal(resolveCloudConfig({ ...staging, MODE: "production", VITE_SUPABASE_URL: "http://127.0.0.1:54321" }).enabled, false, "never a local stack");
+  assert.equal(resolveCloudConfig({ ...staging, MODE: "production", VITE_ROOTMAP_CLOUD: undefined }).enabled, false, "still off unless asked");
 });
 
 test("local and staging enable it with a valid URL and publishable key", () => {
@@ -56,14 +59,14 @@ test("secret keys are refused; unknown keys are refused", () => {
   assert.ok(!isSecretKey(jwt({ role: "anon" })));
 });
 
-test("build guard: no secret key in any VITE_ variable, no cloud in the public website or a production build", () => {
+test("build guard: no secret key in any VITE_ variable, in any build", () => {
   assert.doesNotThrow(() => assertSafeClientEnv({}, { mode: "production", publicSite: true }));
   assert.doesNotThrow(() => assertSafeClientEnv(local, { mode: "development", publicSite: false }));
   assert.doesNotThrow(() => assertSafeClientEnv(staging, { mode: "staging", publicSite: false }));
   assert.throws(() => assertSafeClientEnv({ VITE_ANYTHING: "sb_secret_abc" }, { mode: "development", publicSite: false }), /secret key/);
   assert.throws(() => assertSafeClientEnv({ VITE_SUPABASE_PUBLISHABLE_KEY: jwt({ role: "service_role" }) }, { mode: "staging", publicSite: false }), /secret key/);
-  assert.throws(() => assertSafeClientEnv(staging, { mode: "production", publicSite: false }), /not allowed/);
-  assert.throws(() => assertSafeClientEnv(staging, { mode: "staging", publicSite: true }), /not allowed/);
+  assert.doesNotThrow(() => assertSafeClientEnv(staging, { mode: "production", publicSite: true }));
+  assert.throws(() => assertSafeClientEnv({ ...staging, VITE_SUPABASE_PUBLISHABLE_KEY: "sb_secret_abc" }, { mode: "production", publicSite: true }), /secret key/);
 });
 
 // ---- Platform ------------------------------------------------------------------------------------------------

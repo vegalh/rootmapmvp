@@ -27,7 +27,7 @@ test("each space has its own database; the guest space keeps RootMap's original 
 });
 
 test("the open space must match the sign-in state, or the app reloads into the right one", () => {
-  const signedIn = (userId: string) => ({ status: "signed-in" as const, user: { userId, email: null }, account: null, offline: false });
+  const signedIn = (userId: string) => ({ status: "signed-in" as const, user: { userId, email: null, hasPassword: true }, account: null, offline: false });
   const accountA = { kind: "account" as const, userId: A };
   assert.equal(spaceMatches(GUEST, { status: "signed-out" }), true);
   assert.equal(spaceMatches(accountA, signedIn(A)), true);

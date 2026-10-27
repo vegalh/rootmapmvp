@@ -49,7 +49,7 @@ Each day it suggests one hands-on activity suited to each child's age, with clea
 - **My Week.** Plan activities for the days ahead, keep saved ideas, and see what's been completed. Family goals and a family bookshelf are also available from Profile.
 - **Bilingual, light and dark.** Full English and Simplified Chinese, plus light and dark appearance.
 - **Private by default.** Everything is stored on the device, with no account needed. You can export and restore a backup at any time.
-- **Account and sync (beta).** An optional email-code sign-in that backs up and syncs a family's data across devices. It's turned on only in beta builds; the public website stays local-only.
+- **Account and sync (beta).** An optional account that backs up and syncs a family's data across devices: created with an email code, then signed in with email and password. It's on in builds configured with a Supabase project (beta builds, and the website once its production project is set up).
 
 ## Technology
 

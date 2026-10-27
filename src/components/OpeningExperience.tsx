@@ -8,15 +8,17 @@ import { isValidCode, isValidEmail, normalizeCode, normalizeEmail, type AuthFail
 // are carried over unchanged; at 390×844 the layout below resolves to the original pixel positions. On other
 // screen sizes the logo and sheet positions are derived from measurements instead of fixed pixels.
 //
-// Sign-in (Phase 2B-2 M2): an email and a typed 6-digit code, no password. Welcome offers "Continue with Email" and
-// "Continue as Guest"; signing up and signing in are the same step, because the server creates the account on first
-// use. The screens only collect what is typed and pass it to `auth`; without it (the development preview) they show a
+// Sign-in (Phase 2B-2 M2; passwords 2026-10-27): the email step takes an email and a password. "Email me a code"
+// sends a 6-digit code instead: that is how an account is created (the server creates it on first use) and how a
+// forgotten password is replaced. After a code sign-in the app asks for a password if the account has none
+// (components/PasswordForm.tsx). Welcome offers "Continue with Email" and "Continue as Guest". The screens only collect what is typed and pass it to `auth`; without it (the development preview) they show a
 // short "not available yet" notice and send nothing.
 
 // The sign-in actions (lib/cloud/session.ts in the app).
 export type OpeningAuth = {
   sendCode: (email: string) => Promise<AuthResult>;
   confirmCode: (email: string, code: string) => Promise<AuthResult<unknown>>;
+  signIn: (email: string, password: string) => Promise<AuthResult<unknown>>;
 };
 
 type View = "welcome" | "email" | "code";
@@ -33,7 +35,9 @@ const failureText = (failure: AuthFailure, c: Copy) =>
         : failure === "rate-limited" ? c.authRateLimited
           : failure === "offline" ? c.authOffline
             : failure === "captcha" ? c.authCaptcha
-              : c.authUnavailable;
+              : failure === "password-rejected" ? c.authPasswordRejected
+                : failure === "weak-password" ? c.authWeakPassword
+                  : c.authUnavailable;
 
 const OUT = "cubic-bezier(.22,1,.36,1)";
 const POP = "cubic-bezier(.34,1.56,.64,1)";
@@ -87,6 +91,7 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
   // The email step the code view came from, so Back returns there with the same words.
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPasswordValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<AuthFailure | null>(null);
   const [resendAt, setResendAt] = useState(0);
@@ -250,7 +255,19 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
     else setFailure(result.failure);
   };
 
-  const submitEmail = (e: FormEvent) => { e.preventDefault(); void sendCode(false); };
+  const signIn = async () => {
+    if (busy) return;
+    if (!isValidEmail(email)) { setFailure("invalid-email"); return; }
+    if (!auth) { unavailable(); return; }
+    if (!password) { setFailure("password-rejected"); return; }
+    setBusy(true); setFailure(null);
+    const result = await auth.signIn(normalizeEmail(email), password);
+    setBusy(false);
+    if (result.ok) { setPasswordValue(""); onSignedIn?.(normalizeEmail(email)); }
+    else setFailure(result.failure);
+  };
+
+  const submitEmail = (e: FormEvent) => { e.preventDefault(); void signIn(); };
   const submitCode = (e: FormEvent) => { e.preventDefault(); void confirmCode(code); };
   // Digits only (codes are often pasted as "123 456"); the code is checked as soon as all six are there.
   const typeCode = (raw: string) => {
@@ -428,10 +445,16 @@ export default function OpeningExperience({ lang, setLang, startAt = "animation"
               <p style={{ margin: "0 0 4px 0", fontSize: k.bodySize, lineHeight: 1.5, color: "#76654f" }}>{c.openingEmailBody}</p>
               <label style={labelStyle}>
                 <span>{c.openingEmailLabel}</span>
-                <input name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); setFailure(null); }} aria-invalid={!!failure} style={inputStyle} />
+                <input name="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false} value={email} onChange={e => { setEmail(e.target.value); setFailure(null); }} aria-invalid={failure === "invalid-email"} style={inputStyle} />
+              </label>
+              <label style={labelStyle}>
+                <span>{c.openingPasswordLabel}</span>
+                <input name="password" type="password" autoComplete="current-password" value={password} onChange={e => { setPasswordValue(e.target.value); setFailure(null); }} aria-invalid={failure === "password-rejected"} style={inputStyle} />
               </label>
               {errorText}
-              <button type="submit" disabled={busy} style={{ ...primaryBtn, marginTop: "auto", opacity: busy ? 0.7 : 1 }}>{busy ? c.openingSending : c.openingSendCode}</button>
+              <button type="submit" disabled={busy} style={{ ...primaryBtn, marginTop: "auto", opacity: busy ? 0.7 : 1 }}>{busy ? c.openingSigningIn : c.openingSignIn}</button>
+              <button type="button" disabled={busy} onClick={() => void sendCode(false)} style={{ ...primaryBtn, border: "1.5px solid #4b7c63", background: "transparent", color: "#2f4d3d", opacity: busy ? 0.7 : 1 }}>{c.openingCodeInstead}</button>
+              <p style={{ margin: "-4px 0 0 0", fontSize: 13.5, lineHeight: 1.45, color: "#76654f", textAlign: "center" }}>{c.openingCodeInsteadNote}</p>
             </form>
           )}
         </div>
