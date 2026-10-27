@@ -5,7 +5,7 @@ import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
 import { newRecordId } from "../lib/data/schema";
-import type { Activity, Child, ModalKind, Plan, Screen } from "../types";
+import type { Activity, Child, Lang, ModalKind, Plan, Screen } from "../types";
 import { categoryOptionLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
@@ -243,7 +243,7 @@ function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemo
     return (
       <Modal title={t.markAsTried} close={close}>
         <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{categoryOptionLabel(a.category, t)}</small></span></div>
-        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", c?.first || "")} · {fmtLong(savedFor.date, t.code as "en" | "zh")}</p>
+        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", c?.first || "")} · {fmtLong(savedFor.date, t.code as Lang)}</p>
         <div className="sheet-buttons">
           <button onClick={() => addMemory(savedFor.childId, savedFor.date)}>{t.addMemory}</button>
           <button onClick={close}>{t.done}</button>

@@ -1,12 +1,12 @@
 import { fmtMonthDay, localIsoDate } from "./dates";
 import { initialObservations } from "../data/progress";
-import type { Entry, LessonRecord } from "../types";
+import type { Entry, Lang, LessonRecord } from "../types";
 
 // Looking Back (Today) and the weekly recap: which of the parent's own Moments to bring back, and when. Pure, so the
 // rules are tested on their own; screens pass in what they need from the store (e.g. whether a photo can be shown).
 
 // "October 6 – October 12" / "10月6日 – 10月12日" for the Monday-to-Sunday week starting `week`.
-export function weekRange(week: string, lang: "en" | "zh"): string {
+export function weekRange(week: string, lang: Lang): string {
   return `${fmtMonthDay(week, lang)} – ${fmtMonthDay(addDays(week, 6), lang)}`;
 }
 

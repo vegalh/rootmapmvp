@@ -267,10 +267,6 @@ export function childTabLabel(tab: string, t: Copy): string {
     : tab;
 }
 
-export function notificationTabLabel(tab: string, t: Copy): string {
-  return tab === "All" ? t.all : tab === "Follow-ups" ? t.followUps : tab === "Classroom" ? t.classroom : tab;
-}
-
 import { ageFromDob } from "./dates";
 
 // Chinese names for the fixed lesson options offered per learning area (see `areaLessons` in data/progress.ts).
@@ -300,10 +296,6 @@ export function childShortAge(child: { dob: string }, t: Copy): string {
   const { years, months } = ageFromDob(child.dob);
   if (t.code === "zh") return months > 0 ? `${years}岁${months}月` : `${years}岁`;
   return months > 0 ? `${years}y ${months}m` : `${years}y`;
-}
-
-export function childEnrolled(child: { enrolled: string; enrolledZh?: string }, t: Copy): string {
-  return t.code === "zh" ? child.enrolledZh || child.enrolled : child.enrolled;
 }
 
 // Returns the Chinese note text when available, otherwise the stored English note.

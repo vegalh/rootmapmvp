@@ -162,6 +162,3 @@ export async function maybeSeedPerfData(): Promise<void> {
   console.info(`[perfSeed] wrote ${children.length} children, ${entries.length} entries, ${records.length} records, ${photos.length} photos in ${ms}ms`);
 }
 
-// Exposed for the perf test harness, which measures a clean reload after seeding separately from the seeding
-// time itself (seeding only ever happens once per fresh profile in that harness).
-export const PERF_SEED_COUNTS = { children: CHILD_COUNT, entries: ENTRY_COUNT, records: RECORD_COUNT, photos: PHOTO_COUNT };

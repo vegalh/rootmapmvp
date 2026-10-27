@@ -42,7 +42,6 @@ export type Collections = {
   savedCollections: SavedCollection;
 };
 export type CollectionName = keyof Collections;
-export type AnyRecord = Collections[CollectionName];
 
 export const COLLECTIONS: CollectionName[] = ["children", "records", "observations", "entries", "plans", "goals", "saved", "savedCollections"];
 // Collections stored as a plain list of ids in the legacy (localStorage and backup file) format.

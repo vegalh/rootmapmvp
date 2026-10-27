@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
-import { EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
+import { EntryTimeline, SearchField, SearchToggle, WriteButton } from "../components/EntryTimeline";
 import { TreeLogo } from "../components/TreeLogo";
 import { Modal, useConfirm, useLatest, ChildPhoto } from "../components/ui";
 import { draftKey, readDraft } from "../lib/journalDrafts";
@@ -123,9 +123,7 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
     <div className="journal">
       <div className="journal-head">
         <h2>{t.journalOf.replace("{name}", child.first)}</h2>
-        <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
-          <Icon name={searching ? "close" : "search"} />
-        </button>
+        <SearchToggle searching={searching} setSearching={setSearching} setQuery={setQuery} t={t} />
       </div>
       {searching && <SearchField query={query} setQuery={setQuery} t={t} />}
       {!searching && <WriteButton label={t.writeEntry} draft={readDraft(draftKey(child.id))} write={write} lang={lang} t={t} />}

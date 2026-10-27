@@ -203,7 +203,6 @@ async function guestPreferences(): Promise<StoredSetting[]> {
 
 export const activeSpace = () => space;
 // The account space's description (null in the guest space).
-export const activeSpaceMeta = () => spaceMeta;
 // Local changes waiting for sync, oldest first (always empty in the guest space).
 export const pendingOutbox = () => [...outbox.values()].sort((a, b) => a.seq - b.seq);
 
@@ -310,9 +309,6 @@ export const dataMode = () => mode;
 export const getCollection = <K extends CollectionName>(name: K): Collections[K][] => cache.collections[name];
 
 // Visible (not deleted) records of one child, for collections that belong to a child.
-export const listByChild = <K extends "records" | "observations" | "entries">(name: K, childId: string) =>
-  getCollection(name).filter(r => r.childId === childId && !r.deletedAt);
-
 // The stored value, or `fallback` when absent or of another shape (array vs. object vs. primitive).
 export const readSetting = <T>(key: string, fallback: T): T => settingFrom(cache.settings, key, fallback);
 

@@ -20,9 +20,12 @@ export function AccountPage({ cloud, back, signOut, openImport, t }: { cloud: Cl
 
   const confirm = async () => {
     setBusy(true);
-    await signOut();
-    setBusy(false);
-    setConfirming(false);
+    try {
+      await signOut();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
   };
 
   return (

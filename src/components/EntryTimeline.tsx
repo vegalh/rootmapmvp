@@ -34,7 +34,15 @@ export function ChildFilter({ value, onChange, childrenData, allValue = "All", t
   );
 }
 
-// Search toggle + field used above both timelines.
+// Search toggle + field used above both timelines. Closing the search clears it.
+export function SearchToggle({ searching, setSearching, setQuery, t }: { searching: boolean; setSearching: (on: boolean) => void; setQuery: (q: string) => void; t: Copy }) {
+  return (
+    <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
+      <Icon name={searching ? "close" : "search"} />
+    </button>
+  );
+}
+
 export function SearchField({ query, setQuery, t }: { query: string; setQuery: (q: string) => void; t: Copy }) {
   return (
     <label className="search journal-search">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { ChildFilter, EntryTimeline, SearchField, WriteButton } from "../components/EntryTimeline";
+import { ChildFilter, EntryTimeline, SearchField, SearchToggle, WriteButton } from "../components/EntryTimeline";
 import { latestNewDraft } from "../lib/journalDrafts";
 import { matchesQuery, newestFirst } from "../lib/entries";
 import type { Child, Entry, Lang } from "../types";
@@ -42,9 +42,7 @@ export function MomentsPage({ entries, childrenData, childFilter, setChildFilter
       <div className="moments-controls">
         {/* With one child there is nothing to choose. */}
         {childrenData.length > 1 ? <ChildFilter value={filter} onChange={setChildFilter} childrenData={childrenData} t={t} /> : <span className="moments-controls-fill" />}
-        <button className="icon-button" aria-label={t.search} aria-pressed={searching} onClick={() => { setSearching(!searching); setQuery(""); }}>
-          <Icon name={searching ? "close" : "search"} />
-        </button>
+        <SearchToggle searching={searching} setSearching={setSearching} setQuery={setQuery} t={t} />
       </div>
       {searching && <SearchField query={query} setQuery={setQuery} t={t} />}
       {!searching && childrenData.length > 0 && (

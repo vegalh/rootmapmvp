@@ -22,8 +22,6 @@ export const isSyncedCollection = (c: string): c is SyncedCollection => c in TAB
 
 // Columns that can't change after insert (sent on insert only).
 export const INSERT_ONLY: Partial<Record<Table, string[]>> = { goals: ["owner_user_id"], photos: ["sha256", "mime_type", "byte_size"] };
-// Written by the server, read by clients (e.g. a photo's verification). Not part of a row.
-export const SERVER_COLUMNS = ["rev", "change_seq", "server_updated_at", "updated_by", "storage_path", "server_sha256", "verified_at"];
 
 // The image a new child gets when the parent picks none (ModalOverlay). Stored on the server as a bundled key.
 export const DEFAULT_CHILD_PHOTO = "https://images.unsplash.com/photo-1606386666595-d135abc1e3b2?auto=format&fit=crop&w=300&q=85";

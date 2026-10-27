@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
-import { useSetting } from "../lib/data/hooks";
 import type { Child, Screen } from "../types";
 import { childInitialsSrc, childPhotoSrc } from "../lib/children";
 import { copy, type Copy } from "../lib/i18n";
@@ -52,15 +51,6 @@ export function Shell({ children: content, active, go, openQuick, t, nav = true 
       {content}
       {nav && <BottomNav active={active} go={go} openQuick={openQuick} t={t} />}
     </div>
-  );
-}
-
-export function FilterSelect({ label, value, onChange, options, renderLabel }: { label: string; value: string; onChange: (v: string) => void; options: string[]; renderLabel?: (option: string) => string }) {
-  return (
-    <label className="mini-select">
-      <span>{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option value={o} key={o}>{renderLabel ? renderLabel(o) : o}</option>)}</select>
-    </label>
   );
 }
 
@@ -413,9 +403,4 @@ export function ChildPhoto({ child }: { child: Pick<Child, "id" | "first" | "las
 
 export function Empty({ text, children: action }: { text: string; children?: React.ReactNode }) {
   return <div className="empty"><Icon name="compass" size={25} /><p>{text}</p>{action}</div>;
-}
-
-export function NotificationToggle({ label }: { label: string }) {
-  const [on, setOn] = useSetting<boolean>(`rootmap-pref-${label}`, true);
-  return <button onClick={() => setOn(!on)}><span>{label}</span><i className={`switch ${on ? "on" : ""}`}><b /></i></button>;
 }
