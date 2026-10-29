@@ -727,6 +727,8 @@ export default function App() {
           openRecap={week => { setRecapWeek(week); setRecapChild(""); go("recap"); }}
           openDiscover={() => { setDiscoverTab("activities"); go("discover"); }}
           openAddChild={() => setModal("addChild")}
+          showSignIn={cloudConfig.enabled && cloud.status === "signed-out"}
+          openSignIn={() => go("signIn")}
           t={t}
         />
       );

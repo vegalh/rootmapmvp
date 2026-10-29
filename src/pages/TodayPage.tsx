@@ -27,7 +27,7 @@ const canShowPhoto = (p: string) => !!photoUrl(p);
 
 // The home screen: an activity idea for one of the children, a memory from at least a week ago, the week's
 // Moments to revisit, and a short reflection. All read-only.
-export function TodayPage({ entries, records, childrenData, lang, openActivity, openEntry, openRecord, openRecap, openDiscover, openAddChild, t }: {
+export function TodayPage({ entries, records, childrenData, lang, openActivity, openEntry, openRecord, openRecap, openDiscover, openAddChild, showSignIn, openSignIn, t }: {
   entries: Entry[];
   records: LessonRecord[];
   childrenData: Child[];
@@ -40,6 +40,9 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
   openDiscover: () => void;
   // A new family's first step.
   openAddChild: () => void;
+  // A reminder to sign in, shown only on builds with cloud sign-in while the parent is browsing as a guest.
+  showSignIn?: boolean;
+  openSignIn?: () => void;
   t: Copy;
 }) {
   const today = localIsoToday();
@@ -63,7 +66,12 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
 
   return (
     <>
-      <header className="brand-header"><TreeLogo /></header>
+      <header className="brand-header">
+        <TreeLogo />
+        {showSignIn && openSignIn && (
+          <button className="header-signin" onClick={openSignIn}><Icon name="user" size={15} />{t.headerSignIn}</button>
+        )}
+      </header>
       <main className="page-content today-page">
         <div className="hero-title"><p className="today-date">{dateLine}</p><h1>{t.todayTitle}</h1></div>
 

@@ -71,6 +71,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .icon-button { border: 0; background: transparent; color: var(--primary); width: 36px; height: 36px; display: grid; place-items: center; padding: 0; }
 .brand-header { height: 108px; padding: var(--safe-top) 21px 10px; display: flex; align-items: center; justify-content: space-between; }
 .brand { display: flex; align-items: center; gap: 7px; }
+.header-signin { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border: 1.5px solid var(--primary); border-radius: 12px; background: transparent; color: var(--primary); font-family: var(--font-body); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .brand svg { width: 35px; height: 40px; }
 .brand span { font: 700 30px var(--font-heading); color: var(--dark-purple); }
 .hero-title { padding: 13px 0 19px; }
