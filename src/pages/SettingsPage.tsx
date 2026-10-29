@@ -9,8 +9,9 @@ import { saveSetting } from "../lib/data/hooks";
 import { readSetting } from "../lib/data/store";
 import { addPhoto, photoUrl } from "../lib/photos";
 
-export function SettingsPage({ screen, back, lang, setLang, appearance, setAppearance, profile, setProfile, notify, t }: {
+export function SettingsPage({ screen, go, back, lang, setLang, appearance, setAppearance, profile, setProfile, notify, t }: {
   screen: Screen;
+  go: (s: Screen) => void;
   // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
   notify: (message: string) => void;
   back: () => void;
@@ -117,6 +118,15 @@ export function SettingsPage({ screen, back, lang, setLang, appearance, setAppea
         </p>
       </div>
       {screen === "privacy" && usageSharingAvailable() && <UsageSharingSwitch t={t} />}
+      {screen === "privacy" && (
+        <section className="menu-section">
+          <div>
+            <button onClick={() => go("backup")} aria-label={t.backupRestore}>
+              <i><Icon name="layers" size={18} /></i><span>{t.backupRestore}</span><Icon name="chevron" size={16} />
+            </button>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

@@ -261,6 +261,116 @@ await step("Edit Child: × discards the edits, and reopening shows the saved val
   await closeX();
 });
 
+// Regression tests for the 6 Back-target bugs found during the full click-through audit: a screen reachable from
+// more than one origin had a hardcoded (or incomplete) back destination, so Back skipped past where the parent
+// actually came from. Each test below reproduces the exact origin that used to break, and also exercises the
+// screen's other, already-working origin so a future fix can't "fix" one path by breaking the other.
+
+await step("My Week > Add Planning Note: Back returns to My Week, not a settings screen", async () => {
+  await nav("Profile");
+  await page.eval(`__t.click("My Week", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week open");
+  await page.eval(`__t.clickSel(".week-page .round-add")`);
+  await page.waitFor(`document.querySelector(".overlay")`, 3000, "week add sheet open");
+  await page.eval(`__t.click("Add Planning Note", ".overlay button")`);
+  await page.waitFor(`document.querySelector(".notes-pad")`, 3000, "Notes open");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "back on My Week");
+  await notHelp();
+});
+
+await step("Activity Detail > Add to My Week: lands on the Weekly Plan tab even from Completed, and Back there returns to the activity", async () => {
+  await nav("Profile");
+  await page.eval(`__t.click("My Week", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week open");
+  // Leave My Week on a tab other than Weekly Plan, so landing on Weekly Plan after Add to My Week is a real
+  // change and not just whatever tab was already selected.
+  await page.eval(`__t.click("Completed", ".segmented button")`);
+  assert.equal(await page.eval(`document.querySelector(".segmented button.active")?.textContent.trim()`), "Completed");
+  // Back here returns to Profile (My Week's other real origin), preserving the tab just set.
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on a tab page");
+  assert.equal(await activeTab(), "Profile");
+
+  await nav("Discover");
+  await page.eval(`__t.clickSel(".activity-name")`);
+  await page.waitFor(`document.body.innerText.includes("Add to My Week")`, 3000, "activity open");
+  await page.eval(`__t.click("Add to My Week")`);
+  await page.waitFor(`document.querySelector(".overlay .child-checks button")`, 3000, "plan sheet open");
+  await page.eval(`__t.clickSel(".overlay .child-checks button")`);
+  await page.eval(`__t.clickSel(".overlay .modal-primary")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "landed on My Week");
+  assert.equal(await page.eval(`document.querySelector(".segmented button.active")?.textContent.trim()`), "Weekly Plan");
+  await notHelp();
+
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.body.innerText.includes("Mark as Tried")`, 3000, "back on the activity, not Profile");
+  await notHelp();
+});
+
+await step("Moments > Weekly Recap: Back returns to Moments", async () => {
+  await nav("Kids");
+  await page.eval(`__t.click("All Moments", ".recent-title button")`);
+  await page.waitFor(`document.querySelector(".moments-page")`, 3000, "Moments shown");
+  await page.eval(`__t.clickSel(".moments-week-link")`);
+  await page.waitFor(`document.querySelector(".recap-page")`, 3000, "Weekly Recap open");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".moments-page")`, 3000, "back on Moments");
+  await notHelp();
+});
+
+await step("Profile > Saved Activities > an activity: Back returns to Saved Activities, not Discover", async () => {
+  await nav("Discover");
+  await page.eval(`__t.clickSel(".activity-name")`);
+  await page.waitFor(`document.body.innerText.includes("Add to My Week")`, 3000, "activity open");
+  const wasSaved = await page.eval(`document.querySelectorAll(".detail-actions button")[1].getAttribute("aria-pressed") === "true"`);
+  if (!wasSaved) await page.eval(`__t.clickSel(".detail-actions button", 1)`);
+  await page.waitFor(`document.querySelectorAll(".detail-actions button")[1].getAttribute("aria-pressed") === "true"`, 3000, "activity saved");
+  await page.eval(`__t.clickSel(".detail-actions button", 0)`);
+  await appReady();
+
+  await nav("Profile");
+  await page.eval(`__t.click("Saved Activities", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".simple-page .week-list")`, 3000, "Saved Activities open");
+  await page.eval(`__t.clickSel(".simple-page .week-list button")`);
+  await page.waitFor(`document.body.innerText.includes("Add to My Week")`, 3000, "activity open from Saved Activities");
+  await page.eval(`__t.clickSel(".detail-actions button", 0)`);
+  await page.waitFor(`document.querySelector(".simple-page h1")?.textContent.trim() === "Saved Activities"`, 3000, "back on Saved Activities, not Discover");
+});
+
+await step("Today > Looking Back > Child Profile: Back returns to Today", async () => {
+  await nav("Today");
+  const past = new Date(Date.now() - 9 * 86400000);
+  await page.eval(`__t.put("records", { id: "nav-test-tried", childId: "emma", lesson: "Mopping the Floor", area: "practical-life", date: ${JSON.stringify(past.toISOString().slice(0, 10))}, kind: "tried", activityId: "mopping", createdAt: ${JSON.stringify(past.toISOString())}, origin: "user" })`);
+  await page.reload();
+  await appReady();
+  await page.waitFor(`document.querySelector("#today-looking-back")`, 5000, "Looking Back card shown");
+  await page.eval(`__t.clickSel(".today-memory.tried")`);
+  await page.waitFor(`document.querySelector(".profile-hero h1")`, 3000, "child profile open");
+  await page.eval(`__t.clickSel(".child-header button")`);
+  await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on a tab page");
+  assert.equal(await activeTab(), "Today");
+  await notHelp();
+  // Clean up the seeded record; it was only needed to make the card appear.
+  await page.eval(`__t.del("records", "nav-test-tried")`);
+});
+
+await step("Normal paths still work: My Week and an activity each still return to Profile/Discover by default", async () => {
+  await nav("Profile");
+  await page.eval(`__t.click("My Week", ".menu-section button")`);
+  await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week open");
+  await page.eval(`__t.clickSel(".page-header .icon-button")`);
+  await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on a tab page");
+  assert.equal(await activeTab(), "Profile");
+
+  await nav("Discover");
+  await page.eval(`__t.clickSel(".activity-name")`);
+  await page.waitFor(`document.body.innerText.includes("Add to My Week")`, 3000, "activity open");
+  await page.eval(`__t.clickSel(".detail-actions button", 0)`);
+  await page.waitFor(`document.querySelector(".bottom-nav")`, 3000, "back on a tab page");
+  assert.equal(await activeTab(), "Discover");
+});
+
 await page.close();
 const failed = results.filter(r => r[0] === "FAIL");
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

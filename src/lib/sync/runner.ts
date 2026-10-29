@@ -154,6 +154,7 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   let failures = 0;
   let sessionCheckedAt = 0;
   let seenOutbox = outboxSignature();
+  let seenProfile = profileSignature();
 
   const schedule = (ms: number) => {
     if (stopped) return;
@@ -214,18 +215,24 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       schedule(Math.min(MAX_BACKOFF_MS, 5000 * 2 ** (failures - 1)));
     } finally {
       running = false;
-      // What the round itself removed from the outbox isn't a new change.
-      if (!again) seenOutbox = outboxSignature();
+      // What the round itself removed from the outbox, or adopted/pushed for the profile, isn't a new change.
+      if (!again) { seenOutbox = outboxSignature(); seenProfile = profileSignature(); }
       update();
       if (again && !stopped) { again = false; schedule(0); }
     }
   }
 
-  // Local changes: sync shortly after (several quick edits make one round).
+  // Local changes: sync shortly after (several quick edits make one round). The profile (name/photo/contact) is
+  // a setting, not a collection, so it never reaches the outbox; it is watched here by value instead, the same
+  // way, so editing it is backed up as promptly as everything else (see profile.ts).
   const unsubscribe = subscribe(() => {
     update();
     const sig = outboxSignature();
-    if (sig !== seenOutbox) { seenOutbox = sig; if (!running) schedule(DEBOUNCE_MS); else again = true; }
+    const profileSig = profileSignature();
+    if (sig !== seenOutbox || profileSig !== seenProfile) {
+      seenOutbox = sig; seenProfile = profileSig;
+      if (!running) schedule(DEBOUNCE_MS); else again = true;
+    }
   });
   const online = () => { failures = 0; schedule(0); };
   const visible = () => { if (document.visibilityState === "visible") schedule(0); };
@@ -254,5 +261,7 @@ function setRunning(next: { userId: string; familyId: string } | null) { syncAcc
 const isRunning = (a: { userId: string; familyId: string }) => syncAccount === a;
 
 const outboxSignature = () => pendingOutbox().map(e => `${e.key}@${e.seq}`).join("|");
+// What profileLocal.get() currently holds, as a value the "a change happened" watcher below can compare cheaply.
+const profileSignature = () => JSON.stringify(profileLocal.get());
 
 export { allPhotoMetas };

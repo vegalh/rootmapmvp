@@ -673,7 +673,12 @@ export default function App() {
     }
     else if (destination === "entryEdit") startEntry("moments", momentsFilter === "All" ? undefined : momentsFilter);
     else if (destination === "addChild") setModal("addChild");
-    else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") go(destination as Screen);
+    else if (destination && destination !== "quick" && destination !== "filters" && destination !== "plan" && destination !== "weekAdd") {
+      // "Add to My Week" lands on My Week's Weekly Plan tab, where the just-added activity actually shows up —
+      // otherwise a parent could land on whichever tab (e.g. Completed) they had open last and see no change.
+      if (destination === "week") setWeekTab("plan");
+      go(destination as Screen);
+    }
   };
 
   // The sign-in actions the opening screens use. Signing in creates the session and the empty family and profile on
@@ -773,7 +778,7 @@ export default function App() {
           music={music}
           saved={saved.includes(music.id)}
           toggleSaved={() => { trackClick("activity.detail"); if (!saved.includes(music.id)) trackClick("activity.save"); toggleSaved(music.id); }}
-          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" || previous === "saved" ? previous : "discover")}
           openPlan={detailAction("activity.addToWeek", () => setModal("plan"))}
           openTried={detailAction("activity.markTried", () => setModal("tried"))}
           t={t}
@@ -810,7 +815,7 @@ export default function App() {
           activity={activity}
           saved={saved.includes(activity.id)}
           toggleSaved={() => { trackClick("activity.detail"); if (!saved.includes(activity.id)) trackClick("activity.save"); toggleSaved(activity.id); }}
-          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" ? previous : "discover")}
+          back={() => goBack(previous === "week" || previous === "today" || previous === "collection" || previous === "saved" ? previous : "discover")}
           openPlan={detailAction("activity.addToWeek", () => setModal("plan"))}
           openTried={detailAction("activity.markTried", () => setModal("tried"))}
           notify={setToast}
@@ -838,6 +843,9 @@ export default function App() {
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "guestImport" && syncUser) {
+      // Back is intentionally not a dismissal: it only navigates away, leaving guestImportState() at null so the
+      // offer can resurface later. Only "Not Now" inside GuestImportPage calls dismissImport() to record a real
+      // decision. Don't "fix" Back to also dismiss - that would silently discard the offer to import.
       return <GuestImportPage userId={syncUser} back={() => goBack(previous === "account" ? "account" : "today")} done={started => { if (started) setToast(t.importStarted); setImportAvailable(false); go("account"); }} lang={lang} t={t} />;
     }
     if (screen === "child") {
@@ -868,7 +876,9 @@ export default function App() {
             if (!savedOk(await commitChildren(childrenData.filter(c => c.id !== child.id)))) return;
             goBack("children");
           }}
-          back={() => goBack("children")}
+          // Usually opened from Kids, but Today's "Looking Back" (an activity tried a while ago) opens a child's
+          // profile too -- back should return to Today then, not jump to the Kids list.
+          back={() => goBack(previous === "today" ? "today" : "children")}
           record={() => { setRecordFrom("child"); go("record"); }}
           childrenData={childrenData}
           editRecord={editActivityRecord}
@@ -976,7 +986,9 @@ export default function App() {
           childrenData={childrenData}
           openActivity={openActivity}
           openAdd={() => setModal("weekAdd")}
-          back={() => goBack("profile")}
+          // Usually opened from Profile, but "Add to My Week" on an activity/music page lands here too —
+          // back should return to that activity, not jump to a page the parent never visited.
+          back={() => goBack(previous === "activity" || previous === "music" ? previous : "profile")}
           t={t}
         />
       );
@@ -996,8 +1008,8 @@ export default function App() {
         </main>
       );
     }
-    // Developer/migration utility only: no parent-facing navigation leads here. Saving is meant to be
-    // automatic (see the planned cloud sync); the backup library in lib/backup.ts stays for migration.
+    // Reached from Profile → Privacy & Data. Saving is otherwise automatic (see cloud sync), but a parent can still
+    // export or restore a file here; the backup library in lib/backup.ts also stays for migration.
     if (screen === "backup") {
       return (
         <BackupPage
@@ -1013,7 +1025,7 @@ export default function App() {
             try { sessionStorage.setItem(JUST_RESTORED_KEY, "1"); } catch { /* no confirmation toast */ }
             window.location.reload();
           }}
-          back={() => goBack("profile")}
+          back={() => goBack(previous === "privacy" ? "privacy" : "profile")}
           lang={lang}
           t={t}
         />
@@ -1030,7 +1042,9 @@ export default function App() {
           setChild={setRecapChild}
           lang={lang}
           open={id => openEntry(id, "recap")}
-          back={() => goBack("today")}
+          // Opened from either Today ("Your week in moments") or Moments ("Look back week by week"); back must
+          // return to whichever one it was, not always Today.
+          back={() => goBack(previous === "observations" ? "observations" : "today")}
           t={t}
         />
       );
@@ -1059,7 +1073,9 @@ export default function App() {
     if (screen === "notifications") {
       return <NotificationsPage back={() => goBack("children")} t={t} />;
     }
-    return <SettingsPage screen={screen} back={() => goBack(screen === "notes" && previous === "goals" ? "goals" : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
+    // Notes opens from Goals or My Week (the weekAdd modal); its Back returns to whichever one it was. Every
+    // other settings screen here (language, appearance, personal, …) opens only from Profile.
+    return <SettingsPage screen={screen} go={go} back={() => goBack(screen === "notes" ? previous : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
   };
 
   if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {

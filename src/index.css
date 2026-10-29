@@ -94,6 +94,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .bottom-nav button { border: 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 15px; padding: 0 2px; }
 .bottom-nav button.active { color: var(--primary); font-weight: 700; }
 .bottom-nav .nav-add i { width: 52px; height: 52px; margin-top: -25px; display: grid; place-items: center; color: white; background: var(--primary); border: 5px solid var(--bg); border-radius: 50%; box-shadow: 0 6px 16px rgba(75,124,99,.3); font-style: normal; }
+/* Sits just above the bottom nav so a page's last row never looks cut off behind the raised Quick Add circle: it
+   fades into the background before reaching the bar instead of stopping abruptly. Doesn't affect layout or clicks
+   (they pass through to whatever's behind it, same as before). */
+.tab-fade { position: fixed; z-index: 29; left: 0; right: 0; bottom: 88px; height: 44px; background: linear-gradient(to bottom, transparent, var(--bg) 85%); pointer-events: none; }
 
 .discover-page .page-header { min-height: 125px; }
 .discover-search { margin-bottom: 12px; }
@@ -412,7 +416,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
   :root { --frame-w: 402px; --frame-top: 18px; }
   .app-shell { width: var(--frame-w); min-height: calc(100vh - var(--frame-top)); margin: var(--frame-top) auto 0; border-radius: 34px 34px 0 0; overflow: clip; box-shadow: 0 20px 70px rgba(59,42,26,.22); position: relative; }
   .screen { min-height: calc(100vh - var(--frame-top)); }
-  .bottom-nav,.sticky-action,.form-bottom { position: fixed; left: 50%; right: auto; width: var(--frame-w); margin-left: calc(var(--frame-w) / -2); }
+  .bottom-nav,.sticky-action,.form-bottom,.tab-fade { position: fixed; left: 50%; right: auto; width: var(--frame-w); margin-left: calc(var(--frame-w) / -2); }
   .overlay { position: fixed; left: 50%; right: auto; width: var(--frame-w); margin-left: calc(var(--frame-w) / -2); top: var(--frame-top); bottom: 0; border-radius: 34px 34px 0 0; overflow: hidden; }
 }
 /* Larger desktop viewports: keep the phone mockup at its true phone size instead of zooming it up. */

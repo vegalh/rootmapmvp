@@ -23,6 +23,11 @@ const child = (id, first) => ({ id, first, last: "Test", dob: "2022-05-01", enro
 const addChild = (p, id, first) => store(p, `return S.write({ collections: { children: [${JSON.stringify(child(id, first))}] } }, { rollback: true });`);
 const localChild = (p, id) => store(p, `return S.getCollection("children").find(c => c.id === ${JSON.stringify(id)}) ?? null;`);
 const serverChildren = familyId => admin(`/rest/v1/children?family_id=eq.${familyId}&select=id,first,rev&order=id`);
+// The parent's own profile (name/photo/contact): a user-scoped singleton synced outside the children/entries/etc.
+// record-sync engine (lib/sync/profile.ts), so it is checked on its own rather than through serverChildren-style helpers.
+const localProfile = p => store(p, `return S.readSetting("rootmap-profile", { name: "", photo: "", contact: "" });`);
+const setProfile = (p, info) => store(p, `return S.write({ settings: [["rootmap-profile", ${JSON.stringify(info)}]] }, { rollback: true });`);
+const serverProfile = userId => admin(`/rest/v1/profiles?user_id=eq.${userId}&select=display_name,photo_ref,contact`).then(rows => rows[0] ?? null);
 const signInFromProfile = async (u, email, entry) => {
   await u.openProfile();
   await u.click("Sign in or create an account");
@@ -85,6 +90,38 @@ try {
     assert.deepEqual(await store(two, `return S.pendingOutbox();`), []);
     await two.eval(`[...document.querySelectorAll(".bottom-nav button")][3].click()`);
     await two.waitFor(`document.body.innerText.includes("Ada")`, 5000, "shown on My Children");
+  });
+
+  // allBackedUp (status.ts) is purely about the record-sync engine's outbox and photos; the profile is a
+  // separate singleton (profile.ts) with no outbox entry of its own, so these wait on the server row itself,
+  // reached shortly after the edit (runner.ts's debounce) without needing an explicit syncNow.
+  const waitServerProfile = async (userId, expected, label) => {
+    for (let i = 0; i < 100; i++) {
+      if (JSON.stringify(await serverProfile(userId)) === JSON.stringify(expected)) return;
+      await sleep(200);
+    }
+    throw new Error(`waitServerProfile timed out: ${label}`);
+  };
+
+  await step("The parent's own profile (name/contact) set on device 1 reaches device 2", async () => {
+    await setProfile(one, { name: "Dana Lee", photo: "", contact: "dana@example.com" });
+    await waitServerProfile(idA, { display_name: "Dana Lee", photo_ref: null, contact: "dana@example.com" }, "device 1 sent the profile");
+    await syncNow(two);
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.readSetting("rootmap-profile", {}).name === "Dana Lee")`, 30000, "profile arrived on device 2");
+    assert.deepEqual(await localProfile(two), { name: "Dana Lee", photo: "", contact: "dana@example.com" });
+    await u2.openProfile();
+    await two.waitFor(`document.body.innerText.includes("Dana Lee")`, 5000, "name shown on device 2's Profile page");
+  });
+
+  await step("An edit to the profile on device 2 (last write wins) reaches device 1", async () => {
+    await setProfile(two, { name: "Dana Lee", photo: "", contact: "dana@newmail.example" });
+    await waitServerProfile(idA, { display_name: "Dana Lee", photo_ref: null, contact: "dana@newmail.example" }, "device 2 sent the profile edit");
+    await syncNow(one);
+    await one.waitFor(`import("/src/lib/data/store.ts").then(S => S.readSetting("rootmap-profile", {}).contact === "dana@newmail.example")`, 30000, "profile edit arrived on device 1");
+    assert.deepEqual(await localProfile(one), { name: "Dana Lee", photo: "", contact: "dana@newmail.example" });
+    await u1.openProfile();
+    await one.waitFor(`document.body.innerText.includes("Dana Lee")`, 5000, "name shown on device 1's Profile page");
+    await u1.click("RootMap Account"); // back to Account, where later steps expect device 1 to be
   });
 
   await step("An edit on device 2 reaches device 1", async () => {

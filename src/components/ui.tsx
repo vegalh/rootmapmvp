@@ -49,6 +49,9 @@ export function Shell({ children: content, active, go, openQuick, t, nav = true 
   return (
     <div className={`screen ${nav ? "has-nav" : ""}`}>
       {content}
+      {/* Fades whatever scrolls up behind the bar instead of letting it look cut off by the raised Quick Add
+          circle (see .tab-fade in index.css); purely visual, so it never blocks a tap. */}
+      {nav && <div className="tab-fade" aria-hidden="true" />}
       {nav && <BottomNav active={active} go={go} openQuick={openQuick} t={t} />}
     </div>
   );
