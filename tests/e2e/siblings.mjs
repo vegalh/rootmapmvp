@@ -206,13 +206,18 @@ await step("Quick Add Moment for all three: Save waits for a child, then it's sh
   await page.eval(`__t.type(".journal-text-input", "Picnic with everyone")`);
   assert.deepEqual(await pressed(".journal-editor"), []);
   assert.ok(await page.eval(`document.querySelector(".journal-save").disabled`), "Save disabled until a child is chosen");
-  await page.eval(`__t.chooseChildren(".journal-editor", [${q(anan.id)}, ${q(lele.id)}, ${q(doudou.id)}])`);
+  // Three quick taps in a row (one synchronous burst, before React re-renders) all count.
+  await page.eval(`document.querySelectorAll(".journal-editor .child-checks button[data-child]").forEach(b => b.click())`);
+  await page.waitFor(`document.querySelectorAll(".journal-editor .child-checks button[aria-pressed=true]").length === 3`, 3000, "all three chosen");
   await page.waitFor(`!document.querySelector(".journal-save").disabled`, 3000, "Save enabled");
   await page.eval(`__t.clickSel(".journal-save")`);
   await page.waitFor(`!document.querySelector(".journal-editor")`, 5000, "saved");
   const added = (await live("entries")).filter(e => !before.some(b => b.id === e.id));
   assert.equal(added.length, 3);
   assert.equal(new Set(added.map(e => e.createdAt)).size, 1, "same createdAt");
+  // The draft written before a child was chosen moved with the first child and was cleared on save.
+  const drafts = (await page.eval(`__t.all("drafts")`)).map(d => d.key);
+  assert.deepEqual(drafts.filter(k => [":new", `${anan.id}:new`, `${lele.id}:new`, `${doudou.id}:new`].includes(k)), [], drafts.join(" "));
   await go("#/kids");
   await page.waitFor(`document.querySelector(".recent-activity button")`, 3000, "Recent moments");
   const rows = await page.eval(`[...document.querySelectorAll(".recent-activity button")].filter(b => b.innerText.includes("Picnic with everyone")).map(b => b.querySelector("strong").innerText)`);

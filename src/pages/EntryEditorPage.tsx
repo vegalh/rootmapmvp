@@ -86,18 +86,23 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
     return !draft ? "idle" : ok ? "saved" : "failed";
   };
 
-  // A new entry's draft follows the chosen child, so move it rather than leaving a copy behind.
-  const chooseChild = (id: string) => {
-    if (!entry) void writeDraft(draftKey(fields.childId), null);
-    set({ childId: id, childIds: [id] });
-  };
+  const chooseChild = (id: string) => set({ childId: id, childIds: [id] });
 
-  // "Who is this moment about?": the draft moves too when the first chosen child changes.
-  const toggleChild = (id: string) => {
-    const next = withChildren(fields, fields.childIds.includes(id) ? fields.childIds.filter(x => x !== id) : [...fields.childIds, id]);
-    if (next.childId !== fields.childId) void writeDraft(draftKey(fields.childId), null);
-    set({ childId: next.childId, childIds: next.childIds });
-  };
+  // "Who is this moment about?": built from the latest state, so quick taps in a row all count.
+  const toggleChild = (id: string) => setFields(f => {
+    const next = withChildren(f, f.childIds.includes(id) ? f.childIds.filter(x => x !== id) : [...f.childIds, id]);
+    return { ...f, childId: next.childId, childIds: next.childIds };
+  });
+
+  // A new entry's draft follows its (first) chosen child, so move it rather than leaving a copy behind: the copy
+  // under the previous child is cleared, and the autosave writes it under the new one.
+  const draftChild = useRef(fields.childId);
+  useEffect(() => {
+    if (entry || draftChild.current === fields.childId) return;
+    void writeDraft(draftKey(draftChild.current), null);
+    draftChild.current = fields.childId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields.childId]);
 
   // Debounced autosave after each change.
   useEffect(() => {
