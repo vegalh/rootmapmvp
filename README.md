@@ -27,8 +27,8 @@ Each day it suggests one hands-on activity suited to each child's age, with clea
 <table>
   <tr>
     <td align="center" width="33%"><img src="docs/screenshots/today.jpg" alt="Today screen with today's inspiration for Maya" width="240"><br><sub><b>Today</b>: one idea per child</sub></td>
-    <td align="center" width="33%"><img src="docs/screenshots/discover.jpg" alt="Discover screen with the activity library" width="240"><br><sub><b>Discover</b>: activities, books and music</sub></td>
-    <td align="center" width="33%"><img src="docs/screenshots/activity-detail.jpg" alt="Water Pouring activity details" width="240"><br><sub><b>Activity</b>: skills, materials and steps</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/discover.jpg" alt="Discover screen with the activity library" width="240"><br><sub><b>Discover</b>: activities, books and collections</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/activity-detail.jpg" alt="Getting Water activity details" width="240"><br><sub><b>Activity</b>: skills, materials and steps</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/moments.jpg" alt="My Moments timeline" width="240"><br><sub><b>Moments</b>: photos and notes, by month</sub></td>
@@ -42,7 +42,7 @@ Each day it suggests one hands-on activity suited to each child's age, with clea
 ## Features
 
 - **Today.** A daily activity idea for each child, a look back at a moment from earlier weeks, and a short reflection for parents.
-- **Discover.** A library of Montessori-style activities you can search and filter by age, topic and learning area, plus curated picture books (English and Chinese editions) and music activities.
+- **Discover.** A library of Montessori-style activities (including interactive music activities) you can search and filter by setting, age, category and materials, plus curated picture books (English and Chinese editions) and themed collections.
 - **Activity details.** The skills an activity builds, what you'll need, and step-by-step guidance. Save it, add it to your week, or mark it as tried.
 - **Moments.** Photos and a few words, grouped by month, searchable, with a week-by-week recap.
 - **Child profiles.** Each child has a journal and a history of the activities they've tried, so you can see their own path.
