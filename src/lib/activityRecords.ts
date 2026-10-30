@@ -121,11 +121,15 @@ export function recentActivityIds(records: LessonRecord[], childId: string | und
 
 // My Week › complete: the records a completed plan adds to its children's activity history, one per child still in
 // My Children, dated `date`. A child who already has a record for this plan gets no second one, so completing
-// twice (a double tap, or a retry after a failed save) never duplicates history.
+// twice (a double tap, or a retry after a failed save) never duplicates history. A child who already has a live
+// record for this same activity on this same date (e.g. Mark as Tried earlier that day) also gets no second one;
+// a record for another date, another activity, or one that's been deleted never blocks it.
 export function planCompletionRecords(plan: Plan, records: LessonRecord[], activeChildIds: string[], date: string, now: string, newId: () => string): LessonRecord[] {
   const out: LessonRecord[] = [];
   for (const childId of new Set(plan.childIds)) {
-    if (records.some(r => r.planId === plan.id && r.childId === childId && !r.deletedAt)) continue;
+    const already = records.some(r => !r.deletedAt && r.childId === childId
+      && (r.planId === plan.id || (r.activityId === plan.activityId && r.date === date)));
+    if (already) continue;
     const built = buildActivityRecord({ kind: "tried", childId, date, activityId: plan.activityId, planId: plan.id }, newId(), now, activeChildIds);
     if ("record" in built) out.push(built.record);
   }

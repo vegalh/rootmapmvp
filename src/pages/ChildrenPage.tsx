@@ -2,7 +2,7 @@ import { Icon } from "../components/Icon";
 import { ChildPhoto } from "../components/ui";
 import { TreeLogo } from "../components/TreeLogo";
 import { fmt } from "../lib/dates";
-import { entryText, newestFirst } from "../lib/entries";
+import { entryText, mergeShared, newestFirst } from "../lib/entries";
 import type { Child, Entry } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName } from "../lib/children";
@@ -22,6 +22,8 @@ export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAd
   const lang = t.code === "zh" ? "zh" : "en";
   const recent = entries.filter(e => childrenData.some(c => c.id === e.childId)).sort(newestFirst);
   const latest = (id: string) => recent.find(e => e.childId === id);
+  // A moment saved for several children is shown once, naming them all.
+  const shared = mergeShared(recent);
 
   return (
     <>
@@ -58,13 +60,15 @@ export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAd
           <>
             <div className="section-title recent-title"><h2>{t.recentMomentsLabel}</h2><button className="text-action" onClick={openMoments}>{t.allMoments}</button></div>
             <div className="recent-activity">
-              {recent.slice(0, 3).map(o => {
-                const c = childrenData.find(x => x.id === o.childId);
+              {shared.entries.slice(0, 3).map(o => {
+                const ids = shared.childrenOf.get(o.id) ?? [o.childId];
+                const kids = childrenData.filter(x => ids.includes(x.id));
+                const c = kids[0];
                 if (!c) return null;
                 return (
                   <button onClick={() => openEntry(o.id)} key={o.id}>
                     <ChildPhoto child={c} />
-                    <span><strong>{childOptionLabel(c, childrenData, t)}</strong><small>{o.title || t.independentObservation} · {fmt(o.date, lang)}</small><p>{entryText(o, lang)}</p></span>
+                    <span><strong>{kids.length > 1 ? kids.map(k => k.first).join(t.nameJoin) : childOptionLabel(c, childrenData, t)}</strong><small>{o.title || t.independentObservation} · {fmt(o.date, lang)}</small><p>{entryText(o, lang)}</p></span>
                     <Icon name="chevron" size={16} />
                   </button>
                 );

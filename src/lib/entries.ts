@@ -17,6 +17,35 @@ export function matchesQuery(e: Entry, query: string) {
   return !q || [e.title, e.text, e.textZh].some(s => s?.toLowerCase().includes(q));
 }
 
+// Groups a shared moment (one entry per child, saved together by "Who is this moment about?" or a Quick Add with
+// several children) back into a single card for display: entries with the same createdAt, date, title, text and
+// photos (same ids, same order) are one group. Each group keeps only its first entry (in the input's order); every
+// child in the group is listed in `childrenOf`, keyed by that kept entry's id. This is display-only — each child's
+// own Journal/Moments list is built from their own, still-separate entry, and editing or deleting one child's copy
+// never touches another's.
+export function mergeShared(entries: Entry[]): { entries: Entry[]; childrenOf: Map<string, string[]> } {
+  const groups = new Map<string, Entry[]>();
+  const order: string[] = [];
+  for (const e of entries) {
+    const key = JSON.stringify([e.createdAt, e.date, e.title ?? "", e.text ?? "", e.photos]);
+    let group = groups.get(key);
+    if (!group) {
+      group = [];
+      groups.set(key, group);
+      order.push(key);
+    }
+    group.push(e);
+  }
+  const merged: Entry[] = [];
+  const childrenOf = new Map<string, string[]>();
+  for (const key of order) {
+    const group = groups.get(key)!;
+    merged.push(group[0]);
+    childrenOf.set(group[0].id, group.map(e => e.childId));
+  }
+  return { entries: merged, childrenOf };
+}
+
 // Groups already-sorted entries into consecutive [YYYY-MM, entries] buckets.
 export function groupByMonth(entries: Entry[]): [string, Entry[]][] {
   const groups: [string, Entry[]][] = [];

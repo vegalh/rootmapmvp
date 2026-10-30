@@ -109,8 +109,8 @@ await step("With one child, every form chooses that child and shows it before sa
   const mia = (await live("children"))[0];
   await openActivity("dotting");
   await page.eval(`__t.click("Mark as Tried", ".sticky-action button")`);
-  await page.waitFor(`document.querySelector(".overlay select")`, 3000, "tried sheet");
-  assert.equal(await page.eval(`document.querySelector(".overlay select").value`), mia.id);
+  await page.waitFor(`document.querySelector(".overlay .child-checks button[data-child]")`, 3000, "tried sheet");
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".overlay .child-checks button[aria-pressed=true]")].map(b => b.dataset.child)`), [mia.id]);
   assert.ok(await page.eval(`!document.querySelector(".overlay .sheet-buttons button:last-child").disabled`));
   assert.ok((await text()).includes("Skills"), "skills shown read-only");
   await page.eval(`document.querySelector(".overlay header button").click()`); await noModal();

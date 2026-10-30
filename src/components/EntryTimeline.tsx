@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
 import { ChildPhoto } from "./ui";
 import { entryText, groupByMonth } from "../lib/entries";
@@ -34,6 +34,30 @@ export function ChildFilter({ value, onChange, childrenData, allValue = "All", t
   );
 }
 
+// A card/highlight's header: one child shows an avatar and their full name, as every entry always has. Several
+// children — a moment shared by siblings, merged for display by `mergeShared` — show small overlapping avatars
+// (`.entry-child.together`) and first names joined by `t.nameJoin` ("Anan, Lele" / "安安、乐乐"). `time` is any
+// trailing node (a `<time>`, usually) shown after the name(s), exactly where it always has been.
+export function EntryChildren({ ids, childrenData, time, t }: { ids: string[]; childrenData: Child[]; time?: ReactNode; t: Copy }) {
+  const kids = childrenData.filter(c => ids.includes(c.id));
+  if (!kids.length) return null;
+  if (kids.length === 1) {
+    const c = kids[0];
+    return (
+      <span className="entry-child">
+        <ChildPhoto child={c} />
+        <span><strong>{c.first} {c.last}</strong>{time}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="entry-child together">
+      {kids.map(c => <ChildPhoto child={c} key={c.id} />)}
+      <span><strong>{kids.map(c => c.first).join(t.nameJoin)}</strong>{time}</span>
+    </span>
+  );
+}
+
 // Search toggle + field used above both timelines. Closing the search clears it.
 export function SearchToggle({ searching, setSearching, setQuery, t }: { searching: boolean; setSearching: (on: boolean) => void; setQuery: (q: string) => void; t: Copy }) {
   return (
@@ -64,12 +88,16 @@ const REVEAL_STEP = 60;
 // all in the DOM) is the slowest part of opening Moments/Journal and the main cost of scrolling through it.
 // Instead only the first `INITIAL_REVEAL` cards are rendered, growing by `REVEAL_STEP` as an off-screen sentinel
 // scrolls into view — same cards, same order, same look, just built incrementally.
-export function EntryTimeline({ entries, childrenData, lang, open }: {
+export function EntryTimeline({ entries, childrenData, childrenOf, lang, open, t }: {
   // Already filtered and sorted newest first.
   entries: Entry[];
   childrenData?: Child[];
+  // Entries merged by `mergeShared`: the group's children, keyed by the kept entry's id. Omitted ids fall back to
+  // the entry's own (single) childId.
+  childrenOf?: Map<string, string[]>;
   lang: Lang;
   open: (id: string) => void;
+  t: Copy;
 }) {
   const [revealed, setRevealed] = useState(INITIAL_REVEAL);
   // A new filter/search/child selection is a fresh list; start over from the top instead of keeping a stale count.
@@ -94,18 +122,14 @@ export function EntryTimeline({ entries, childrenData, lang, open }: {
         <section className="journal-month" key={month}>
           <h3>{fmtMonthYear(`${month}-01`, lang)}</h3>
           {list.map(e => {
-            const c = childrenData?.find(x => x.id === e.childId);
+            const ids = childrenOf?.get(e.id) ?? [e.childId];
+            const header = childrenData && (
+              <EntryChildren ids={ids} childrenData={childrenData} time={<time>{fmtDayMonth(e.date, lang)}</time>} t={t} />
+            );
             const text = entryText(e, lang);
             return (
               <button className="journal-card" onClick={() => open(e.id)} key={e.id}>
-                {c ? (
-                  <span className="entry-child">
-                    <ChildPhoto child={c} />
-                    <span><strong>{c.first} {c.last}</strong><time>{fmtDayMonth(e.date, lang)}</time></span>
-                  </span>
-                ) : (
-                  <time>{fmtDayMonth(e.date, lang)}</time>
-                )}
+                {header || <time>{fmtDayMonth(e.date, lang)}</time>}
                 {e.photos.length > 0 && <EntryPhotos photos={e.photos} />}
                 {e.title && <strong>{e.title}</strong>}
                 {text && <p>{text}</p>}

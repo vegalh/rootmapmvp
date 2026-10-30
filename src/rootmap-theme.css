@@ -5,8 +5,9 @@
        lesson-card-title, detail-title, account-name, login-name, week-quote)
      --font-body: 'Nunito', system-ui, sans-serif;  (used for: body copy, nav-item, buttons,
        filter-pill, week-tab, history-title)
-   RootMap adopts the same two-font hierarchy in place of the previous Playfair Display / Inter pairing. */
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap');
+   RootMap adopts the same two-font hierarchy in place of the previous Playfair Display / Inter pairing.
+   Both fonts are bundled with the app (imported at the top of index.css), not loaded from Google Fonts, which is
+   blocked or slow in mainland China. */
 
 :root {
   /* Logo, main headings, section headings, activity/card titles */
@@ -20,15 +21,14 @@
    Scoped entirely to :lang(zh) so the English experience (fonts,
    sizes, weights, the RootMap logo) is completely untouched.
 
-   Font choice: Gen Jyuu Gothic (源柔黑体) was requested, but it has
-   no production-ready WOFF2 build anywhere — only raw, unsubset
-   TTF files (~10MB each) via an npm/CDN mirror explicitly marked
-   "not for font downloading". With no subsetting tooling available,
-   it can't be reliably loaded on the web. Noto Sans SC is used
-   instead: same soft/rounded/humanist feel, officially hosted on
-   Google Fonts with proper WOFF2 delivery and variable weights.
+   Font choice: no web font is loaded for Chinese. Noto Sans SC used
+   to come from Google Fonts, which is blocked or slow in mainland
+   China (where most Chinese-speaking parents are), and a full CJK
+   font is far too large to bundle. Chinese text uses the system's
+   own Chinese font instead: PingFang SC on Apple devices, Microsoft
+   YaHei on Windows. 'Noto Sans SC' stays first in the stack for
+   devices that already have it installed.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap');
 
 :root {
   --font-heading-zh: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;

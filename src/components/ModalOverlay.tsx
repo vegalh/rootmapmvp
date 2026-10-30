@@ -7,7 +7,7 @@ import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
 import { newRecordId } from "../lib/data/schema";
 import type { Activity, Child, Lang, ModalKind, Plan, Screen } from "../types";
 import { categoryOptionLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
-import { childOptionLabel, childShortName, defaultChildId, isActiveChild } from "../lib/children";
+import { childShortName, defaultChildId, isActiveChild } from "../lib/children";
 
 type OverlayProps = Parameters<typeof ModalSheets>[0];
 
@@ -30,12 +30,13 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
   // Resolves to false (with an error already shown) when the device couldn't save.
   setPlans: (p: Plan[]) => Promise<boolean>;
   selectedChild: string;
-  // Records that `childId` tried the selected activity; resolves to an error message when it couldn't be stored.
-  saveTried: (childId: string, date: string, notes: string) => Promise<string | null>;
+  // Records that each of `childIds` tried the selected activity (all or none); resolves to an error message when
+  // they couldn't be stored.
+  saveTried: (childIds: string[], date: string, notes: string) => Promise<string | null>;
   // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
   notify: (message: string) => void;
-  // Opens the Moments editor for `childId`, prefilled with the selected activity as context.
-  addMemory: (childId: string, date: string) => void;
+  // Opens the Moments editor for `childIds`, prefilled with the selected activity and the note as context.
+  addMemory: (childIds: string[], date: string, notes: string) => void;
   t: Copy;
 }) {
   const [name, setName] = useState("");
@@ -189,7 +190,7 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
           <legend>{t.selectChildren}</legend>
           <div className="child-checks">
             {childrenData.map(c => (
-              <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} onClick={() => setChosen(chosen.includes(c.id) ? chosen.filter(x => x !== c.id) : [...chosen, c.id])} key={c.id}>
+              <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} data-child={c.id} onClick={() => setChosen(current => (current.includes(c.id) ? current.filter(x => x !== c.id) : [...current, c.id]))} key={c.id}>
                 <ChildPhoto child={c} />{childShortName(c, childrenData)}
               </button>
             ))}
@@ -208,44 +209,55 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
   );
 }
 
-// "Mark as Tried": a few-second record that a child tried this activity. Mounted fresh on every open.
+// "Mark as Tried": a few-second record that one or more children tried this activity (siblings often try it
+// together). Mounted fresh on every open.
 function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemory, close, t }: {
   activity: Activity;
-  // The child the parent was last looking at; preselected only while still in the list.
+  // The child the parent was last looking at; preselected only while still in the list (and the only child is
+  // always preselected). With several children and none preferred, nobody is.
   preferredChild: string;
   childrenData: Child[];
-  saveTried: (childId: string, date: string, notes: string) => Promise<string | null>;
-  addMemory: (childId: string, date: string) => void;
+  saveTried: (childIds: string[], date: string, notes: string) => Promise<string | null>;
+  addMemory: (childIds: string[], date: string, notes: string) => void;
   close: () => void;
   t: Copy;
 }) {
   const a = localizeActivity(activity, t);
-  const [childId, setChildId] = useState(defaultChildId(childrenData, preferredChild));
-  const valid = isActiveChild(childrenData, childId);
+  const [chosen, setChosen] = useState<string[]>(() => {
+    const preset = defaultChildId(childrenData, preferredChild);
+    return preset ? [preset] : [];
+  });
+  // In family order, never a removed child.
+  const validChosen = childrenData.filter(c => chosen.includes(c.id) && isActiveChild(childrenData, c.id)).map(c => c.id);
   const [date, setDate] = useState(localIsoToday());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
-  const [savedFor, setSavedFor] = useState<{ childId: string; date: string }>();
+  const [savedFor, setSavedFor] = useState<{ childIds: string[]; date: string; notes: string }>();
   // Guards against a double tap storing the same attempt twice before the sheet re-renders.
   const saving = useRef(false);
 
+  const toggle = (id: string) => {
+    setChosen(current => (current.includes(id) ? current.filter(x => x !== id) : [...current, id]));
+    setError("");
+  };
+
   const save = async () => {
     if (saving.current) return;
-    if (!valid) { setError(t.chooseChildFirst); return; }
+    if (!validChosen.length) { setError(t.chooseChildFirst); return; }
     saving.current = true;
-    const failure = await saveTried(childId, date, notes.trim());
+    const failure = await saveTried(validChosen, date, notes.trim());
     if (failure) { setError(failure); saving.current = false; return; }
-    setSavedFor({ childId, date });
+    setSavedFor({ childIds: validChosen, date, notes: notes.trim() });
   };
 
   if (savedFor) {
-    const c = childrenData.find(x => x.id === savedFor.childId);
+    const names = childrenData.filter(c => savedFor.childIds.includes(c.id)).map(c => c.first).join(t.nameJoin);
     return (
       <Modal title={t.markAsTried} close={close}>
         <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{categoryOptionLabel(a.category, t)}</small></span></div>
-        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", c?.first || "")} · {fmtLong(savedFor.date, t.code as Lang)}</p>
+        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", names)} · {fmtLong(savedFor.date, t.code as Lang)}</p>
         <div className="sheet-buttons">
-          <button onClick={() => addMemory(savedFor.childId, savedFor.date)}>{t.addMemory}</button>
+          <button onClick={() => addMemory(savedFor.childIds, savedFor.date, savedFor.notes)}>{t.addMemory}</button>
           <button onClick={close}>{t.done}</button>
         </div>
       </Modal>
@@ -256,12 +268,17 @@ function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemo
     <Modal title={t.markAsTried} close={close}>
       <div className="sheet-fields">
         <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{categoryOptionLabel(a.category, t)}</small></span></div>
-        <Field label={t.childLabel}>
-          <select value={childId} onChange={e => { setChildId(e.target.value); setError(""); }}>
-            <option value="" disabled>{t.selectChild}</option>
-            {childrenData.map(c => <option value={c.id} key={c.id}>{childOptionLabel(c, childrenData, t)}</option>)}
-          </select>
-        </Field>
+        <fieldset>
+          <legend>{childrenData.length > 1 ? t.whoTriedIt : t.childLabel}</legend>
+          <div className="child-checks">
+            {childrenData.map(c => (
+              <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} data-child={c.id} onClick={() => toggle(c.id)} key={c.id}>
+                <ChildPhoto child={c} />{childShortName(c, childrenData)}
+              </button>
+            ))}
+          </div>
+          {!validChosen.length && <p className="field-hint">{t.chooseChildForPlan}</p>}
+        </fieldset>
         <Field label={t.date}><input type="date" value={date} max={localIsoToday()} onChange={e => e.target.value && setDate(e.target.value)} /></Field>
         {a.domains.length ? (
           <fieldset>
@@ -274,7 +291,7 @@ function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemo
       {error && <p className="journal-status error" role="alert">{error}</p>}
       <div className="sheet-buttons">
         <button onClick={close}>{t.cancel}</button>
-        <button onClick={save} disabled={!valid}>{t.save}</button>
+        <button onClick={save} disabled={!validChosen.length}>{t.save}</button>
       </div>
     </Modal>
   );

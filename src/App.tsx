@@ -14,7 +14,7 @@ import { MyWeekPage, ActivityRow, type WeekTab } from "./pages/MyWeekPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { RecordFormPage } from "./pages/RecordFormPage";
-import { EntryEditorPage } from "./pages/EntryEditorPage";
+import { EntryEditorPage, type EntryPrefill } from "./pages/EntryEditorPage";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { WeeklyRecapPage } from "./pages/WeeklyRecapPage";
@@ -36,7 +36,7 @@ import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
 import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreData, syncMeta } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
-import { copy, localizeActivity } from "./lib/i18n";
+import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
 import { useCloudState } from "./lib/cloud/hooks";
 import type { AuthResult } from "./lib/cloud/auth";
@@ -204,8 +204,8 @@ export default function App() {
   const [entryOrigin, setEntryOrigin] = useState<"moments" | "child" | "activity" | "today" | "children" | "recap">("moments");
   // Child preselected for a new entry.
   const [editorChild, setEditorChild] = useState<string | undefined>(start.screen === "entryEdit" ? start.child : undefined);
-  // Editable starting title/date for a new entry (the activity just marked as tried).
-  const [editorPrefill, setEditorPrefill] = useState<{ title: string; date: string } | undefined>();
+  // Editable starting title/date/note and children for a new entry (the activity just marked as tried).
+  const [editorPrefill, setEditorPrefill] = useState<EntryPrefill | undefined>();
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
@@ -249,7 +249,7 @@ export default function App() {
   const [migrated, setMigrated] = useSetting<string[]>(MIGRATED_KEY, []);
   const { items: goals, set: setGoals } = useCollection("goals");
   const [lastBackup, setLastBackup] = useSetting<string>(LAST_BACKUP_KEY, "");
-  const [lang, setLang] = useSetting<Lang>("rootmap-language", "en");
+  const [lang, setLang] = useSetting<Lang>("rootmap-language", deviceLanguage());
   const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
   const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
@@ -594,7 +594,7 @@ export default function App() {
   };
   const originScreen: Screen = entryOrigin === "child" ? "child" : entryOrigin === "activity" ? activityScreen : entryOrigin === "today" ? "today" : entryOrigin === "children" ? "children" : entryOrigin === "recap" ? "recap" : "observations";
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
-  const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: { title: string; date: string }) => {
+  const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: EntryPrefill) => {
     if (!childrenData.length) { setModal("addChild"); return; }
     setSelectedEntry(undefined);
     setEntryOrigin(origin);
@@ -605,11 +605,17 @@ export default function App() {
   };
 
   // Every activity record (Add Activity and Mark as Tried) is built and stored here, through the same builder.
-  // Repeat attempts are separate records. Resolves to an error message, or null once stored.
-  const addActivityRecord = async (input: RecordInput) => {
-    const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), new Date().toISOString(), activeChildIds);
-    if ("problem" in built) return problemMessage(built.problem, t);
-    const failure = await commitRecords([built.record, ...records]);
+  // Repeat attempts are separate records. Several inputs (Mark as Tried for siblings) are stored in one write, so
+  // either all of them are stored or none is. Resolves to an error message, or null once stored.
+  const addActivityRecord = async (...inputs: RecordInput[]) => {
+    const now = new Date().toISOString();
+    const added: LessonRecord[] = [];
+    for (const input of inputs) {
+      const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), now, activeChildIds);
+      if ("problem" in built) return problemMessage(built.problem, t);
+      added.push(built.record);
+    }
+    const failure = await commitRecords([...added, ...records]);
     return failure ? storageMessage(failure) : null;
   };
   // Corrects a record's date, notes or child. Same id and everything else unchanged (stage, skills and the activity
@@ -653,8 +659,10 @@ export default function App() {
     setPlans(current => [...current, { id: newRecordId("p"), activityId: plan.activityId, date: localIsoToday(), childIds, ...(plan.note ? { note: plan.note } : {}) }]);
     setToast(t.planRepeated);
   };
-  // "Mark as Tried": the quick record for the activity already open in Discover.
-  const saveTried = (childId: string, date: string, notes: string) => addActivityRecord({ kind: "tried", childId, date, activityId: activity.id, notes });
+  // "Mark as Tried": the quick record for the activity already open in Discover. Each child gets their own record,
+  // with the same date and note.
+  const saveTried = (childIds: string[], date: string, notes: string) =>
+    addActivityRecord(...childIds.map((childId): RecordInput => ({ kind: "tried", childId, date, activityId: activity.id, notes })));
 
   const closeModal = (destination?: Screen | ModalKind) => {
     setModal(null);
@@ -950,13 +958,17 @@ export default function App() {
           back={() => goBack(entry ? "entry" : editorReturn)}
           save={async (f, draft) => {
             const now = new Date().toISOString();
-            const fields = { childId: f.childId, date: f.date, title: f.title.trim() || undefined, text: f.text.trim() ? f.text : undefined, photos: f.photos };
+            const { childIds, ...rest } = f;
+            const fields = { childId: rest.childId, date: rest.date, title: rest.title.trim() || undefined, text: rest.text.trim() ? rest.text : undefined, photos: rest.photos };
             if (entry) {
               // Same id and createdAt; a translated seed text no longer matches once the text is edited.
               const textZh = (entry.text || "") === (fields.text || "") ? entry.textZh : undefined;
               if (!(await storeEntries(entries.map(e => (e.id === entry.id ? { ...e, ...fields, textZh, updatedAt: now } : e)), draft))) return false;
             } else {
-              if (!(await storeEntries([{ id: newRecordId("m"), ...fields, createdAt: now, updatedAt: now }, ...entries], draft))) return false;
+              // A moment about several children is one entry per child (each child's Journal keeps its own copy),
+              // with the same content and timestamps, stored together. Lists of every child show it once (mergeShared).
+              const created = (childIds.length ? childIds : [fields.childId]).map(childId => ({ id: newRecordId("m"), ...fields, childId, createdAt: now, updatedAt: now }));
+              if (!(await storeEntries([...created, ...entries], draft))) return false;
             }
             setToast(t.entrySaved);
             goBack(originScreen);
@@ -1120,7 +1132,7 @@ export default function App() {
         setPlans={async next => savedOk(await commitPlans(next))}
         selectedChild={selectedChild}
         saveTried={saveTried}
-        addMemory={(childId, date) => { setModal(null); startEntry("activity", childId, { title: localizeActivity(activity, t).title, date }); }}
+        addMemory={(childIds, date, notes) => { setModal(null); startEntry("activity", childIds[0], { title: localizeActivity(activity, t).title, date, text: notes || undefined, childIds }); }}
         notify={setToast}
         t={t}
       />

@@ -130,7 +130,7 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
 
       {mine.length === 0 && !legacyNotes && !searching && <p className="journal-empty">{t.journalEmpty}</p>}
       {searching && query.trim() && shown.length === 0 && <p className="journal-empty">{t.journalNoResults}</p>}
-      <EntryTimeline entries={shown} lang={lang} open={open} />
+      <EntryTimeline entries={shown} lang={lang} open={open} t={t} />
 
       {legacyNotes && !searching && (
         <section className="journal-legacy">

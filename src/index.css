@@ -1,3 +1,11 @@
+/* Caveat and Nunito ship with the app (@fontsource) instead of loading from Google Fonts, which is blocked or slow
+   in mainland China. */
+@import '@fontsource/caveat/600.css';
+@import '@fontsource/caveat/700.css';
+@import '@fontsource/nunito/400.css';
+@import '@fontsource/nunito/600.css';
+@import '@fontsource/nunito/700.css';
+@import '@fontsource/nunito/800.css';
 @import './rootmap-theme.css';
 @import 'tailwindcss';
 
@@ -369,6 +377,12 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .entry-child time, .journal-card .entry-child time { display: block; margin-top: 1px; font-size: 13px; letter-spacing: .3px; color: var(--muted); }
 .journal-entry > .entry-child { margin-bottom: 4px; }
 .journal-card .entry-child + strong, .journal-card .entry-child + p { margin-top: 10px; }
+/* A moment shared by siblings (lib/entries.ts mergeShared): small overlapping avatars, then their first names. */
+.entry-child.together { gap: 0; }
+.entry-child.together img { width: 32px; height: 32px; border: 2px solid var(--card); }
+.entry-child.together img + img { margin-left: -10px; }
+.entry-child.together > span { margin-left: 10px; }
+.entry-children { margin-bottom: 14px; }
 .entry-child-pick { position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 15px; background: var(--card); }
 .entry-child-pick img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
 .entry-child-pick > span { flex: 1; min-width: 0; }

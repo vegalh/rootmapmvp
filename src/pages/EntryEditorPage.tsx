@@ -6,13 +6,18 @@ import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import type { Child, Entry, EntryDraft, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
-import { childOptionLabel } from "../lib/children";
+import { childOptionLabel, childShortName } from "../lib/children";
 
+// `childIds` is every child chosen (in family order); `childId` is always the first of them, or the one child.
 type Fields = Required<Omit<EntryDraft, "savedAt">>;
 type DraftStatus = "idle" | "saving" | "saved" | "failed";
 
+// Starting values for a new entry (e.g. the activity just marked as tried, its note and the children who tried it).
+export type EntryPrefill = { title: string; date: string; text?: string; childIds?: string[] };
+
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const sameFields = (a: Fields, b: Fields) =>
-  a.childId === b.childId && a.date === b.date && a.title === b.title && a.text === b.text && a.photos.length === b.photos.length && a.photos.every((p, i) => p === b.photos[i]);
+  a.childId === b.childId && sameList(a.childIds, b.childIds) && a.date === b.date && a.title === b.title && a.text === b.text && sameList(a.photos, b.photos);
 const hasContent = (f: Fields) => Boolean(f.title.trim() || f.text.trim() || f.photos.length);
 
 // The one editor for every memory, whether started from Moments or a child's Journal. Unsaved changes are
@@ -24,8 +29,8 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   // From a child's Journal the child is shown as read-only context instead of a picker.
   lockChild: boolean;
   entry?: Entry;
-  // Starting text for a new entry (e.g. the activity just marked as tried); freely editable, never saved on its own.
-  prefill?: { title: string; date: string };
+  // Starting values for a new entry (e.g. the activity just marked as tried); freely editable, never saved on its own.
+  prefill?: EntryPrefill;
   lang: Lang;
   // Resolves to false when the entry couldn't be stored (e.g. device out of space). `draftKey` is the draft to
   // clear in the same write, so the saved entry can't be resumed from it and saved twice.
@@ -33,16 +38,32 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   back: () => void;
   t: Copy;
 }) {
-  // An edit's draft stays under the entry's original child even if the parent picks another child.
+  // A new moment, not tied to one child's Journal, can be about several children: it's saved as one entry each.
+  // Editing an entry is always about its one child.
+  const several = !entry && !lockChild && childrenData.length > 1;
+  // In family order, only children still in the family.
+  const inFamily = (ids: string[]) => childrenData.filter(c => ids.includes(c.id)).map(c => c.id);
+  const withChildren = (f: Omit<Fields, "childId" | "childIds">, ids: string[]): Fields => {
+    const childIds = several ? inFamily(ids) : ids.slice(0, 1);
+    return { ...f, childIds, childId: childIds[0] || "" };
+  };
+  // An edit's draft stays under the entry's original child even if the parent picks another child. A new entry's
+  // draft is stored under its first chosen child.
   const keyFor = (f: Fields) => (entry ? draftKey(entry.childId, entry.id) : draftKey(f.childId));
   const base: Fields = entry
-    ? { childId: entry.childId, date: entry.date, title: entry.title || "", text: entry.text || "", photos: entry.photos }
-    : { childId, date: prefill?.date || localIsoToday(), title: prefill?.title || "", text: "", photos: [] };
+    ? { childId: entry.childId, childIds: [entry.childId], date: entry.date, title: entry.title || "", text: entry.text || "", photos: entry.photos }
+    : withChildren({ date: prefill?.date || localIsoToday(), title: prefill?.title || "", text: prefill?.text || "", photos: [] }, prefill?.childIds?.length ? prefill.childIds : childId ? [childId] : []);
   // A new-entry draft is only worth keeping once it has content beyond any prefill; an edit draft once it differs from the entry.
   const isDirty = (f: Fields) => (entry ? !sameFields(f, base) : hasContent(f) && !(prefill && sameFields(f, base)));
 
   const [initialDraft] = useState(() => readDraft(keyFor(base)));
-  const [fields, setFields] = useState<Fields>(() => (initialDraft ? { childId: initialDraft.childId || base.childId, date: initialDraft.date, title: initialDraft.title, text: initialDraft.text, photos: initialDraft.photos } : base));
+  // A draft written before a moment could be for several children has only `childId`; it restores that one child.
+  const [fields, setFields] = useState<Fields>(() => {
+    if (!initialDraft) return base;
+    const restoredFields = { date: initialDraft.date, title: initialDraft.title, text: initialDraft.text, photos: initialDraft.photos };
+    if (entry) return { ...restoredFields, childId: initialDraft.childId || base.childId, childIds: [initialDraft.childId || base.childId] };
+    return withChildren(restoredFields, initialDraft.childIds?.length ? initialDraft.childIds : [initialDraft.childId || base.childId]);
+  });
   const [restored, setRestored] = useState(Boolean(initialDraft));
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [error, setError] = useState("");
@@ -68,7 +89,14 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   // A new entry's draft follows the chosen child, so move it rather than leaving a copy behind.
   const chooseChild = (id: string) => {
     if (!entry) void writeDraft(draftKey(fields.childId), null);
-    set({ childId: id });
+    set({ childId: id, childIds: [id] });
+  };
+
+  // "Who is this moment about?": the draft moves too when the first chosen child changes.
+  const toggleChild = (id: string) => {
+    const next = withChildren(fields, fields.childIds.includes(id) ? fields.childIds.filter(x => x !== id) : [...fields.childIds, id]);
+    if (next.childId !== fields.childId) void writeDraft(draftKey(fields.childId), null);
+    set({ childId: next.childId, childIds: next.childIds });
   };
 
   // Debounced autosave after each change.
@@ -126,13 +154,14 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
   };
 
   const child = childrenData.find(c => c.id === fields.childId);
-  // Never saved for a removed child or without one: with several children the parent picks one first.
-  const canSave = hasContent(fields) && !!child && !adding && !saving;
+  const chosen = several ? inFamily(fields.childIds) : child ? [child.id] : [];
+  // Never saved for a removed child or without one: with several children the parent picks at least one first.
+  const canSave = hasContent(fields) && chosen.length > 0 && !adding && !saving;
   const submit = async () => {
     if (!canSave) return;
     done.current = true;
     setSaving(true);
-    const ok = await save(fields, keyFor(fields));
+    const ok = await save({ ...fields, childId: chosen[0], childIds: chosen }, keyFor(fields));
     if (ok) return;
     // Not stored: keep editing, and keep the draft.
     done.current = false;
@@ -156,7 +185,19 @@ export function EntryEditorPage({ childrenData, childId, lockChild, entry, prefi
         <button className="journal-save" onClick={submit} disabled={!canSave}>{t.save}</button>
       </header>
 
-      {lockChild ? (
+      {several ? (
+        <fieldset className="entry-children">
+          <legend>{t.momentForChildren}</legend>
+          <div className="child-checks">
+            {childrenData.map(c => (
+              <button aria-pressed={fields.childIds.includes(c.id)} className={fields.childIds.includes(c.id) ? "active" : ""} data-child={c.id} onClick={() => toggleChild(c.id)} key={c.id}>
+                <ChildPhoto child={c} />{childShortName(c, childrenData)}
+              </button>
+            ))}
+          </div>
+          {!chosen.length && <p className="field-hint">{t.chooseChildForPlan}</p>}
+        </fieldset>
+      ) : lockChild ? (
         <div className="entry-child-pick">
           {child && <ChildPhoto child={child} />}
           <span><small>{t.childLabel}</small><strong>{child ? `${child.first} ${child.last}`.trim() : ""}</strong></span>

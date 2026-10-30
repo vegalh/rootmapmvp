@@ -278,8 +278,8 @@ await step("Music: save, Add to My Week, Mark as Tried, all through the existing
   musicId = (await live("saved")).find(x => x.id.startsWith("music-")).id;
 
   await page.eval(`__t.click("Mark as Tried", ".sticky-action button")`);
-  await page.waitFor(`document.querySelector(".overlay select")`, 3000, "tried sheet");
-  await page.eval(`__t.type(".overlay select", "emma")`);
+  await page.waitFor(`document.querySelector(".overlay .child-checks button[data-child]")`, 3000, "tried sheet");
+  await page.eval(`__t.chooseChildren(".overlay", ["emma"])`);
   await page.eval(`__t.click("Save", ".overlay .sheet-buttons button")`);
   await page.waitFor(`document.querySelector(".tried-done")`, 3000, "tried saved");
   const tried = (await live("records")).filter(r => r.kind === "tried" && r.activityId === musicId);
@@ -308,11 +308,12 @@ await step("My Week shows the music activity in Weekly Plan, Completed and Saved
   await page.eval(`${row}.querySelector(".plan-actions button").click()`); await sleep(200);
   const plan = (await live("plans")).find(p => p.activityId === musicId);
   assert.equal(plan.completed, true);
-  // Completing the plan adds it to Maya's activity history, once.
+  // Maya was already marked as tried with this activity today, so completing the plan adds no second record:
+  // her history keeps exactly one record for it today.
   const done = (await live("records")).filter(r => r.activityId === musicId && r.planId === plan.id);
-  assert.equal(done.length, 1, "one record for the completed plan");
-  assert.equal(done[0].childId, "emma");
-  assert.equal((await live("records")).filter(r => r.activityId === musicId).length, triedBefore + 1);
+  assert.equal(done.length, 0, "no second record for the completed plan");
+  assert.equal((await live("records")).filter(r => r.activityId === musicId).length, triedBefore);
+  assert.equal((await live("records")).filter(r => r.activityId === musicId && r.childId === "emma" && r.date === plan.completedDate).length, 1, "one record for Maya today");
   await page.eval(`__t.click("Completed", ".segmented button")`); await sleep(150);
   assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in completed");
   await page.eval(`[...document.querySelectorAll(".week-list .activity-row")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector("button").click()`);

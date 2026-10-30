@@ -173,6 +173,22 @@ window.__t = {
     el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
     return true;
   },
+  // Child chips (".child-checks button[data-child]" under \`scope\`): taps them so exactly \`ids\` are chosen, one tap
+  // at a time (each after the page has re-rendered, like real taps).
+  async chooseChildren(scope, ids) {
+    const chips = () => [...document.querySelectorAll(scope + " .child-checks button[data-child]")];
+    if (!chips().length) throw new Error("no child chips in " + scope);
+    for (const id of ids) if (!chips().some(b => b.dataset.child === id)) throw new Error("no chip for " + id);
+    for (const child of chips().map(b => b.dataset.child)) {
+      const b = chips().find(x => x.dataset.child === child);
+      if (ids.includes(child) === (b.getAttribute("aria-pressed") === "true")) continue;
+      b.click();
+      await new Promise(r => setTimeout(r, 50));
+    }
+    const chosen = chips().filter(b => b.getAttribute("aria-pressed") === "true").map(b => b.dataset.child);
+    if (chosen.length !== ids.length || !ids.every(id => chosen.includes(id))) throw new Error("chose " + chosen + ", wanted " + ids);
+    return true;
+  },
   imagesLoaded(selector = "img") { return [...document.querySelectorAll(selector)].map(i => ({ src: i.getAttribute("src")?.slice(0, 30), ok: i.complete && i.naturalWidth > 0 })); },
 };
 true;

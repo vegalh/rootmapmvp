@@ -4,7 +4,7 @@ import { TreeLogo } from "../components/TreeLogo";
 import { ChildPhoto } from "../components/ui";
 import { ageFromDob, fmtLong, localIsoToday } from "../lib/dates";
 import { photoUrl } from "../lib/photos";
-import { entryText } from "../lib/entries";
+import { entryText, mergeShared } from "../lib/entries";
 import { childShortName } from "../lib/children";
 import { trackClick, useImpression } from "../lib/analytics/tracker";
 import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../lib/i18n";
@@ -126,7 +126,7 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
         )}
 
         {recapWeek && (
-          <WeekCard week={recapWeek} entries={weekEntries(recapEntries(entries, childIds), recapWeek)} thisWeek={recapWeek === weekStart(today)} lang={lang} open={() => openRecap(recapWeek)} t={t} />
+          <WeekCard week={recapWeek} entries={mergeShared(weekEntries(recapEntries(entries, childIds), recapWeek)).entries} thisWeek={recapWeek === weekStart(today)} lang={lang} open={() => openRecap(recapWeek)} t={t} />
         )}
 
         <section className="today-section today-thought" aria-labelledby="today-thought">
@@ -140,10 +140,11 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
 
 export default TodayPage;
 
-// The week's Moments, offered to revisit: a few of its photos (or its first words) and the week's dates.
+// The week's Moments, offered to revisit: a few of its photos (or its first words) and the week's dates. A moment
+// shared by siblings comes in once (mergeShared), and a photo is never shown twice.
 function WeekCard({ week, entries, thisWeek, lang, open, t }: { week: string; entries: Entry[]; thisWeek: boolean; lang: Lang; open: () => void; t: Copy }) {
   const shown = weekHighlights(entries, canShowPhoto);
-  const photos = shown.flatMap(e => e.photos.filter(canShowPhoto).slice(0, 1));
+  const photos = [...new Set(shown.flatMap(e => e.photos.filter(canShowPhoto).slice(0, 1)))];
   const words = shown.map(e => e.title || entryText(e, lang)).find(Boolean);
   return (
     <section className="today-section" aria-labelledby="today-week">

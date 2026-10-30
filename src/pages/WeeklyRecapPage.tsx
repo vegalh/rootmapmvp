@@ -1,8 +1,8 @@
 import { Icon } from "../components/Icon";
 import { ChildPhoto, PageHeader } from "../components/ui";
-import { ChildFilter, EntryPhotos } from "../components/EntryTimeline";
+import { ChildFilter, EntryChildren, EntryPhotos } from "../components/EntryTimeline";
 import { fmtDayMonth, localIsoToday } from "../lib/dates";
-import { entryText } from "../lib/entries";
+import { entryText, mergeShared } from "../lib/entries";
 import { photoUrl } from "../lib/photos";
 import { addDays, firstRecapWeek, recapEntries, recapWeekForToday, weekEntries, weekHighlights, weekRange, weekStart } from "../lib/memories";
 import type { Child, Entry, Lang } from "../types";
@@ -35,12 +35,15 @@ export function WeeklyRecapPage({ entries, childrenData, week, setWeek, child, s
   // An address may name any day, or a week that hasn't come yet: it shows that day's week, at most this week.
   const shown = /^\d{4}-\d{2}-\d{2}$/.test(week) ? (weekStart(week) > thisWeek ? thisWeek : weekStart(week)) : recapWeekForToday(mine, today) ?? thisWeek;
   const first = firstRecapWeek(mine);
-  const list = weekEntries(mine, shown);
+  // For every child, a moment saved for several children is shown once, naming them all.
+  const weekList = forChild ? { entries: weekEntries(mine, shown), childrenOf: undefined } : mergeShared(weekEntries(mine, shown));
+  const list = weekList.entries;
   const highlights = weekHighlights(list, canShowPhoto);
   const rest = list.filter(e => !highlights.includes(e));
   // The nearest earlier week that has Moments, for an empty week.
   const earlier = mine.filter(e => e.date < shown).reduce<string | undefined>((max, e) => (!max || e.date > max ? e.date : max), undefined);
   const childOf = (id: string) => childrenData.find(c => c.id === id);
+  const childrenOf = (e: Entry) => weekList.childrenOf?.get(e.id) ?? [e.childId];
 
   return (
     <main className="page-content recap-page">
@@ -62,13 +65,11 @@ export function WeeklyRecapPage({ entries, childrenData, week, setWeek, child, s
       {highlights.map(e => {
         const c = childOf(e.childId);
         const text = entryText(e, lang);
+        const time = <time>{fmtDayMonth(e.date, lang)}</time>;
         return (
           <button className="journal-card recap-highlight" onClick={() => open(e.id)} key={e.id}>
             {e.photos.length > 0 && <EntryPhotos photos={e.photos} />}
-            <span className="entry-child">
-              {c && <ChildPhoto child={c} />}
-              <span>{c && <strong>{c.first} {c.last}</strong>}<time>{fmtDayMonth(e.date, lang)}</time></span>
-            </span>
+            {c ? <EntryChildren ids={childrenOf(e)} childrenData={childrenData} time={time} t={t} /> : <span className="entry-child"><span>{time}</span></span>}
             {e.title && <strong>{e.title}</strong>}
             {text && <p>{text}</p>}
           </button>
@@ -80,13 +81,14 @@ export function WeeklyRecapPage({ entries, childrenData, week, setWeek, child, s
           <h3 id="recap-rest">{t.recapAlso}</h3>
           {rest.map(e => {
             const c = childOf(e.childId);
+            const names = childrenData.filter(x => childrenOf(e).includes(x.id)).map(x => x.first).join(t.nameJoin);
             const photo = e.photos.find(canShowPhoto);
             return (
               <button className="recap-row" onClick={() => open(e.id)} key={e.id}>
                 {photo ? <img src={photoUrl(photo)} alt="" loading="lazy" /> : c ? <ChildPhoto child={c} /> : <i />}
                 <span>
                   <strong>{e.title || entryText(e, lang) || (c ? t.momentWith.replace("{name}", c.first) : "")}</strong>
-                  <small>{c ? `${c.first} · ` : ""}{fmtDayMonth(e.date, lang)}</small>
+                  <small>{names ? `${names} · ` : ""}{fmtDayMonth(e.date, lang)}</small>
                 </span>
                 <Icon name="chevron" size={15} />
               </button>

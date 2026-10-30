@@ -169,7 +169,7 @@ await step("Save still works: a Moment from Quick Add is stored and opens Moment
   await page.eval(`__t.type(".journal-editor textarea", "Saved from navigation test")`);
   // Two children and none chosen yet: the Moment can't be saved until the parent picks one.
   assert.ok(await page.eval(`document.querySelector(".journal-save").disabled`), "no child chosen yet");
-  await page.eval(`__t.type(".entry-child-pick select", "emma")`);
+  await page.eval(`__t.chooseChildren(".journal-editor .entry-children", ["emma"])`);
   await page.waitFor(`!document.querySelector(".journal-save").disabled`, 3000, "save enabled");
   await page.eval(`__t.clickSel(".journal-save")`);
   await page.waitFor(`document.body.innerText.includes("Saved from navigation test") && !document.querySelector(".journal-editor")`, 5000, "moment shown");

@@ -234,6 +234,9 @@ export type Entry = SyncMeta & {
 export type EntryDraft = {
   // Child the draft is for; absent in drafts written before Moments could pick a child.
   childId?: string;
+  // Several children chosen for a new, not-yet-saved moment (childId is always the first of these). Absent in
+  // drafts written before a moment could be for more than one child.
+  childIds?: string[];
   date: string;
   title: string;
   text: string;

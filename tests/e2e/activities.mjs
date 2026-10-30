@@ -216,11 +216,11 @@ await step("History shows older records, new records and Mark as Tried; never bl
   await page.waitFor(`document.querySelector(".detail-page")`, 3000, "activity");
   const title = await page.eval(`document.querySelector(".detail-content h1").textContent`);
   await page.eval(`__t.click("Mark as Tried", ".sticky-action button")`);
-  await page.waitFor(`document.querySelector(".overlay select")`, 3000, "tried sheet");
+  await page.waitFor(`document.querySelector(".overlay .child-checks button[data-child]")`, 3000, "tried sheet");
   assert.equal(await page.eval(`document.querySelector(".overlay .plan-activity strong").textContent`), title);
   assert.ok(await page.eval(`document.querySelector(".overlay .plan-activity small").textContent.length > 0`), "category shown");
   assert.ok(!(await page.eval(`!!document.querySelector(".overlay .picker-row")`)), "no picker");
-  await page.eval(`__t.type(".overlay select", ${q(childId)})`);
+  await page.eval(`__t.chooseChildren(".overlay", [${q(childId)}])`);
   await page.eval(`__t.click("Save", ".overlay .sheet-buttons button")`);
   await page.waitFor(`document.querySelector(".tried-done")`, 3000, "tried saved");
   const tried = (await live("records")).find(r => r.kind === "tried" && r.lesson === title && !recordsBefore.some(x => x.id === r.id));

@@ -290,8 +290,8 @@ await step("18. Mark as Tried still works (stored with uuid id and timestamps)",
   await page.eval(`__t.click("Dotting", ".activity-name")`).catch(() => page.eval(`__t.clickSel(".activity-name")`));
   await page.waitFor(`document.body.innerText.includes("Mark as Tried")`);
   await page.eval(`__t.click("Mark as Tried")`);
-  await page.waitFor(`document.querySelector(".modal select, .sheet-fields select")`);
-  await page.eval(`__t.type(".sheet-fields select", "c-1760000000000")`);
+  await page.waitFor(`document.querySelector(".overlay .child-checks button[data-child]")`);
+  await page.eval(`__t.chooseChildren(".overlay", ["c-1760000000000"])`);
   await page.eval(`__t.type(".sheet-fields textarea", "Tried again 再试一次")`);
   await page.eval(`[...document.querySelectorAll(".sheet-buttons button")].at(-1).click()`);
   await page.waitFor(`document.querySelector(".tried-done")`);

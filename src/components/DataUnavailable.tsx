@@ -1,11 +1,11 @@
 import { TreeLogo } from "./TreeLogo";
-import { copy } from "../lib/i18n";
+import { copy, deviceLanguage } from "../lib/i18n";
 import type { Lang } from "../types";
 
 // Shown only when this device's RootMap data exists but the browser won't open it (see lib/data/store.ts).
 // The app deliberately doesn't fall back to an older copy, which would look like recent memories were lost.
 export function DataUnavailable() {
-  let lang: Lang = navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+  let lang: Lang = deviceLanguage();
   try {
     const stored = localStorage.getItem("rootmap-language");
     if (stored === '"zh"' || stored === '"en"') lang = JSON.parse(stored);
