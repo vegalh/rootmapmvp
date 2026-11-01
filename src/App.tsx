@@ -33,7 +33,7 @@ import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreData, syncMeta } from "./lib/data/store";
+import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreAddsOnly, restoreData, syncMeta } from "./lib/data/store";
 import { newRecordId } from "./lib/data/schema";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
@@ -1030,6 +1030,7 @@ export default function App() {
             if (dataMode() === "localStorage") return applyBackup(localStorage, backup);
             return (await restoreData(backup.data)) ? { ok: true as const } : { ok: false as const, rolledBack: true };
           }}
+          addOnly={dataMode() === "indexeddb" && restoreAddsOnly()}
           lastBackup={lastBackup}
           setLastBackup={setLastBackup}
           restored={() => {

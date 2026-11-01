@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Child } from "../../types";
 import { planGuestMigration, type DemoSeed, type GuestPlan, type GuestSnapshot } from "../data/guestPlan";
-import { isPhotoId, newPhotoId, newRecordId, outboxKey, uuid, type CollectionName, type OutboxEntry, type PhotoMeta } from "../data/schema";
+import { isPhotoId, isShared, newPhotoId, newRecordId, outboxKey, uuid, type CollectionName, type OutboxEntry, type PhotoMeta } from "../data/schema";
 import { SyncOffline, sha256Hex } from "./engine";
 import { COLLECTION_OF, TABLE, clientRow, fromRow, toRow, type Row, type SyncedCollection, type Table } from "./mapping";
 
@@ -402,9 +402,10 @@ export async function prepareGuestImport(client: SupabaseClient, local: GuestImp
     for (const row of rows) records.set(keyOf(collection, String(row.id)), fromRow(collection, row, undefined));
   }
   for (const row of await rowsById(client, ctx.familyId, "photos", snapshot.photos.map(p => p.id))) photos.set(String(row.id), { sha256: String(row.sha256) });
-  // This device's copy of the account (it may hold changes not sent yet); it takes precedence.
-  for (const collection of IMPORTED) for (const r of local.records(collection)) records.set(keyOf(collection, String(r.id)), r);
-  for (const p of local.photos()) photos.set(p.id, { sha256: p.sha256 });
+  // This device's copy of the account (it may hold changes not sent yet); it takes precedence. Children shared from
+  // other families and their records are never the user's own: guest data is never matched with or copied onto them.
+  for (const collection of IMPORTED) for (const r of local.records(collection)) if (!isShared(r)) records.set(keyOf(collection, String(r.id)), r);
+  for (const p of local.photos()) if (!isShared(p)) photos.set(p.id, { sha256: p.sha256 });
   const children = [...records.entries()].filter(([k, r]) => k.startsWith("children:") && !r.deletedAt).map(([, r]) => r as unknown as Child);
   const account: AccountView = { records, photos, children, handled };
   // Only the demo children's pictures are needed to decide (is it still the bundled one?); the rest are read when

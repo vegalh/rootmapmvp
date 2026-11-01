@@ -280,9 +280,59 @@ describe("kept versions (record_versions)", () => {
   });
 });
 
+// Phase 2b (migration 20261101000300): a photo can be added for a child the user can write.
+let edPhoto: { id: string; path: string };
+let signedBefore: string;
+describe("photos added for a shared child", () => {
+  const newRow = (childId: string | null) => {
+    const bytes = randomBytes(128);
+    return { bytes, row: { family_id: F, id: newPhotoId(), mime_type: "image/jpeg", byte_size: bytes.length, sha256: sha256(bytes), ...(childId ? { child_id: childId } : {}) } };
+  };
+
+  it("an editor adds a photo for the shared child: row, file and server verification, all in the child's family", async () => {
+    const { bytes, row } = newRow("X");
+    const [inserted] = must(await Ed.client.from("photos").insert(row).select("id, storage_path, child_id")) as { id: string; storage_path: string; child_id: string }[];
+    assert.equal(inserted.child_id, "X");
+    assert.ok(inserted.storage_path.startsWith(`${F}/`), "the path is the child's family's, as for every photo");
+    must(await Ed.client.storage.from(BUCKET).upload(inserted.storage_path, bytes, { contentType: "image/jpeg" }));
+    const verify = await Ed.client.functions.invoke("verify-photo", { body: { familyId: F, photoId: inserted.id } });
+    assert.equal((verify.data as { status: string }).status, "verified");
+    edPhoto = { id: inserted.id, path: inserted.storage_path };
+    // Attached to a shared Moment.
+    must(await Ed.client.from("entries").update({ photo_ids: [photo.x.id, photo.xy.id, edPhoto.id] }).eq("family_id", F).eq("id", "eX"));
+  });
+
+  it("the child's members (owner, viewer) see it; a family member with no role and an outsider don't", async () => {
+    const { row } = newRow("X");
+    must(await Ed.client.from("photos").insert(row)); // not shown by any Moment yet: follows the child it was added for
+    for (const who of [O, Vw, Ed]) assert.ok(ids(await who.client.from("photos").select("id").eq("family_id", F)).includes(row.id));
+    for (const who of [Fm, Out]) assert.ok(!ids(await who.client.from("photos").select("id").eq("family_id", F)).includes(row.id));
+    assert.equal((await Vw.client.storage.from(BUCKET).download(edPhoto.path)).error, null);
+  });
+
+  it("a viewer, an outsider, or an editor for a child they can't write can't add one; the child can't be changed later", async () => {
+    refused(await Vw.client.from("photos").insert(newRow("X").row), "viewer adding a photo");
+    refused(await Out.client.from("photos").insert(newRow("X").row), "outsider adding a photo");
+    refused(await Ed.client.from("photos").insert(newRow("Y").row), "editor adding a photo for an unshared child");
+    refused(await Ed.client.from("photos").insert(newRow("no-such-child").row), "a photo for a child that doesn't exist");
+    refused(await Ed.client.from("photos").update({ child_id: "Z" }).eq("family_id", F).eq("id", edPhoto.id), "changing a photo's child");
+  });
+
+  it("signed URLs: a member can create one; it is an ordinary expiring link", async () => {
+    const signed = must(await Ed.client.storage.from(BUCKET).createSignedUrl(edPhoto.path, 60)) as { signedUrl: string };
+    signedBefore = signed.signedUrl;
+    assert.equal((await fetch(signedBefore)).status, 200);
+  });
+});
+
 describe("revoked membership", () => {
   it("removing a membership ends all access at once; what the member wrote stays with the child", async () => {
     must(await svc().from("child_memberships").delete().eq("family_id", F).eq("child_id", "X").eq("user_id", Ed.id));
+    // No new signed URL. One created before keeps working until it expires (60 s here): it is a self-contained,
+    // time-limited link, not checked against memberships when used.
+    assert.ok((await Ed.client.storage.from(BUCKET).createSignedUrl(edPhoto.path, 60)).error, "a revoked member got a new signed URL");
+    assert.equal((await fetch(signedBefore)).status, 200);
+    refused(await Ed.client.from("photos").insert({ family_id: F, id: newPhotoId(), mime_type: "image/jpeg", byte_size: 1, sha256: "b".repeat(64), child_id: "X" }), "adding a photo after revocation");
     assert.deepEqual(ids(await Ed.client.from("children").select("id").eq("family_id", F)), ["Z"]);
     assert.ok(!ids(await Ed.client.from("entries").select("id").eq("family_id", F)).includes("eEd"));
     assert.deepEqual(ids(await Ed.client.from("record_versions").select("id").eq("family_id", F)), [], "even their own kept version");

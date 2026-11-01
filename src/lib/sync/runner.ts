@@ -6,7 +6,7 @@ import { initialChildren } from "../../data/children";
 import { initialObservations, initialRecords } from "../../data/progress";
 import { readGuestSnapshot } from "../data/guestPlan";
 import {
-  DEFAULT_SAVED, activeSpace, allPhotoMetas, commitSync, getCollection, guestImportState, guestPhotoBytes, hasPhotoBytes, importGuestCopy, pendingOutbox, photoBytes,
+  DEFAULT_SAVED, activeSpace, allPhotoMetas, cleanupRecords, commitCleanup, commitSync, getCollection, guestImportState, guestPhotoBytes, hasPhotoBytes, importGuestCopy, pendingOutbox, photoBytes,
   photoChecksum, photoMeta, readSetting, refreshFromDisk, saveGuestImportState, storePhotoBytes, subscribe, syncMeta, syncRecordFor, syncRecordValue, write,
 } from "../data/store";
 import {
@@ -14,7 +14,8 @@ import {
   type ImportContext, type ImportProgress, type Prepared,
 } from "./guestImport";
 import { SyncOffline, sha256Hex, type RoundResult } from "./engine";
-import { sharedSyncEnabled, syncScopes, type ScopeBase } from "./scopes";
+import { isShared } from "../data/schema";
+import { familyPhotos, sharedScopes, sharedSyncEnabled, syncScopes, type CleanupLocal, type ScopeBase } from "./scopes";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import { EMPTY_PROFILE, syncProfile, type ProfileLocal, type ProfileRow } from "./profile";
 import type { SyncedCollection } from "./mapping";
@@ -26,7 +27,7 @@ import type { ProfileInfo } from "../../types";
 // is open. One round at a time across this account's tabs (Web Locks). After a failure it waits longer each time
 // (up to 5 minutes); coming back online retries at once.
 
-const local: ScopeBase = {
+const local: ScopeBase & CleanupLocal = {
   outbox: pendingOutbox,
   syncRecord: syncRecordFor,
   record: (collection: SyncedCollection, id: string) => syncRecordValue(collection, id),
@@ -35,11 +36,13 @@ const local: ScopeBase = {
   commit: batch => commitSync(batch),
   refresh: refreshFromDisk,
   photoFamily: id => (photoMeta(id) as { familyId?: string } | undefined)?.familyId,
+  // Removing a shared child's data after access ended (scopes.ts).
+  all: cleanupRecords,
+  commitCleanup,
 };
 
 const photoLocal: PhotoLocal = {
-  // The user's own family's photos (a photo of a shared child carries its family, lib/sync/scopes.ts).
-  photos: () => (allPhotoMetas() as LocalPhoto[]).filter(p => !(p as { familyId?: string }).familyId),
+  photos: () => allPhotoMetas() as LocalPhoto[],
   hasBytes: hasPhotoBytes,
   bytes: photoBytes,
   storeBytes: storePhotoBytes,
@@ -61,8 +64,9 @@ const profileLocal: ProfileLocal = {
 const importLocal: GuestImportLocal = {
   guest: readGuestSnapshot,
   guestPhotoBytes,
-  records: collection => getCollection(collection) as unknown as Record<string, unknown>[],
-  photos: allPhotoMetas,
+  // Only the user's own: guest data is never matched with, or copied onto, a child shared from another family.
+  records: collection => (getCollection(collection) as unknown as Record<string, unknown>[]).filter(r => !isShared(r)),
+  photos: () => allPhotoMetas().filter(p => !isShared(p)),
   state: guestImportState,
   saveState: saveGuestImportState,
   copy: importGuestCopy,
@@ -179,15 +183,23 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
     const go = async () => {
       phase = "syncing"; update();
       // The user's own family; children shared from other families too once sharing is switched on (scopes.ts).
-      const result = (await syncScopes(client, local, { userId, homeFamilyId: familyId, enabled: sharedSyncEnabled })).home;
-      notSent = result.notSent;
+      // `homeChildren`: the user's own children stored here; an answer about memberships that leaves them all out
+      // can't be right and is ignored (scopes.ts).
+      const homeChildren = getCollection("children").filter(c => !isShared(c) && !c.deletedAt).map(c => c.id);
+      const scopes = await syncScopes(client, local, { userId, homeFamilyId: familyId, enabled: sharedSyncEnabled, homeChildren });
+      notSent = Object.assign({}, scopes.home.notSent, ...Object.values(scopes.shared).map(r => r.notSent));
       // The parent's own profile (name/photo/contact): a user-scoped singleton, so it syncs on its own, not
       // through the record-sync engine above.
       await syncProfile(client, userId, profileLocal);
       // Then the files of photos whose details are on the server (and downloads of others' photos).
       if (cloudConfig.enabled) {
-        const photos = await syncPhotos(client, photoLocal, { familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
-        photosFailed = photos.failed;
+        // Each family's photo files in its own folder: the user's own, then each shared family's.
+        const photos = await syncPhotos(client, familyPhotos(photoLocal, null), { familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
+        photosFailed = { ...photos.failed };
+        for (const scope of scopes.state ? sharedScopes(scopes.state) : []) {
+          const shared = await syncPhotos(client, familyPhotos(photoLocal, scope.familyId), { familyId: scope.familyId, url: cloudConfig.supabaseUrl, key: cloudConfig.publishableKey });
+          Object.assign(photosFailed, shared.failed);
+        }
         // Then, if earlier memories are being brought in, whether the server now has all of them.
         await advanceGuestImport(client, importLocal, { familyId, userId });
       }

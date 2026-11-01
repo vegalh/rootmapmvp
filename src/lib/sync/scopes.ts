@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { outboxKey, type ArchiveItem, type OutboxEntry, type SyncRecord } from "../data/schema";
+import { isScopedId, outboxKey, scopedId, unscope, type ArchiveItem, type OutboxEntry, type SyncRecord } from "../data/schema";
 import { CHILD_COLLECTIONS, syncRound, type RoundResult, type SyncBatch, type SyncLocal } from "./engine";
 import type { SyncedCollection } from "./mapping";
+import type { PhotoLocal } from "./photos";
 
 // Sync scopes for children shared from other families (Shared Child Profiles Phase 2a;
 // docs/shared-child-profiles-phase2a.md).
@@ -17,16 +18,13 @@ import type { SyncedCollection } from "./mapping";
 // id of the user's own family or of another family. Photo ids are already global ("photo-<uuid>", unique across the
 // bucket) and keep them; a shared photo carries its `familyId`.
 //
-// Switched off: `sharedSyncEnabled` is false, so the app syncs only its own family, as before.
-export const sharedSyncEnabled = false;
+// Switched off. Only a development server started with VITE_ROOTMAP_SHARED_SYNC=on (the browser tests) switches it
+// on; a production or staging build never does, whatever its variables say. Otherwise the app syncs only its own
+// family, as before.
+const env = (import.meta as { env?: Record<string, string | boolean | undefined> }).env;
+export const sharedSyncEnabled = env?.VITE_ROOTMAP_SHARED_SYNC === "on" && env?.MODE === "development";
 
-const SEP = "\u001f";
-export const scopedId = (familyId: string, id: string) => `${familyId}${SEP}${id}`;
-export const isScopedId = (id: string) => id.includes(SEP);
-export function unscope(localId: string): { familyId: string; id: string } | null {
-  const i = localId.indexOf(SEP);
-  return i < 0 ? null : { familyId: localId.slice(0, i), id: localId.slice(i + 1) };
-}
+export { isScopedId, scopedId, unscope };
 
 export type Role = "owner" | "editor" | "viewer";
 export type Membership = { familyId: string; childId: string; role: Role };
@@ -78,13 +76,16 @@ function toServer(collection: string, record: Record<string, unknown>): Record<s
   return out;
 }
 
+// A key as the engine sees it in a shared family's scope ("entries:m-1") to the key stored here.
+const localKeyIn = (familyId: string, key: string) => {
+  const c = collectionOf(key);
+  return c === "photos" ? key : outboxKey(c, scopedId(familyId, idOf(key)));
+};
+
 // One shared family as a single-family space for the sync engine: the engine sees plain ids, its own cursors, and only
 // this family's entries; whatever it stores is translated back to scoped ids.
 export function scopedLocal(base: ScopeBase, familyId: string): SyncLocal {
-  const localKey = (key: string) => {
-    const c = collectionOf(key);
-    return c === "photos" ? key : outboxKey(c, scopedId(familyId, idOf(key)));
-  };
+  const localKey = (key: string) => localKeyIn(familyId, key);
   const serverEntry = (e: OutboxEntry): OutboxEntry => (e.collection === "photos" ? e : { ...e, id: unscope(e.id)!.id, key: outboxKey(e.collection, unscope(e.id)!.id) });
   const localEntry = (e: OutboxEntry): OutboxEntry => (e.collection === "photos" ? e : { ...e, id: scopedId(familyId, e.id), key: outboxKey(e.collection, scopedId(familyId, e.id)) });
   return {
@@ -113,6 +114,45 @@ export function scopedLocal(base: ScopeBase, familyId: string): SyncLocal {
     },
     refresh: () => base.refresh(),
   };
+}
+
+// One family's photos for photo-file sync (lib/sync/photos.ts): the user's own (null) or a shared family's. Files go to
+// and come from that family's folder, so a photo is only ever handled under the family it belongs to.
+export function familyPhotos(local: PhotoLocal, familyId: string | null): PhotoLocal {
+  return {
+    photos: () => local.photos().filter(p => ((p as { familyId?: string }).familyId ?? null) === familyId),
+    hasBytes: id => local.hasBytes(id),
+    bytes: id => local.bytes(id),
+    storeBytes: (id, blob) => local.storeBytes(id, blob),
+    syncRecord: key => local.syncRecord(key),
+    commit: batch => local.commit(batch),
+  };
+}
+
+// A photo added on this device and not uploaded yet, shown only by records of one shared family, belongs to that
+// family: it is uploaded into that family's folder, with the child it was added for (`childHint`), which the server
+// checks against the user's membership. A photo the user's own records show stays the user's. Pure.
+export function sharedPhotoAssignments(local: Pick<CleanupLocal, "all">, uploaded: (id: string) => boolean): { id: string; familyId: string; childHint: string }[] {
+  const families = new Map<string, Set<string>>();
+  const hints = new Map<string, string>();
+  for (const collection of ["children", "entries"] as const) {
+    for (const r of local.all(collection)) {
+      const scope = unscope(String(r.id));
+      const child = collection === "children" ? String(r.id) : String(r.childId ?? "");
+      for (const p of photosOf(r)) {
+        families.set(p, (families.get(p) ?? new Set()).add(scope?.familyId ?? ""));
+        if (scope && !hints.has(p)) hints.set(p, unscope(child)?.id ?? "");
+      }
+    }
+  }
+  const out: { id: string; familyId: string; childHint: string }[] = [];
+  for (const photo of local.all("photos")) {
+    const id = String(photo.id);
+    const used = [...(families.get(id) ?? [])];
+    if (photo.familyId || uploaded(id) || used.length !== 1 || !used[0] || !hints.get(id)) continue;
+    out.push({ id, familyId: used[0], childHint: hints.get(id)! });
+  }
+  return out;
 }
 
 // ---- Memberships: what the user can reach, and how that changes -------------------------------------------------
@@ -326,6 +366,7 @@ export async function runRevocations(local: CleanupLocal, state: ScopeState, now
 
 // ---- One round over every scope -------------------------------------------------------------------------------
 
+// `shared` results' `notSent` use this device's keys (scoped ids), like `home`'s.
 export type ScopesResult = { home: RoundResult; shared: Record<string, RoundResult>; actions: ScopeAction[]; state: ScopeState | null; memberships: MembershipFetch | null };
 
 // The user's own family, then (when enabled) memberships, removals, and each shared family. With `enabled` false this
@@ -335,6 +376,17 @@ export async function syncScopes(
   base: ScopeBase & Partial<CleanupLocal>,
   opts: { userId: string; homeFamilyId: string; enabled: boolean; homeChildren?: string[]; pageSize?: number; now?: string },
 ): Promise<ScopesResult> {
+  if (opts.enabled && base.all) {
+    const assigned = sharedPhotoAssignments(base as ScopeBase & CleanupLocal, id => !!base.syncRecord(outboxKey("photos", id)));
+    if (assigned.length) {
+      const records = [];
+      for (const a of assigned) {
+        const photo = await base.record("photos", a.id);
+        if (photo) records.push({ collection: "photos" as const, record: { ...photo, familyId: a.familyId, childHint: a.childHint } });
+      }
+      await base.commit({ records });
+    }
+  }
   const home = await syncRound(client, homeLocal(base), { familyId: opts.homeFamilyId, userId: opts.userId, pageSize: opts.pageSize });
   if (!opts.enabled) return { home, shared: {}, actions: [], state: null, memberships: null };
 
@@ -359,7 +411,9 @@ export async function syncScopes(
   }
   const shared: Record<string, RoundResult> = {};
   for (const scope of sharedScopes(state)) {
-    shared[scope.familyId] = await syncRound(client, scopedLocal(base, scope.familyId), { familyId: scope.familyId, userId: opts.userId, childIds: scope.childIds, pageSize: opts.pageSize });
+    const round = await syncRound(client, scopedLocal(base, scope.familyId), { familyId: scope.familyId, userId: opts.userId, childIds: scope.childIds, pageSize: opts.pageSize });
+    round.notSent = Object.fromEntries(Object.entries(round.notSent).map(([k, v]) => [localKeyIn(scope.familyId, k), v]));
+    shared[scope.familyId] = round;
   }
   return { home, shared, actions: observed.actions, state, memberships };
 }

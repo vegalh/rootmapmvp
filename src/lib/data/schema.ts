@@ -198,5 +198,18 @@ export function uuid(): string {
 }
 
 export const newPhotoId = () => `photo-${uuid()}`;
+
+// A record of a family that shares children with this user is stored under `scopedId(familyId, id)` (lib/sync/
+// scopes.ts). The separator is a control character, which the server refuses in every id, so a scoped id never equals
+// an id of the user's own family. Such records also carry `familyId`; so does a shared photo.
+const SCOPE_SEP = "\u001f";
+export const scopedId = (familyId: string, id: string) => `${familyId}${SCOPE_SEP}${id}`;
+export const isScopedId = (id: unknown): boolean => typeof id === "string" && id.includes(SCOPE_SEP);
+export function unscope(localId: string): { familyId: string; id: string } | null {
+  const i = localId.indexOf(SCOPE_SEP);
+  return i < 0 ? null : { familyId: localId.slice(0, i), id: localId.slice(i + 1) };
+}
+// A record (or photo) of another family: never part of the user's own data (backups, restores, guest import).
+export const isShared = (r: { id?: unknown; familyId?: unknown }) => isScopedId(r.id) || typeof r.familyId === "string";
 // Stable, globally unique record id. The prefix keeps ids readable ("m-…" entry, "c-…" child).
 export const newRecordId = (prefix: string) => `${prefix}-${uuid()}`;

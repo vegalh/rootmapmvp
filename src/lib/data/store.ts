@@ -4,13 +4,14 @@ import { initialObservations, initialRecords } from "../../data/progress";
 import { BACKUP_KEYS } from "../backup";
 import { backupCorrupt, isQuotaError, writeRaw, type StorageFailure } from "../storage";
 import type { GuestImportState, ImportBuild } from "../sync/guestImport";
+import type { CleanupBatch } from "../sync/scopes";
 import { deviceId } from "./device";
 import { done, getAll, openDatabase, openExisting, request } from "./idb";
 import { buildFromLegacy, readLegacyStorage, type Built, type Defaults } from "./legacy";
 import { isMigrated, migrateFromLocalStorage } from "./migrate";
 import { applyChanges, byPosition, outboxEntries } from "./records";
 import {
-  COLLECTIONS, DB_NAME, GUEST, ID_LIST_COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, newPhotoId, settingShape,
+  COLLECTIONS, DB_NAME, GUEST, ID_LIST_COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, isScopedId, isShared, newPhotoId, scopedId, settingShape, unscope,
   type CollectionName, type Collections, type OutboxCollection, type OutboxEntry, type PhotoBlob, type PhotoMeta, type Space, type SpaceMeta,
   type StoreName, type StoredDraft, type StoredSetting, type SyncRecord,
 } from "./schema";
@@ -330,8 +331,22 @@ export function subscribe(listener: () => void) {
 }
 
 function publish() {
-  published = { collections: { ...cache.collections }, settings: new Map(cache.settings) };
+  published = { collections: visibleCollections(), settings: new Map(cache.settings) };
   for (const listener of [...listeners]) listener();
+}
+
+// Shared children whose access has ended but whose data isn't removed from this device yet (lib/sync/scopes.ts,
+// a "pending" removal): never shown, from the moment the removal is decided, including after a reload before it
+// is done. Their records stay in memory (sync and the removal itself read them) and on disk until the removal.
+function pendingRemovals(): Set<string> {
+  const revoked = (spaceMeta?.scopes as { revoked?: Record<string, { state?: string }> } | undefined)?.revoked ?? {};
+  return new Set(Object.entries(revoked).filter(([, r]) => r.state === "pending").map(([key]) => key));
+}
+function visibleCollections(): typeof cache.collections {
+  const hidden = space.kind === "account" ? pendingRemovals() : new Set<string>();
+  if (!hidden.size) return { ...cache.collections };
+  const shown = (r: { id: string; childId?: string }) => !hidden.has(r.id) && !(r.childId && hidden.has(r.childId));
+  return Object.fromEntries(Object.entries(cache.collections).map(([name, list]) => [name, (list as { id: string; childId?: string }[]).filter(shown)])) as unknown as typeof cache.collections;
 }
 
 export const readDraftValue = (key: string) => cache.drafts.get(key);
@@ -379,6 +394,7 @@ function applyToCache(change: Change) {
 // taken back out. The IndexedDB transaction is started synchronously, before this function first yields, so a
 // write begun while the page is closing is already queued.
 export function write(change: Change, { rollback = false } = {}): Promise<StorageFailure | null> {
+  if (space.kind === "account") change = withSharedIds(change);
   const queued = queueOutbox(Object.entries(change.collections || {}) as [CollectionName, { id: string; deletedAt?: string | null }[]][]);
   const undoCache = applyToCache(change);
   const undo = () => { undoCache(); queued.undo(); };
@@ -410,6 +426,21 @@ export function write(change: Change, { rollback = false } = {}): Promise<Storag
       return settle(failureOf(e));
     },
   );
+}
+
+// A Moment or activity record made here for a child shared from another family belongs to that family: it is stored
+// under that family's scoped id (schema.ts scopedId), like the records that come from there, so it is synced with
+// that family and never mistaken for the user's own. Screens create such records with plain ids.
+function withSharedIds(change: Change): Change {
+  const fix = <T extends { id: string; childId?: string }>(list: T[] | undefined) => list?.map(r => {
+    const scope = r.childId && !isScopedId(r.id) ? unscope(r.childId) : null;
+    return scope ? { ...r, id: scopedId(scope.familyId, r.id), familyId: scope.familyId } : r;
+  });
+  if (!change.collections?.entries && !change.collections?.records) return change;
+  const collections = { ...change.collections };
+  if (collections.entries) collections.entries = fix(collections.entries);
+  if (collections.records) collections.records = fix(collections.records);
+  return { ...change, collections };
 }
 
 // Account spaces: the outbox entries for a change's records, already applied to memory (with a way back if the
@@ -605,10 +636,12 @@ export async function photoAsDataUrl(ref: string): Promise<string> {
 // ---------------------------------------------------------------------------------------------------------
 // Backup file support (lib/backup.ts format, version 1: legacy keys, photos inline)
 
+// Only the user's own data: children shared from other families, their records and photos, and drafts about them
+// are not the user's to keep, and are left out.
 export async function backupData(): Promise<Record<string, unknown>> {
   const inline = (ref: unknown) => (typeof ref === "string" ? photoAsDataUrl(ref) : Promise.resolve(ref));
-  const live = <K extends CollectionName>(name: K) => getCollection(name).filter(r => !r.deletedAt);
-  const children = getCollection("children");
+  const live = <K extends CollectionName>(name: K) => getCollection(name).filter(r => !r.deletedAt && !isShared(r as { id: string }));
+  const children = getCollection("children").filter(c => !isShared(c));
   const data: Record<string, unknown> = {
     [LEGACY_KEYS.children]: await Promise.all(children.filter(c => !c.deletedAt).map(async c => ({ ...c, photo: await inline(c.photo) }))),
     [LEGACY_DELETED_CHILDREN_KEY]: await Promise.all(children.filter(c => c.deletedAt).map(async c => ({ ...c, photo: await inline(c.photo) }))),
@@ -619,7 +652,7 @@ export async function backupData(): Promise<Record<string, unknown>> {
     [LEGACY_KEYS.goals]: live("goals"),
     [LEGACY_KEYS.saved]: live("saved").map(s => s.id),
     [LEGACY_KEYS.savedCollections]: live("savedCollections").map(s => s.id),
-    [LEGACY_DRAFTS_KEY]: Object.fromEntries(await Promise.all(allDrafts().map(async ([key, d]) => [key, { ...d, photos: await Promise.all(d.photos.map(inline)) }]))),
+    [LEGACY_DRAFTS_KEY]: Object.fromEntries(await Promise.all(allDrafts().filter(([key]) => !isScopedId(key)).map(async ([key, d]) => [key, { ...d, photos: await Promise.all(d.photos.map(inline)) }]))),
   };
   for (const key of Object.keys(BACKUP_KEYS)) {
     if (!settingShape(key) || !cache.settings.has(key)) continue;
@@ -629,40 +662,56 @@ export async function backupData(): Promise<Record<string, unknown>> {
   return data;
 }
 
-// Replaces this device's data with a validated backup, all or nothing (one transaction). Nothing is erased:
-// records not in the backup are soft-deleted (removed profiles reappear under Recently Deleted), photos are kept.
+// Restores a validated backup, all or nothing (one transaction). Records of children shared from other families are
+// never touched, and never taken from a file.
+//
+// - Guest space (unchanged): this device's data is replaced by the backup. Nothing is erased: records not in the
+//   backup are soft-deleted (removed profiles reappear under Recently Deleted), photos are kept.
+// - Account space: only adds. Records the account doesn't have are added (and backed up); every record it has stays
+//   exactly as it is, and nothing is deleted, here or in the cloud. Settings and drafts likewise: only missing ones.
+//   (Replacing the account's data would delete and revert records on every device; that is never done by a restore.)
+export const restoreAddsOnly = () => space.kind === "account";
 export async function restoreData(data: Record<string, unknown>): Promise<boolean> {
   if (mode !== "indexeddb" || !db) return false;
   const now = nowIso();
+  const addOnly = restoreAddsOnly();
   const built = buildFromLegacy({ values: data, unplaced: [] }, { now, defaults: defaultsFor(data), extractPhotos: true, newPhotoId, photoSource: "restored" });
+  const present = (name: CollectionName) => new Set(getCollection(name).map(r => r.id));
+  const incomingOf = (name: CollectionName) => (built.collections[name] as { id: string; familyId?: string }[]).filter(r => !isShared(r) && !(addOnly && present(name).has(r.id)));
+  const incoming = Object.fromEntries(COLLECTIONS.map(name => [name, incomingOf(name)])) as Record<CollectionName, { id: string; deletedAt?: string | null }[]>;
+  // The user's own records the backup doesn't have: soft-deleted in the guest space only.
+  const removedOf = (name: CollectionName) => {
+    if (addOnly) return [];
+    const ids = new Set(built.collections[name].map(r => r.id));
+    return getCollection(name).filter(r => !r.deletedAt && !isShared(r as { id: string }) && !ids.has(r.id));
+  };
+  // Photos the restored records show (an add-only restore brings only those).
+  const shown = new Set(COLLECTIONS.flatMap(name => incoming[name].flatMap(r => [...((r as { photos?: string[] }).photos ?? []), (r as { photo?: string }).photo])));
+  const photos = addOnly ? built.photos.filter(p => shown.has(p.meta.id)) : built.photos;
   // Every record the restore writes, by collection (for the outbox in an account space).
-  const written: [OutboxCollection, { id: string; deletedAt?: string | null }[]][] = COLLECTIONS.map(name => {
-    const incoming = new Set(built.collections[name].map(r => r.id));
-    const removed = getCollection(name).filter(r => !r.deletedAt && !incoming.has(r.id)).map(r => ({ id: r.id, deletedAt: now }));
-    return [name, [...built.collections[name], ...removed]];
-  });
-  written.push(["photos", built.photos.map(p => p.meta)]);
+  const written: [OutboxCollection, { id: string; deletedAt?: string | null }[]][] = COLLECTIONS.map(name => [name, [...incoming[name], ...removedOf(name).map(r => ({ id: r.id, deletedAt: now }))]]);
+  written.push(["photos", photos.map(p => p.meta)]);
   const queued = queueOutbox(written);
   try {
     const tx = db.transaction([...STORE_NAMES.filter(s => s !== "meta"), ...(queued.entries.length ? ["outbox" as const] : [])], "readwrite");
     for (const entry of queued.entries) tx.objectStore("outbox").put(entry);
     for (const name of COLLECTIONS) {
       const store = tx.objectStore(name);
-      const incoming = new Set(built.collections[name].map(r => r.id));
-      for (const rec of built.collections[name]) store.put({ ...rec, updatedAt: now });
-      for (const rec of getCollection(name)) if (!rec.deletedAt && !incoming.has(rec.id)) store.put({ ...rec, deletedAt: now, updatedAt: now });
+      for (const rec of incoming[name]) store.put({ ...rec, updatedAt: now });
+      for (const rec of removedOf(name)) store.put({ ...rec, deletedAt: now, updatedAt: now });
     }
-    for (const { meta, blob } of built.photos) {
+    for (const { meta, blob } of photos) {
       tx.objectStore("photos").put(meta);
       tx.objectStore("photoBlobs").put({ id: meta.id, blob } satisfies PhotoBlob);
     }
     for (const key of Object.keys(BACKUP_KEYS)) {
       if (!settingShape(key)) continue;
+      if (addOnly) { if (key in built.settings && !cache.settings.has(key)) tx.objectStore("settings").put({ key, value: built.settings[key], updatedAt: now } satisfies StoredSetting); continue; }
       if (key in built.settings) tx.objectStore("settings").put({ key, value: built.settings[key], updatedAt: now } satisfies StoredSetting);
       else tx.objectStore("settings").delete(key);
     }
-    tx.objectStore("drafts").clear();
-    for (const [key, draft] of Object.entries(built.drafts)) tx.objectStore("drafts").put({ ...draft, key } satisfies StoredDraft);
+    if (!addOnly) tx.objectStore("drafts").clear();
+    for (const [key, draft] of Object.entries(built.drafts)) if (!isScopedId(key) && !(addOnly && cache.drafts.has(key))) tx.objectStore("drafts").put({ ...draft, key } satisfies StoredDraft);
     for (const item of built.archive) tx.objectStore("archive").put(item);
     await done(tx);
     return true;
@@ -813,6 +862,68 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
   });
 }
 
+// Removal of a shared child's data after access ended (lib/sync/scopes.ts, runRevocations). Everything stored, from
+// memory (complete; only what is shown is filtered).
+export const cleanupRecords = (collection: "children" | "entries" | "records" | "photos"): Record<string, unknown>[] =>
+  collection === "photos" ? (allPhotoMetas() as unknown as Record<string, unknown>[]) : ((cache.collections as Record<string, unknown[]>)[collection] as Record<string, unknown>[]);
+
+// Applies a removal in one transaction together with the new scope state: records, photo details and files, sync
+// state and outbox entries go; unsent changes are written to the archive (never loaded, shown or synced). "stale" if
+// an outbox entry changed meanwhile (nothing applied). A device closed or reloaded before the transaction completes
+// applied none of it, and the removal is still "pending" (so its child stays hidden) until a later round does it.
+export function commitCleanup(batch: CleanupBatch, scopes: unknown): Promise<"ok" | "stale"> {
+  if (space.kind !== "account" || !db || !spaceMeta) return Promise.reject(new Error("cleanup needs an open account space"));
+  // Development only (browser tests): stops here, as a device closed before the removal is stored would.
+  if (import.meta.env.DEV && (globalThis as { __rootmapHoldCleanup?: boolean }).__rootmapHoldCleanup) return Promise.reject(new Error("cleanup held (test)"));
+  for (const r of batch.outboxRemove) if (outbox.get(r.key)?.seq !== r.seq) return Promise.resolve("stale");
+  const nextMeta: SpaceMeta = { ...spaceMeta, scopes };
+  const tx = db.transaction(["children", "entries", "records", "photos", "photoBlobs", "syncRecords", "outbox", "archive", "meta"], "readwrite");
+  const result = new Promise<"ok" | "stale">(resolveResult => {
+    let left = batch.outboxRemove.length;
+    let stale = false;
+    const apply = () => {
+      try {
+        for (const { collection, id } of batch.deleteRecords) tx.objectStore(collection).delete(id);
+        for (const id of batch.deletePhotos) { tx.objectStore("photos").delete(id); tx.objectStore("photoBlobs").delete(id); }
+        for (const key of batch.deleteSyncRecords) tx.objectStore("syncRecords").delete(key);
+        for (const r of batch.outboxRemove) tx.objectStore("outbox").delete(r.key);
+        for (const item of batch.archive) tx.objectStore("archive").put(item);
+        tx.objectStore("meta").put(nextMeta);
+      } catch {
+        try { tx.abort(); } catch { /* finished */ }
+      }
+    };
+    if (!left) apply();
+    for (const r of batch.outboxRemove) {
+      const req = tx.objectStore("outbox").get(r.key);
+      req.onsuccess = () => {
+        if ((req.result as OutboxEntry | undefined)?.seq !== r.seq) stale = true;
+        if (--left === 0) {
+          if (stale) { try { tx.abort(); } catch { /* finished */ } }
+          else apply();
+        }
+      };
+    }
+    done(tx).then(() => resolveResult("ok"), () => resolveResult("stale"));
+  });
+  return result.then(outcome => {
+    if (outcome !== "ok") return outcome;
+    const gone = new Map<string, Set<string>>();
+    for (const { collection, id } of batch.deleteRecords) gone.set(collection, (gone.get(collection) ?? new Set()).add(id));
+    for (const [name, ids] of gone) (cache.collections as Record<string, { id: string }[]>)[name] = (cache.collections as Record<string, { id: string }[]>)[name].filter(r => !ids.has(r.id));
+    for (const id of batch.deletePhotos) {
+      photoMetas.delete(id);
+      const url = photoUrls.get(id);
+      if (url) { URL.revokeObjectURL(url); photoUrls.delete(id); }
+    }
+    for (const key of batch.deleteSyncRecords) syncRecords.delete(key);
+    for (const r of batch.outboxRemove) outbox.delete(r.key);
+    spaceMeta = nextMeta;
+    publish();
+    return outcome;
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Bringing the guest data into the account (account spaces only; lib/sync/guestImport.ts)
 
@@ -886,7 +997,8 @@ export async function refreshFromDisk(): Promise<void> {
   const stored = await getAll<OutboxEntry>(db, "outbox");
   const same = stored.length === outbox.size && stored.every(e => outbox.get(e.key)?.seq === e.seq);
   const storedMeta = await request<SpaceMeta | undefined>(db.transaction("meta").objectStore("meta").get("space"));
-  const syncedElsewhere = JSON.stringify(storedMeta?.cursors ?? {}) !== JSON.stringify(spaceMeta?.cursors ?? {});
+  const progress = (m: SpaceMeta | null | undefined) => JSON.stringify([m?.cursors ?? {}, m?.scopeCursors ?? {}, m?.scopes ?? null]);
+  const syncedElsewhere = progress(storedMeta) !== progress(spaceMeta);
   if (storedMeta) spaceMeta = storedMeta;
   if (!same || syncedElsewhere) await hydrate(db);
 }

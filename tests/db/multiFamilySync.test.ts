@@ -145,10 +145,10 @@ describe("multi-family sync", () => {
     d.edit("entries", { ...d.get("entries", key)!, text: "edited as a viewer" });
     r = await d.scopes({ homeChildren: ["emma"] });
     const entryKey = `entries:${key}`;
-    assert.match(r.shared[O1.familyId].notSent["entries:m-1"].reason, /access denied/);
+    assert.match(r.shared[O1.familyId].notSent[entryKey].reason, /access denied/);
     assert.ok(d.out.get(entryKey)!.rejected, "marked as refused");
     r = await d.scopes({ homeChildren: ["emma"] });
-    assert.match(r.shared[O1.familyId].notSent["entries:m-1"].reason, /not sent again/);
+    assert.match(r.shared[O1.familyId].notSent[entryKey].reason, /not sent again/);
     assert.equal(d.get("entries", key)!.text, "edited as a viewer", "the local change is kept");
 
     await setRole(O1.familyId, "emma", "editor");
@@ -216,7 +216,7 @@ describe("multi-family sync", () => {
     await revoke(O2.familyId, "emma");
     d.offline = false;
     let r = await d.scopes({ homeChildren: ["emma"] });
-    assert.match(r.shared[O2.familyId].notSent["entries:m-e"].reason, /access denied/);
+    assert.match(r.shared[O2.familyId].notSent[`entries:${key}`].reason, /access denied/);
     assert.ok(d.get("entries", key), "kept until the removal is confirmed");
     r = await d.scopes({ homeChildren: ["emma"] });
     assert.deepEqual(r.actions, [{ kind: "revoke", familyId: O2.familyId, childId: "emma" }, { kind: "dropScope", familyId: O2.familyId }]);

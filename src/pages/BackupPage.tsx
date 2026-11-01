@@ -22,11 +22,13 @@ const errorText = (error: BackupError, t: Copy) => ({
 // replace. Nothing is written until the last step, and the last step is all-or-nothing (see applyBackup).
 type Restore = { backup: BackupFile; step: "review" } | { backup: BackupFile; step: "safetySaved"; file: string };
 
-export function BackupPage({ snapshot, restore: applyRestore, lastBackup, setLastBackup, restored, back, lang, t }: {
+export function BackupPage({ snapshot, restore: applyRestore, addOnly = false, lastBackup, setLastBackup, restored, back, lang, t }: {
   // The current data in backup form (lib/data/store.ts backupData).
   snapshot: () => Promise<Record<string, unknown>>;
   // Replaces all data with the backup, all or nothing.
   restore: (backup: BackupFile) => Promise<{ ok: true } | { ok: false; rolledBack: boolean }>;
+  // Signed in: a restore only adds what the account doesn't have (lib/data/store.ts restoreData).
+  addOnly?: boolean;
   lastBackup: string;
   setLastBackup: (iso: string) => void;
   // Called after a successful restore; the app reloads so every screen reads the restored data.
@@ -115,7 +117,7 @@ export function BackupPage({ snapshot, restore: applyRestore, lastBackup, setLas
             <strong>{t.restoreFrom.replace("{date}", day(summary.exportedAt))}</strong>
             <span>{t.restoreCounts.replace("{children}", String(summary.children)).replace("{entries}", String(summary.entries)).replace("{photos}", String(summary.photos)).replace("{records}", String(summary.records)).replace("{goals}", String(summary.goals)).replace("{plans}", String(summary.plans))}</span>
           </div>
-          <p className="restore-warning" role="alert">{t.restoreWarning}</p>
+          <p className="restore-warning" role="alert">{addOnly ? t.restoreWarningAccount : t.restoreWarning}</p>
           {restore.step === "review"
             ? <p className="restore-step">{t.restoreSafetyStep}</p>
             : <p className="tried-done" role="status"><Icon name="check" size={18} />{t.safetyDownloaded.replace("{file}", restore.file)}</p>}
