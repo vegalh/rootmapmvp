@@ -1025,7 +1025,7 @@ with M6 / M7.)
 | Environment | Project | Region | Plan | Schema | Data |
 |---|---|---|---|---|---|
 | Local | `supabase start` (Docker) | — | — | Migrations `20261012000100`–`000700` | Test data only, recreated on every reset |
-| Staging, and the public website since 2026-10-27 | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 | Free | Migrations `20261012000100`–`000700`, applied 2026-10-12 with `supabase db push --linked` (`000700` after a dry run showed it was the only one pending) | None: 0 users, 0 objects, 0 app rows |
+| Staging, and the public website since 2026-10-27 | `rootmap-staging` (`cbgkkeveprftddrobzao`) | us-east-2 | Free | All 10 migrations, `20261012000100`–`20261027000200` including `20261020000100_saved_collections` (`000100`–`000700` applied 2026-10-12 with `supabase db push --linked`; verified with `supabase migration list --linked` on 2026-11-01) | Live since 2026-10-27; a few families, children and photos on 2026-11-01. No backups (docs/shared-child-profiles-phase0.md) |
 | Production (dedicated) | **Not created**: the website uses rootmap-staging | Decided by the region test (section 15) | Pro | — | — |
 
 ### The public website uses rootmap-staging (decided 2026-10-27)
