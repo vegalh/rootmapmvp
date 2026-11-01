@@ -1082,6 +1082,7 @@ Website set-up:
 | `20261027000100_usage_analytics.sql` (staging 2026-10-27) | Usage analytics: `private.admins`, aggregate usage tables, `public.record_usage()`, `public.am_i_admin()`, `public.admin_usage_summary()` (section 20) |
 | `20261027000200_admin_grants.sql` (staging 2026-10-27) | Owner-only `private.grant_admin(email)`, `private.revoke_admin(email)`, `private.list_admins()` (section 20.6) |
 | `20261101000100_child_memberships.sql` (local only, **not on staging**) | Shared Child Profiles Phase 1a: `child_memberships`, exactly one owner per child, backfill of existing children ([shared-child-profiles-phase1a.md](shared-child-profiles-phase1a.md)) |
+| `20261101000200_child_access.sql` (local only, **not on staging**) | Shared Child Profiles Phase 1b: children, entries, activity records, photos (rows and files) and record versions by child role; `record_versions.child_id` ([shared-child-profiles-phase1b.md](shared-child-profiles-phase1b.md)) |
 
 Every database change is a new migration file. An applied migration is never edited.
 

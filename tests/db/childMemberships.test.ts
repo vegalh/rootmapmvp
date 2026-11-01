@@ -263,10 +263,10 @@ describe("who can read and change memberships", () => {
     assert.ok(anon.error || (anon.data ?? []).length === 0);
   });
 
-  it("a membership grants no access to the child's records yet (Phase 1b)", async () => {
-    assert.deepEqual(must(await E.client.from("children").select("id").eq("family_id", A.familyId)), []);
-    const { error } = await E.client.from("entries").insert({ family_id: A.familyId, id: "e-try", child_id: "a-child", date: "2026-10-01", text: "x" });
-    assert.ok(error);
+  it("a membership reaches that child's records, and only that child's (Phase 1b; details in childAccess.test.ts)", async () => {
+    assert.deepEqual(must(await E.client.from("children").select("id").eq("family_id", A.familyId).eq("id", "a-child")), [{ id: "a-child" }]);
+    assert.deepEqual(must(await E.client.from("children").select("id").eq("family_id", A.familyId).eq("id", "emma")), []);
+    must(await E.client.from("entries").insert({ family_id: A.familyId, id: "e-try", child_id: "a-child", date: "2026-10-01", text: "x" }));
   });
 
   it("12. families stay isolated: no child in another family, and no membership from trying", async () => {
