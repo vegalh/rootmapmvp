@@ -136,6 +136,7 @@ test("routes: every page has an address that opens it again; unknown addresses o
     { screen: "child", child: "c-1", childTab: "Journal" }, { screen: "child", child: "c-1", childTab: "Activities" },
     { screen: "entry", entry: "m-1" }, { screen: "entryEdit", entry: "m-1" }, { screen: "entryEdit", child: "c-1" }, { screen: "record", child: "c-1" }, { screen: "record" },
     { screen: "deletedChildren" }, { screen: "notificationPrefs" },
+    { screen: "invite", invite: "abcdef0123456789" },
   ];
   for (const r of routes) {
     const hash = formatRoute(r);
@@ -147,6 +148,13 @@ test("routes: every page has an address that opens it again; unknown addresses o
   assert.equal(parseRoute("#/activity/a%20b%2Fc")!.activity, "a b/c");
   assert.equal(parseRoute(""), null);
   assert.equal(parseRoute("#/no-such-page"), null);
+});
+
+test("routes: an invitation link addresses only its token; without one it opens nothing", () => {
+  assert.equal(formatRoute({ screen: "invite", invite: "abc123" }), "#/invite/abc123");
+  assert.deepEqual(parseRoute("#/invite/abc123"), { screen: "invite", invite: "abc123" });
+  assert.equal(parseRoute("#/invite"), null);
+  assert.equal(formatRoute({ screen: "invite" }), "#/today", "never addresses a blank invitation");
 });
 
 test("routes: links to the former Music tab open Discover > Activities; a music activity's link still opens its page", () => {

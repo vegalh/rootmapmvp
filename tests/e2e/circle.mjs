@@ -111,9 +111,10 @@ try {
     await dL.u.click("Manage", ".child-circle button");
     await dL.p.waitFor(`document.querySelector(".circle-manage")`, 5000, "Manage sheet");
     const m = await text(dL.p);
-    for (const s of ["Manage Profile", "Add & Edit", "View Only", "Can add, edit, and organize the child’s shared growth records.", "Can view the child’s shared growth records but cannot make changes.", "Invite someone to be part of Mia’s Circle", "The person who manages Mia’s profile can invite others and manage access.", "Invitations are coming soon."]) assert.ok(m.includes(s), `Manage shows "${s}"`);
-    await dL.p.eval(`(() => { const li = [...document.querySelectorAll(".circle-manage li")].find(l => l.innerText.includes("Grandma Wu")); const s = li.querySelector("select"); s.value = "grandma"; s.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
-    await dL.p.waitFor(`[...document.querySelectorAll(".circle-manage li")].find(l => l.innerText.includes("Grandma Wu"))?.querySelector("select").value === "grandma"`, 10000, "relationship saved");
+    for (const s of ["Manage Profile", "Add & Edit", "View Only", "Can add, edit, and organize the child’s shared growth records.", "Can view the child’s shared growth records but cannot make changes.", "Invite someone to be part of Mia’s Circle", "The person who manages Mia’s profile can invite others and manage access.", "Invite Someone"]) assert.ok(m.includes(s), `Manage shows "${s}"`);
+    // Each row now has two selects (role, then relationship — Phase 4): the relationship one is found by its options, not by position.
+    await dL.p.eval(`(() => { const li = [...document.querySelectorAll(".circle-manage li")].find(l => l.innerText.includes("Grandma Wu")); const s = [...li.querySelectorAll("select")].find(sel => [...sel.options].some(o => o.value === "grandma")); s.value = "grandma"; s.dispatchEvent(new Event("change", { bubbles: true })); return true; })()`);
+    await dL.p.waitFor(`(() => { const li = [...document.querySelectorAll(".circle-manage li")].find(l => l.innerText.includes("Grandma Wu")); const s = [...li.querySelectorAll("select")].find(sel => [...sel.options].some(o => o.value === "grandma")); return s?.value === "grandma"; })()`, 10000, "relationship saved");
     await dL.p.eval(`[...document.querySelectorAll(".sheet-buttons button")].at(-1).click()`);
     await dL.p.waitFor(`document.querySelector(".child-circle")?.innerText.includes("Grandma")`, 5000, "shown in the circle");
     assert.equal((await rest("GET", `/rest/v1/child_memberships?family_id=eq.${FL}&child_id=eq.c-mia&user_id=eq.${Wu.id}&select=relationship`))[0].relationship, "grandma");

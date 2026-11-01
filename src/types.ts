@@ -291,6 +291,8 @@ export type Screen =
   | "account"
   | "guestImport"
   | "signIn"
+  // Opening a Circle invitation link (components/ChildCircle.tsx, pages/InvitePage.tsx).
+  | "invite"
   // Usage analytics, admins only (pages/AdminPage.tsx).
   | "admin"
   // Change the signed-in parent's password (components/PasswordForm.tsx).

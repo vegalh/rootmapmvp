@@ -22,6 +22,7 @@ import { BackupPage } from "./pages/BackupPage";
 import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
 import { GuestImportPage } from "./pages/GuestImportPage";
+import { InvitePage } from "./pages/InvitePage";
 import BookDetailPage from "./pages/BookDetailPage";
 import MusicDetailPage from "./pages/MusicDetailPage";
 import BookshelfPage from "./pages/BookshelfPage";
@@ -35,7 +36,7 @@ import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
 import { saveSetting, useCollection, useScopes, useSetting } from "./lib/data/hooks";
 import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreAddsOnly, restoreData, syncMeta, archivedChanges } from "./lib/data/store";
 import { photosForChildren } from "./lib/sharedPhotos";
-import { newRecordId } from "./lib/data/schema";
+import { newRecordId, scopedId } from "./lib/data/schema";
 import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
 import { sharedSyncEnabled } from "./lib/sync/scopes";
 import ChildCircle from "./components/ChildCircle";
@@ -165,7 +166,12 @@ function changePage(motion: PageMotion, update: () => void) {
 // Pages that exist only in builds with cloud features; elsewhere their address opens Today.
 const CLOUD_SCREENS: Screen[] = ["signIn", "account", "guestImport"];
 function allowedRoute(r: Route | null): Route | null {
-  return r && (cloudConfig.enabled || !CLOUD_SCREENS.includes(r.screen)) ? r : null;
+  if (!r) return null;
+  if (CLOUD_SCREENS.includes(r.screen) && !cloudConfig.enabled) return null;
+  // An invitation link only ever opens where Shared Child Profiles itself is on (defense in depth: sharing stays
+  // off in production regardless of what a stale or copied link addresses).
+  if (r.screen === "invite" && !(cloudConfig.enabled && sharedSyncEnabled)) return null;
+  return r;
 }
 
 export default function App() {
@@ -214,6 +220,9 @@ export default function App() {
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
+  // The token an invitation link (#/invite/<token>) addresses; "" once there is none to show (components/
+  // ChildCircle.tsx, pages/InvitePage.tsx). Never logged.
+  const [inviteToken, setInviteToken] = useState(start.invite ?? "");
 
   // All persistent data comes from the data layer (src/lib/data): records are stored one by one with sync
   // timestamps, and removing one from a list soft-deletes it. A removed child is a soft-deleted child record,
@@ -473,6 +482,7 @@ export default function App() {
     entry: selectedEntry,
     discoverTab,
     childTab: childTab === "Activities" ? "Activities" : "Journal",
+    invite: inviteToken || undefined,
   });
   shownHash.current = hash;
   // Usage analytics (lib/analytics): a new page address is a new page visit, so its impressions may count again.
@@ -574,6 +584,7 @@ export default function App() {
       if (r.screen === "entry" || r.screen === "entryEdit") setSelectedEntry(r.entry);
       if (r.screen === "recap") { setRecapWeek(r.week ?? ""); setRecapChild(r.child ?? ""); }
       if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
+      if (r.screen === "invite") setInviteToken(r.invite ?? "");
       setScreen(r.screen);
     };
     window.addEventListener("popstate", onPop);
@@ -748,6 +759,13 @@ export default function App() {
     afterSwitchTo({ toast: t.signedOut, screen: "profile" });
     await signOutHere();
   };
+  // Same, but for signing out of the wrong account mid-invitation (pages/InvitePage.tsx, "wrong_email"): omitting
+  // `screen` keeps the #/invite/<token> address through the reload, so the next sign-in returns to the same
+  // invitation instead of Profile.
+  const signOutKeepingInvite = async () => {
+    afterSwitchTo({ toast: t.signedOut });
+    await signOutHere();
+  };
 
   // A signed-in account must have a password (lib/cloud/auth.ts): until it has, this is the only page. Asked only
   // once the server has confirmed the account, so being offline never locks a parent out of their data.
@@ -881,6 +899,25 @@ export default function App() {
     if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
+    if (screen === "invite") {
+      return (
+        <InvitePage
+          key={inviteToken}
+          token={inviteToken}
+          switchAccount={() => void signOutKeepingInvite()}
+          declined={() => go("today")}
+          notify={setToast}
+          accepted={(familyId, childId) => {
+            // The invitation link is spent the moment it's accepted: replacing it with Today (rather than pushing
+            // the child's page on top of it) means Back from the child's profile can't return to it.
+            const h = history.current;
+            if (h) { window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", "#/today"); h.stack[h.idx] = "#/today"; }
+            goChild(scopedId(familyId, childId));
+          }}
+          t={t}
+        />
+      );
+    }
     if (screen === "guestImport" && syncUser) {
       // Back is intentionally not a dismissal: it only navigates away, leaving guestImportState() at null so the
       // offer can resurface later. Only "Not Now" inside GuestImportPage calls dismissImport() to record a real
@@ -911,7 +948,18 @@ export default function App() {
           access={accessOf(child.id)}
           moveTargets={sameFamilyChildren(writableChildren, child.id)}
           circle={sharedSyncEnabled && cloud.status === "signed-in" && cloud.account
-            ? <ChildCircle key={child.id} child={child} homeFamilyId={cloud.account.familyId} access={accessOf(child.id)} t={t} />
+            ? (
+              <ChildCircle
+                key={child.id}
+                child={child}
+                homeFamilyId={cloud.account.familyId}
+                access={accessOf(child.id)}
+                afterLeave={() => goBack("children")}
+                notify={setToast}
+                lang={lang}
+                t={t}
+              />
+            )
             : undefined}
           remove={async () => {
             if (!canManage(accessOf(child.id))) return;
@@ -1133,15 +1181,20 @@ export default function App() {
     return <SettingsPage screen={screen} go={go} back={() => goBack(screen === "notes" ? previous : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
   };
 
-  if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {
-    const fromProfile = !showWelcome;
+  // An invitation link opened while signed out asks to sign in first (spec §5, §9): the invitation itself is never
+  // shown to a signed-out visitor. The #/invite/<token> address stays in the hash throughout (afterSwitchTo above
+  // omits `screen`, so the reload after signing in returns straight to it) and "Continue as guest" doesn't apply
+  // here, so it is left out by going straight to the sign-in form (no "welcome" screen in between).
+  const invitingSignedOut = screen === "invite" && cloud.status === "signed-out";
+  if (cloudConfig.enabled && (showWelcome || screen === "signIn" || invitingSignedOut)) {
+    const fromProfile = !showWelcome && !invitingSignedOut;
     return (
       <div className="opening-screen">
         <div>
           <OpeningExperience
             lang={lang}
             setLang={setLang}
-            startAt={fromProfile ? "final" : "animation"}
+            startAt={fromProfile || invitingSignedOut ? "final" : "animation"}
             auth={openingAuth}
             onContinueAsGuest={() => (fromProfile ? go("profile") : setWelcome("done"))}
           />

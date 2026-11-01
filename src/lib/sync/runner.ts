@@ -135,6 +135,15 @@ export async function acceptImport(answers: ImportAnswers, prepared?: Prepared):
 export const dismissImport = () => dismissGuestImport(importLocal);
 export const guestImportProgress = (): ImportProgress => importProgress(importLocal);
 
+// Starts a round right away, without waiting for the debounce or the regular interval (just after accepting an
+// invitation, so the newly shared child's scope — and its records — arrive as soon as possible). False when sync
+// isn't running (signed out, or still starting up); the regular interval still finds the new child shortly after.
+export function syncNow(): boolean {
+  if (!runNow) return false;
+  runNow();
+  return true;
+}
+
 // "Try again" for photos that failed: photos given up on after repeated rejected uploads are tried again, and a
 // round starts at once (without waiting for the back-off). False when sync isn't running.
 export async function retryPhotos(): Promise<boolean> {

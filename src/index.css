@@ -330,6 +330,15 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .circle-invite { padding: 12px 14px; border: 1px dashed var(--silver); border-radius: 16px; margin-bottom: 14px; }
 .circle-invite h3 { margin: 0 0 4px; font: 600 18px var(--font-heading); color: var(--dark-purple); }
 .circle-invite p { margin: 4px 0 0; font-size: 14px; }
+.text-action.danger { color: var(--danger); }
+.invite-form { display: grid; gap: 10px; margin-top: 10px; }
+.invite-link-ready { margin-top: 10px; }
+.invite-link-ready p { margin: 0 0 8px; font-size: 14px; }
+.invite-pending { margin-top: 16px; }
+.invite-pending h4 { margin: 0 0 8px; font: 600 15px var(--font-heading); color: var(--dark-purple); }
+.invite-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.invite-pending li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.invite-pending li span { display: flex; flex-direction: column; font-size: 14px; }
 .access-notice { margin: 0 0 16px; padding: 14px 16px; background: var(--apricot); border-radius: 18px; }
 .access-notice p { margin: 0 0 6px; line-height: 1.5; }
 .access-notice-actions { display: flex; gap: 18px; justify-content: flex-end; }
