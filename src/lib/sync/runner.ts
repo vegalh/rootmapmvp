@@ -13,7 +13,8 @@ import {
   acceptGuestImport, advanceGuestImport, dismissGuestImport, importProgress, prepareGuestImport, type AcceptResult, type GuestImportLocal, type ImportAnswers,
   type ImportContext, type ImportProgress, type Prepared,
 } from "./guestImport";
-import { SyncOffline, sha256Hex, syncRound, type RoundResult, type SyncLocal } from "./engine";
+import { SyncOffline, sha256Hex, type RoundResult } from "./engine";
+import { sharedSyncEnabled, syncScopes, type ScopeBase } from "./scopes";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import { EMPTY_PROFILE, syncProfile, type ProfileLocal, type ProfileRow } from "./profile";
 import type { SyncedCollection } from "./mapping";
@@ -25,7 +26,7 @@ import type { ProfileInfo } from "../../types";
 // is open. One round at a time across this account's tabs (Web Locks). After a failure it waits longer each time
 // (up to 5 minutes); coming back online retries at once.
 
-const local: SyncLocal = {
+const local: ScopeBase = {
   outbox: pendingOutbox,
   syncRecord: syncRecordFor,
   record: (collection: SyncedCollection, id: string) => syncRecordValue(collection, id),
@@ -33,10 +34,12 @@ const local: SyncLocal = {
   meta: syncMeta,
   commit: batch => commitSync(batch),
   refresh: refreshFromDisk,
+  photoFamily: id => (photoMeta(id) as { familyId?: string } | undefined)?.familyId,
 };
 
 const photoLocal: PhotoLocal = {
-  photos: () => allPhotoMetas() as LocalPhoto[],
+  // The user's own family's photos (a photo of a shared child carries its family, lib/sync/scopes.ts).
+  photos: () => (allPhotoMetas() as LocalPhoto[]).filter(p => !(p as { familyId?: string }).familyId),
   hasBytes: hasPhotoBytes,
   bytes: photoBytes,
   storeBytes: storePhotoBytes,
@@ -175,7 +178,8 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
     const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
     const go = async () => {
       phase = "syncing"; update();
-      const result = await syncRound(client, local, { familyId, userId });
+      // The user's own family; children shared from other families too once sharing is switched on (scopes.ts).
+      const result = (await syncScopes(client, local, { userId, homeFamilyId: familyId, enabled: sharedSyncEnabled })).home;
       notSent = result.notSent;
       // The parent's own profile (name/photo/contact): a user-scoped singleton, so it syncs on its own, not
       // through the record-sync engine above.

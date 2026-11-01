@@ -163,6 +163,9 @@ export type OutboxEntry = {
   deviceId: string;
   // "versions" entries only: what to keep (see lib/sync).
   payload?: { table: string; recordId: string; version: Record<string, unknown>; baseRev: number | null; reason: string };
+  // The server refused this change (seq) for lack of access: not sent again until the record changes (a new seq) or
+  // the user's memberships change (lib/sync/scopes.ts clears it).
+  rejected?: { seq: number; at: string; reason: string };
 };
 export const outboxKey = (collection: OutboxCollection, id: string) => `${collection}:${id}`;
 
@@ -171,7 +174,12 @@ export type SyncRecord = { key: string; collection: OutboxCollection; id: string
 
 // The account space's own description, in "meta".
 // `cursors`: per server table, the highest change number applied on this device (sync, M4).
-export type SpaceMeta = { key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number; cursors?: Record<string, number> };
+// `scopeCursors`: the same, per family whose children are shared with this user (lib/sync/scopes.ts); `cursors` stays
+// the user's own family's. `scopes`: what sync knows about those memberships (ScopeState).
+export type SpaceMeta = {
+  key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number; cursors?: Record<string, number>;
+  scopeCursors?: Record<string, Record<string, number>>; scopes?: unknown;
+};
 
 // Photo ids look like "photo-<uuid>"; anything else in a photo field is an image URL (bundled asset, remote
 // image, or a legacy data URL that could not be converted) and is used as-is.

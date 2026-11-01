@@ -728,7 +728,7 @@ export async function storePhotoBytes(id: string, blob: Blob): Promise<boolean> 
   return true;
 }
 
-export const syncMeta = () => ({ familyId: spaceMeta?.familyId ?? null, cursors: spaceMeta?.cursors ?? {}, deviceId: spaceMeta?.deviceId ?? "" });
+export const syncMeta = () => ({ familyId: spaceMeta?.familyId ?? null, cursors: spaceMeta?.cursors ?? {}, deviceId: spaceMeta?.deviceId ?? "", scopeCursors: spaceMeta?.scopeCursors ?? {}, scopes: spaceMeta?.scopes });
 
 export type SyncCommit = {
   records?: { collection: string; record: Record<string, unknown> }[];
@@ -736,7 +736,8 @@ export type SyncCommit = {
   outboxRemove?: { key: string; seq: number }[];
   outboxAdd?: OutboxEntry[];
   expect?: { key: string; seq: number | null }[];
-  meta?: { familyId?: string; cursors?: Record<string, number> };
+  outboxMark?: { key: string; seq: number; rejected: OutboxEntry["rejected"] | null }[];
+  meta?: { familyId?: string; cursors?: Record<string, number>; scopeCursors?: Record<string, Record<string, number>>; scopes?: unknown };
 };
 
 // Applies a sync result in one transaction, only if every outbox expectation still holds on disk (the parent, or
@@ -746,12 +747,23 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
   const expectations = new Map<string, number | null>();
   for (const e of batch.expect ?? []) expectations.set(e.key, e.seq);
   for (const r of batch.outboxRemove ?? []) expectations.set(r.key, r.seq);
+  for (const r of batch.outboxMark ?? []) expectations.set(r.key, r.seq);
   // Quick check against memory first.
   for (const [key, seq] of expectations) if ((outbox.get(key)?.seq ?? null) !== seq) return Promise.resolve("stale");
 
   const collections = new Set((batch.records ?? []).map(r => r.collection));
   const stores = new Set<string>(["outbox", "syncRecords", "meta", ...collections]);
-  const nextMeta: SpaceMeta = { ...spaceMeta, ...(batch.meta?.familyId ? { familyId: batch.meta.familyId } : {}), ...(batch.meta?.cursors ? { cursors: batch.meta.cursors } : {}) };
+  const nextMeta: SpaceMeta = {
+    ...spaceMeta,
+    ...(batch.meta?.familyId ? { familyId: batch.meta.familyId } : {}),
+    ...(batch.meta?.cursors ? { cursors: batch.meta.cursors } : {}),
+    ...(batch.meta?.scopeCursors ? { scopeCursors: batch.meta.scopeCursors } : {}),
+    ...(batch.meta && "scopes" in batch.meta ? { scopes: batch.meta.scopes } : {}),
+  };
+  const marked = (batch.outboxMark ?? []).map(({ key, rejected }) => {
+    const { rejected: _old, ...entry } = outbox.get(key)!;
+    return rejected ? { ...entry, rejected } : entry;
+  });
   const tx = db.transaction([...stores], "readwrite");
   const result = new Promise<"ok" | "stale">(resolveResult => {
     let stale = false;
@@ -763,6 +775,7 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
         for (const r of batch.syncRecords ?? []) tx.objectStore("syncRecords").put(r);
         for (const r of batch.outboxRemove ?? []) tx.objectStore("outbox").delete(r.key);
         for (const e of batch.outboxAdd ?? []) tx.objectStore("outbox").put(e);
+        for (const e of marked) tx.objectStore("outbox").put(e);
         if (batch.meta) tx.objectStore("meta").put(nextMeta);
       } catch {
         try { tx.abort(); } catch { /* finished */ }
@@ -793,6 +806,7 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
     for (const r of batch.syncRecords ?? []) syncRecords.set(r.key, r);
     for (const r of batch.outboxRemove ?? []) if (outbox.get(r.key)?.seq === r.seq) outbox.delete(r.key);
     for (const e of batch.outboxAdd ?? []) { outbox.set(e.key, e); outboxSeq = Math.max(outboxSeq, e.seq); }
+    for (const e of marked) if (outbox.get(e.key)?.seq === e.seq) outbox.set(e.key, e);
     if (batch.meta) spaceMeta = nextMeta;
     publish();
     return outcome;
