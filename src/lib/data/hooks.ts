@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { reportStorageError, type StorageFailure } from "../storage";
 import { diffCollection } from "./records";
-import { defaults, publishedCollection, publishedSetting, subscribe, write, type Change } from "./store";
+import { defaults, publishedCollection, publishedSetting, subscribe, syncMeta, write, type Change } from "./store";
 import type { CollectionName, Collections } from "./schema";
 
 // React bindings for the data layer. They mirror the old localStorage hook: screens get plain arrays and
@@ -68,4 +68,10 @@ export async function saveSetting(key: string, value: unknown): Promise<boolean>
   const failure = await write({ settings: [[key, value]] });
   if (failure) reportStorageError(failure);
   return !failure;
+}
+
+// What sync last confirmed about children shared from other families (SpaceMeta.scopes, lib/sync/scopes.ts), for
+// showing what the parent can do with each child (lib/childAccess.ts). Undefined in the guest space and before sharing.
+export function useScopes(): unknown {
+  return useSyncExternalStore(subscribe, () => syncMeta().scopes);
 }

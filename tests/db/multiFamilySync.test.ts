@@ -122,12 +122,20 @@ describe("multi-family sync", () => {
     assert.equal(d.get("entries", scopedId(O1.familyId, "m-c3"))!.text, "an old Moment about Cleo");
   });
 
-  it("the owner soft-deleting a shared child is an ordinary change: it stays, marked deleted, nothing is removed", async () => {
+  it("the owner soft-deleting a shared child removes it from members' devices (after two answers); restoring brings it back", async () => {
     o1.remove("children", "c-3");
     await o1.sync();
-    const r = await d.scopes({ homeChildren: ["emma"] });
-    assert.deepEqual(r.actions, []);
-    assert.ok(d.get("children", scopedId(O1.familyId, "c-3"))!.deletedAt);
+    let r = await d.scopes({ homeChildren: ["emma"] });
+    assert.deepEqual(r.actions, [], "missing once is not enough");
+    r = await d.scopes({ homeChildren: ["emma"] });
+    assert.deepEqual(r.actions, [{ kind: "revoke", familyId: O1.familyId, childId: "c-3" }]);
+    assert.equal(d.get("children", scopedId(O1.familyId, "c-3")), undefined);
+    assert.equal(d.get("entries", scopedId(O1.familyId, "m-c3")), undefined);
+    o1.edit("children", { ...o1.get("children", "c-3")!, deletedAt: null });
+    await o1.sync();
+    r = await d.scopes({ homeChildren: ["emma"] });
+    assert.deepEqual(r.actions, [{ kind: "fullResync", familyId: O1.familyId }]);
+    assert.equal(d.get("children", scopedId(O1.familyId, "c-3"))!.first, "Cleo");
     assert.ok(d.get("entries", scopedId(O1.familyId, "m-c3")));
   });
 

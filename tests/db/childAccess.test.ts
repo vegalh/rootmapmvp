@@ -344,11 +344,22 @@ describe("revoked membership", () => {
 });
 
 describe("soft deletion of the child", () => {
-  it("only the owner can soft-delete and restore the child; members keep read access to it (Phase 1b)", async () => {
+  it("only the owner can soft-delete and restore the child; meanwhile everyone else loses access, and gets it back on restore (Phase 3)", async () => {
     must(await O.client.from("children").update({ deleted_at: new Date().toISOString() }).eq("family_id", F).eq("id", "Z"));
+    // The editor of Z: no child, no records, no membership row (so their devices remove it), no writes.
+    assert.deepEqual(must(await Ed.client.from("children").select("id").eq("family_id", F).eq("id", "Z")), []);
+    assert.deepEqual(must(await Ed.client.from("entries").select("id").eq("family_id", F).eq("child_id", "Z")), []);
+    assert.deepEqual(must(await Ed.client.from("child_memberships").select("child_id").eq("family_id", F).eq("child_id", "Z")), []);
+    refused(await Ed.client.from("entries").insert(entry("eAfterDelete", "Z")), "writing to a deleted child");
     await refusedUpdate(Ed.client.from("children").update({ deleted_at: null }).eq("family_id", F).eq("id", "Z"), "editor restoring the child");
-    const [z] = must(await Ed.client.from("children").select("id, deleted_at").eq("family_id", F).eq("id", "Z")) as { deleted_at: string | null }[];
+    // The owner still has it all, and their view of the circle is unchanged.
+    const [z] = must(await O.client.from("children").select("id, deleted_at").eq("family_id", F).eq("id", "Z")) as { deleted_at: string | null }[];
     assert.ok(z.deleted_at);
+    assert.ok(ids(await O.client.from("entries").select("id").eq("family_id", F)).includes("eZ"));
+    assert.equal((must(await O.client.from("child_memberships").select("user_id").eq("family_id", F).eq("child_id", "Z")) as unknown[]).length, 2);
+    // Restored: the editor is back.
     must(await O.client.from("children").update({ deleted_at: null }).eq("family_id", F).eq("id", "Z"));
+    assert.deepEqual(ids(await Ed.client.from("children").select("id").eq("family_id", F).eq("id", "Z")), ["Z"]);
+    assert.deepEqual(must(await Ed.client.from("child_memberships").select("role").eq("family_id", F).eq("child_id", "Z")), [{ role: "editor" }]);
   });
 });

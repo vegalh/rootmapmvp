@@ -32,9 +32,14 @@ import PasswordForm from "./components/PasswordForm";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
-import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreAddsOnly, restoreData, syncMeta } from "./lib/data/store";
+import { saveSetting, useCollection, useScopes, useSetting } from "./lib/data/hooks";
+import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreAddsOnly, restoreData, syncMeta, archivedChanges } from "./lib/data/store";
+import { photosForChildren } from "./lib/sharedPhotos";
 import { newRecordId } from "./lib/data/schema";
+import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
+import { sharedSyncEnabled } from "./lib/sync/scopes";
+import ChildCircle from "./components/ChildCircle";
+import AccessNotice, { ArchivedChangesSheet } from "./components/AccessNotice";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
@@ -334,6 +339,25 @@ export default function App() {
   // The open child's page; undefined once that child is removed (the page then returns to My Children).
   const child = childrenData.find(c => c.id === selectedChild);
   const activeChildIds = useMemo(() => childrenData.map(c => c.id), [childrenData]);
+  // What this parent can do with each child (lib/childAccess.ts). Every child of the user's own family (and every child
+  // in the guest space) is theirs to manage, so without children shared from other families nothing here changes.
+  // Screens only follow this; the server decides.
+  const scopes = useScopes();
+  const accessOf = useCallback((id: string) => childAccess(id, scopes), [scopes]);
+  // Children a new Moment or activity record can be about; and My Week's children (the user's own family only).
+  const writableChildren = useMemo(() => editableChildren(childrenData, scopes), [childrenData, scopes]);
+  const ownChildren = useMemo(() => ownFamilyChildren(childrenData), [childrenData]);
+  // Children no longer shared with this parent (removed from their circle, or their profile deleted), whose note on
+  // My Children hasn't been acknowledged on this device, and the unsent changes kept here because of it.
+  const [accessNoticesSeen, setAccessNoticesSeen] = useSetting<string[]>("rootmap-access-notices", []);
+  const unseenRevoked = useMemo(() => {
+    const revoked = (scopes as { revoked?: Record<string, { state: string }> } | undefined)?.revoked ?? {};
+    return Object.keys(revoked).filter(k => revoked[k].state === "done" && !accessNoticesSeen.includes(k));
+  }, [scopes, accessNoticesSeen]);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [reviewingArchive, setReviewingArchive] = useState(false);
+  const countArchived = useCallback(() => { void archivedChanges().then(a => setArchivedCount(a.length), () => setArchivedCount(0)); }, []);
+  useEffect(countArchived, [scopes, countArchived]);
   const activity = findActivity(selectedActivity) || activities[0];
   const music = findMusic(selectedActivity) || musicActivities[0];
   const book = books.find(b => b.id === selectedBook) || books[0];
@@ -596,9 +620,10 @@ export default function App() {
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: EntryPrefill) => {
     if (!childrenData.length) { setModal("addChild"); return; }
+    if (!writableChildren.length) return;
     setSelectedEntry(undefined);
     setEntryOrigin(origin);
-    setEditorChild(defaultChildId(childrenData, childId) || undefined);
+    setEditorChild(defaultChildId(writableChildren, childId) || undefined);
     setEditorPrefill(prefill);
     setEditorReturn(screen);
     go("entryEdit");
@@ -622,6 +647,10 @@ export default function App() {
   // stay as recorded). Resolves to an error message, or null once stored.
   const editActivityRecord = async (id: string, patch: { date: string; notes: string; childId: string }) => {
     if (!isActiveChild(childrenData, patch.childId)) return t.chooseChildFirst;
+    // Rows never move between families (the server keeps each in its family): a record only moves to a child of the
+    // same family that the parent can add to.
+    const current = records.find(r => r.id === id);
+    if (current && (familyOfId(current.childId) !== familyOfId(patch.childId) || !canAddAndEdit(accessOf(patch.childId)))) return t.cannotMoveFamily;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) return t.chooseDateFirst;
     const notes = patch.notes.trim();
     const next = records.map((r): LessonRecord => {
@@ -655,7 +684,7 @@ export default function App() {
   };
   // Completed › Repeat: the same activity planned again for today, for the children still in My Children.
   const repeatPlan = (plan: Plan) => {
-    const childIds = plan.childIds.filter(id => isActiveChild(childrenData, id));
+    const childIds = plan.childIds.filter(id => isActiveChild(ownChildren, id));
     setPlans(current => [...current, { id: newRecordId("p"), activityId: plan.activityId, date: localIsoToday(), childIds, ...(plan.note ? { note: plan.note } : {}) }]);
     setToast(t.planRepeated);
   };
@@ -676,6 +705,7 @@ export default function App() {
     setLeavingModal(null);
     if (destination === "record") {
       if (!childrenData.length) { setModal("addChild"); return; }
+      if (!writableChildren.length) return;
       setRecordFrom("quick");
       go("record");
     }
@@ -749,6 +779,7 @@ export default function App() {
     if (screen === "children") {
       return (
         <ChildrenPage
+          notice={<AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />}
           childrenData={childrenData}
           entries={entries}
           goChild={goChild}
@@ -877,7 +908,13 @@ export default function App() {
             setToast(t.entrySaved);
           }}
           edit={() => setModal("editChild")}
+          access={accessOf(child.id)}
+          moveTargets={sameFamilyChildren(writableChildren, child.id)}
+          circle={sharedSyncEnabled && cloud.status === "signed-in" && cloud.account
+            ? <ChildCircle key={child.id} child={child} homeFamilyId={cloud.account.familyId} access={accessOf(child.id)} t={t} />
+            : undefined}
           remove={async () => {
+            if (!canManage(accessOf(child.id))) return;
             // Runs once the parent confirms in the page's dialog. The child's journal entries, activity records,
             // plans and drafts are never deleted with the profile.
             // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
@@ -904,9 +941,9 @@ export default function App() {
     if (screen === "record") {
       return (
         <RecordFormPage
-          childrenData={childrenData}
+          childrenData={writableChildren}
           // From a child's page that child; from Quick Add the only child, or none so the parent chooses.
-          childId={recordFrom === "child" && child ? child.id : defaultChildId(childrenData)}
+          childId={recordFrom === "child" && child ? child.id : defaultChildId(writableChildren)}
           lockChild={recordFrom === "child" && !!child}
           records={records}
           // Cancel returns to wherever the form was opened (a child's page, or any tab through Quick Add).
@@ -931,6 +968,7 @@ export default function App() {
         <EntryDetailPage
           entry={entry}
           child={childrenData.find(c => c.id === entry.childId)}
+          canEdit={canAddAndEdit(accessOf(entry.childId))}
           lang={lang}
           back={() => goBack(originScreen)}
           edit={() => go("entryEdit")}
@@ -947,8 +985,9 @@ export default function App() {
       return (
         <EntryEditorPage
           key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}:${editorPrefill?.title || ""}`}
-          childrenData={childrenData}
-          childId={entry?.childId || defaultChildId(childrenData, editorChild)}
+          // A Moment can only be about children the parent can add to; an existing one stays within its family.
+          childrenData={entry ? sameFamilyChildren(writableChildren, entry.childId) : writableChildren}
+          childId={entry?.childId || defaultChildId(writableChildren, editorChild)}
           lockChild={entryOrigin === "child"}
           entry={entry}
           prefill={entry ? undefined : editorPrefill}
@@ -967,7 +1006,10 @@ export default function App() {
             } else {
               // A moment about several children is one entry per child (each child's Journal keeps its own copy),
               // with the same content and timestamps, stored together. Lists of every child show it once (mergeShared).
-              const created = (childIds.length ? childIds : [fields.childId]).map(childId => ({ id: newRecordId("m"), ...fields, childId, createdAt: now, updatedAt: now }));
+              const forChildren = childIds.length ? childIds : [fields.childId];
+              const photosByChild = await photosForChildren(forChildren, fields.photos);
+              if (!photosByChild) { setToast(t.photoCopyFailed); return false; }
+              const created = forChildren.map(childId => ({ id: newRecordId("m"), ...fields, photos: photosByChild[childId], childId, createdAt: now, updatedAt: now }));
               if (!(await storeEntries([...created, ...entries], draft))) return false;
             }
             setToast(t.entrySaved);
@@ -995,7 +1037,7 @@ export default function App() {
           repeatPlan={repeatPlan}
           childFilter={weekFilter}
           setChildFilter={setWeekFilter}
-          childrenData={childrenData}
+          childrenData={ownChildren}
           openActivity={openActivity}
           openAdd={() => setModal("weekAdd")}
           // Usually opened from Profile, but "Add to My Week" on an activity/music page lands here too —
@@ -1120,11 +1162,14 @@ export default function App() {
       <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel && !needsPassword}>
         {content()}
       </Shell>
+      {reviewingArchive && <ArchivedChangesSheet close={() => setReviewingArchive(false)} changed={countArchived} t={t} />}
       <ModalOverlay
         modal={modal ?? leavingModal}
         closing={!modal && !!leavingModal}
         close={closeModal}
         childrenData={childrenData}
+        writableChildren={writableChildren}
+        ownChildren={ownChildren}
         setChildrenData={async next => savedOk(await commitChildren(next))}
         filters={filters}
         setFilters={setFilters}

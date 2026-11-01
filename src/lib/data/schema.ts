@@ -85,6 +85,8 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-welcome": "string",
   // The Family Bookshelf (lib/bookshelf.ts): which curated books the family owns or wishes for.
   "rootmap-bookshelf": "array",
+  // Shared children whose "no longer have access" notice was seen on this device (scopedId keys). Device-only.
+  "rootmap-access-notices": "array",
 };
 // Notification toggles ("rootmap-pref-<label>").
 export const PREF_PREFIX = "rootmap-pref-";

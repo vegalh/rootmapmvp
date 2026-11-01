@@ -13,7 +13,7 @@ import { applyChanges, byPosition, outboxEntries } from "./records";
 import {
   COLLECTIONS, DB_NAME, GUEST, ID_LIST_COLLECTIONS, LEGACY_DELETED_CHILDREN_KEY, LEGACY_DRAFTS_KEY, LEGACY_KEYS, STORE_NAMES, isPhotoId, isScopedId, isShared, newPhotoId, scopedId, settingShape, unscope,
   type CollectionName, type Collections, type OutboxCollection, type OutboxEntry, type PhotoBlob, type PhotoMeta, type Space, type SpaceMeta,
-  type StoreName, type StoredDraft, type StoredSetting, type SyncRecord,
+  type ArchiveItem, type StoreName, type StoredDraft, type StoredSetting, type SyncRecord,
 } from "./schema";
 
 // The single place RootMap data is read from and written to. Screens never touch a storage API directly.
@@ -598,7 +598,8 @@ export const blobToDataUrl = (blob: Blob) =>
 
 // Stores an image and returns the reference to keep in a record. In IndexedDB the bytes go to "photoBlobs"
 // and the metadata to "photos" in one transaction; the localStorage fallback can only keep an inline image.
-export async function savePhoto(blob: Blob, size?: { width: number; height: number }): Promise<{ ok: true; ref: string } | { ok: false; failure: StorageFailure }> {
+// `extra`: a photo for a child shared from another family carries that family and child (lib/sync/scopes.ts).
+export async function savePhoto(blob: Blob, size?: { width: number; height: number }, extra?: { familyId: string; childHint: string }): Promise<{ ok: true; ref: string } | { ok: false; failure: StorageFailure }> {
   if (mode !== "indexeddb" || !db) {
     try { return { ok: true, ref: await blobToDataUrl(blob) }; } catch { return { ok: false, failure: "failed" }; }
   }
@@ -607,7 +608,7 @@ export async function savePhoto(blob: Blob, size?: { width: number; height: numb
   // The fingerprint is taken when the photo is saved, so a later backup can prove the file is unchanged.
   let sha256: string | undefined;
   try { sha256 = await sha256Of(blob); } catch { /* computed later by sync */ }
-  const meta: PhotoMeta = { id, mimeType: blob.type || "image/jpeg", byteSize: blob.size, width: size?.width ?? null, height: size?.height ?? null, createdAt: now, updatedAt: now, deletedAt: null, source: "upload", storagePath: null, uploadedAt: null, ...(sha256 ? { sha256 } : {}) };
+  const meta: PhotoMeta = { id, mimeType: blob.type || "image/jpeg", byteSize: blob.size, width: size?.width ?? null, height: size?.height ?? null, createdAt: now, updatedAt: now, deletedAt: null, source: "upload", storagePath: null, uploadedAt: null, ...(sha256 ? { sha256 } : {}), ...(extra && space.kind === "account" ? extra : {}) };
   const queued = queueOutbox([["photos", [meta]]]);
   try {
     const tx = db.transaction(queued.entries.length ? ["photos", "photoBlobs", "outbox"] : ["photos", "photoBlobs"], "readwrite");
@@ -623,6 +624,20 @@ export async function savePhoto(blob: Blob, size?: { width: number; height: numb
   if (space.kind === "account") photoMetas.set(id, meta);
   publish();
   return { ok: true, ref: id };
+}
+
+// A photo for a child of another family (Shared Child Profiles Phase 3): a photo always belongs to one family, so a
+// Moment about children of two families gets its own copy for the other family. The bytes are copied on this device
+// into a new photo of that family (`familyId`, or null for the user's own; for `childId`, a server id), uploaded there
+// by sync; the original is untouched. null when the copy couldn't be made (the caller saves nothing then).
+export async function copyPhotoForFamily(ref: string, familyId: string | null, childId: string): Promise<string | null> {
+  if (space.kind !== "account" || !isPhotoId(ref)) return null;
+  const blob = await photoBytes(ref);
+  if (!blob) return null;
+  const meta = photoMetas.get(ref);
+  const size = meta?.width && meta?.height ? { width: meta.width, height: meta.height } : undefined;
+  const saved = await savePhoto(blob, size, familyId ? { familyId, childHint: childId } : undefined);
+  return saved.ok ? saved.ref : null;
 }
 
 // The image as a data URL (for backup files). Non-id references are returned unchanged.
@@ -860,6 +875,27 @@ export function commitSync(batch: SyncCommit): Promise<"ok" | "stale"> {
     publish();
     return outcome;
   });
+}
+
+// Changes kept on this device when access to a shared child ended (commitCleanup's archive). Only what is safe to show
+// leaves here: what kind of change it was and when it was kept. Never its text, photos or the child it was about.
+export type ArchivedChange = { id: string; kind: "entries" | "records" | "children" | "photos" | "versions"; keptAt: string };
+const REVOKED_SOURCE = "access-revoked:";
+export async function archivedChanges(): Promise<ArchivedChange[]> {
+  if (space.kind !== "account" || !db) return [];
+  const items = await getAll<ArchiveItem>(db, "archive");
+  return items
+    .filter(a => a.source.startsWith(REVOKED_SOURCE))
+    .map(a => ({ id: a.id, kind: ((a.value as { collection?: string })?.collection ?? "entries") as ArchivedChange["kind"], keptAt: a.archivedAt }))
+    .sort((a, b) => b.keptAt.localeCompare(a.keptAt));
+}
+// Discards kept changes for good (only ones kept because access ended).
+export async function discardArchived(ids: string[]): Promise<boolean> {
+  if (space.kind !== "account" || !db) return false;
+  const tx = db.transaction("archive", "readwrite");
+  const store = tx.objectStore("archive");
+  for (const id of ids) if (id.startsWith("revoked:")) store.delete(id);
+  try { await done(tx); return true; } catch { return false; }
 }
 
 // Removal of a shared child's data after access ended (lib/sync/scopes.ts, runRevocations). Everything stored, from
