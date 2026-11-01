@@ -69,7 +69,7 @@ This is the canonical project structure. Start with task-relevant files below. O
   - `functions/verify-photo/` - Edge Function that checks an uploaded photo file against its SHA-256 before it counts as backed up (runs on the local stack; not deployed to staging yet).
   - `migrations/` - The database schema, RLS, storage policies and triggers as versioned SQL. **Every database change is a new migration file; never edit an applied one or change the database by hand.**
   - `config.toml` - Local Supabase stack settings (`npm run db:start`, needs Docker).
-- `tests/db/` - Database tests against the local stack (`npm run test:db`): two-account security, storage, revisions, sync cursor, email-code sign-in and account setup, record sync (`sync.test.ts`), photo files and their privacy (`photos.test.ts`), guest data brought into an account (`guestImport.test.ts`), usage analytics and admin access (`analytics.test.ts`).
+- `tests/db/` - Database tests against the local stack (`npm run test:db`): two-account security, storage, revisions, sync cursor, email-code sign-in and account setup, record sync (`sync.test.ts`), photo files and their privacy (`photos.test.ts`), guest data brought into an account (`guestImport.test.ts`), usage analytics and admin access (`analytics.test.ts`), per-child memberships and the one-owner rule (`childMemberships.test.ts`).
 
 ## Making common changes
 
