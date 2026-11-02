@@ -13,7 +13,10 @@ import { DB_URL, newDevice, startServer, stepper, ui } from "./cloudkit.mjs";
 
 const db = new pg.Client({ connectionString: DB_URL });
 await db.connect();
-const today = (await db.query("select current_date::text d")).rows[0].d;
+// The day a batch is counted under is the browser's local day (the app's `localIsoToday()`), not the server's UTC date:
+// in the evening west of UTC the two differ. The browser runs on this computer, so this computer's local date.
+const now = new Date();
+const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 let page, u;
 const { step, finish } = stepper(() => page);
 const servers = [];
