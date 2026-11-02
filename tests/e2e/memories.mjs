@@ -199,7 +199,11 @@ await step("Chinese and dark mode on a phone, and the desktop frame: the recap r
   await desktop(); await sleep(300);
   await go(`#/moments-week/${LAST_MONDAY}`);
   const r = await page.eval(`JSON.parse(JSON.stringify(document.querySelector(".recap-page").getBoundingClientRect()))`);
-  assert.ok(r.left >= 519 && r.right <= 921, `inside the phone frame: ${r.left}–${r.right}`);
+  // The frame is centered in the page's width, which a classic scrollbar (Linux, Windows) narrows; macOS overlays it.
+  const f = await page.eval(`JSON.parse(JSON.stringify(document.querySelector(".app-shell").getBoundingClientRect()))`);
+  const pageWidth = await page.eval(`document.documentElement.clientWidth`);
+  assert.ok(f.width === 402 && Math.abs(f.left - (pageWidth - 402) / 2) <= 0.5, `a centered phone frame: ${f.left}–${f.right} in ${pageWidth}`);
+  assert.ok(r.left >= f.left && r.right <= f.right, `inside the phone frame: ${r.left}–${r.right}`);
   assert.equal(await page.eval(`document.documentElement.scrollWidth > innerWidth`), false);
   await phone();
 });
