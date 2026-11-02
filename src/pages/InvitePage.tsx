@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
 import { getCloudClient } from "../lib/cloud/client";
+import { forgetInviteToken } from "../lib/inviteToken";
 import { scopedId } from "../lib/data/schema";
 import { publishedCollection } from "../lib/data/store";
 import { syncNow } from "../lib/sync/runner";
@@ -14,11 +15,16 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // has checked the token itself: this page shows only what `get_invitation_preview` answers, and the raw token never
 // appears in its own text, a toast or a log — only ever inside the one link.
 type PreviewStatus = "invalid" | "expired" | "revoked" | "accepted" | "wrong_email" | "valid";
-type Phase = "checking" | "failed" | "accepting" | PreviewStatus;
+// "already_member": the person managing the profile opened their own link (the invitation stays unused).
+type Phase = "checking" | "failed" | "accepting" | "already_member" | PreviewStatus;
 type Preview = { childFirst: string; role: "editor" | "viewer"; inviterName: string };
+// Answers after which the link can never be used again: the token is forgotten at once (lib/inviteToken.ts).
+const SPENT = new Set<string>(["invalid", "expired", "revoked", "accepted", "already_member"]);
 
-export function InvitePage({ token, switchAccount, accepted, declined, notify, t }: {
+export function InvitePage({ token, email, switchAccount, accepted, declined, notify, t }: {
   token: string;
+  // The signed-in account, shown with the preview so nobody accepts under the wrong one by mistake.
+  email: string;
   // Signs out without losing the invitation address, so a different, matching account can sign in to the same link
   // (the "wrong_email" case).
   switchAccount: () => void;
@@ -42,6 +48,7 @@ export function InvitePage({ token, switchAccount, accepted, declined, notify, t
       if (row.status === "valid" && row.child_first && row.role) {
         setPreview({ childFirst: row.child_first, role: row.role, inviterName: row.inviter_name || "" });
       }
+      if (SPENT.has(row.status)) forgetInviteToken();
       setPhase(row.status);
     })();
     return () => { live = false; };
@@ -54,7 +61,11 @@ export function InvitePage({ token, switchAccount, accepted, declined, notify, t
     const { data, error } = await client.rpc("accept_invitation", { p_token: token });
     const row = (data as { status: PreviewStatus | "ok"; family_id: string | null; child_id: string | null }[] | null)?.[0];
     if (error || !row) { setPhase("failed"); return; }
-    if (row.status !== "ok" || !row.family_id || !row.child_id) { setPhase(row.status as PreviewStatus); return; }
+    if (row.status !== "ok" || !row.family_id || !row.child_id) {
+      if (SPENT.has(row.status)) forgetInviteToken();
+      setPhase(row.status as Phase);
+      return;
+    }
     // A full sync brings the newly shared child (and its records) onto this device before the profile opens, so it
     // is never shown half-loaded. syncNow() only starts a round (it does not return a promise that settles once the
     // round lands), so this waits for the child to actually appear in the local, reactive collection — the same one
@@ -73,6 +84,7 @@ export function InvitePage({ token, switchAccount, accepted, declined, notify, t
     : phase === "revoked" ? t.inviteNoLongerAvailable
     : phase === "accepted" ? t.inviteAlreadyUsed
     : phase === "wrong_email" ? t.inviteWrongEmailNote
+    : phase === "already_member" ? t.inviteAlreadyMember
     : phase === "failed" ? t.inviteFailed
     : "";
 
@@ -92,6 +104,10 @@ export function InvitePage({ token, switchAccount, accepted, declined, notify, t
             <h2>{t.invitePreviewLede.replace("{name}", preview.childFirst)}</h2>
             {preview.inviterName && <p>{t.invitePreviewFrom.replace("{name}", preview.inviterName)}</p>}
             <p>{preview.role === "editor" ? t.accessEditInfo : t.accessViewInfo}</p>
+            <p className="invite-account">
+              {t.inviteSignedInAs.replace("{email}", email)}{" "}
+              <button className="text-action" onClick={switchAccount} disabled={phase === "accepting"}>{t.inviteNotYou}</button>
+            </p>
             <div className="sheet-buttons even">
               <button onClick={declined} disabled={phase === "accepting"}>{t.inviteDecline}</button>
               <button onClick={() => void accept()} disabled={phase === "accepting"}>{t.inviteAccept}</button>

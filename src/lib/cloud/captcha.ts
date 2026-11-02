@@ -1,4 +1,5 @@
 import { cloudConfig } from "./config";
+import { captureInviteToken } from "../inviteToken";
 
 // CAPTCHA for open registration (the beta): with the server's CAPTCHA protection on (Supabase Auth, Cloudflare
 // Turnstile), every request for a sign-in code must carry a fresh token. Off unless VITE_TURNSTILE_SITE_KEY is set
@@ -22,6 +23,9 @@ export const captchaSiteKey = cloudConfig.enabled ? (import.meta.env?.VITE_TURNS
 
 let api: Promise<Turnstile> | undefined;
 function loadTurnstile(): Promise<Turnstile> {
+  // The third-party script must never find an invitation token in the address (lib/inviteToken.ts). It is taken
+  // out when the app starts; this makes sure, whatever happened since.
+  captureInviteToken();
   api ??= new Promise<Turnstile>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = SCRIPT;

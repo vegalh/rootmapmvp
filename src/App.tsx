@@ -19,10 +19,11 @@ import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { WeeklyRecapPage } from "./pages/WeeklyRecapPage";
 import { BackupPage } from "./pages/BackupPage";
-import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
+import { DeletedChildrenPage, type DeletedShared } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
 import { GuestImportPage } from "./pages/GuestImportPage";
 import { InvitePage } from "./pages/InvitePage";
+import { captureInviteToken, forgetInviteToken, pendingInviteToken } from "./lib/inviteToken";
 import BookDetailPage from "./pages/BookDetailPage";
 import MusicDetailPage from "./pages/MusicDetailPage";
 import BookshelfPage from "./pages/BookshelfPage";
@@ -39,11 +40,13 @@ import { photosForChildren } from "./lib/sharedPhotos";
 import { newRecordId, scopedId } from "./lib/data/schema";
 import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
 import { sharedSyncEnabled } from "./lib/sync/scopes";
-import ChildCircle from "./components/ChildCircle";
+import ChildCircle, { CircleJoins } from "./components/ChildCircle";
+import KeptVersions from "./components/KeptVersions";
 import AccessNotice, { ArchivedChangesSheet } from "./components/AccessNotice";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
+import { getCloudClient } from "./lib/cloud/client";
 import { useCloudState } from "./lib/cloud/hooks";
 import type { AuthResult } from "./lib/cloud/auth";
 import { cloudState, confirmSignInCode, sendSignInCode, signInWithPasswordHere, signOutHere } from "./lib/cloud/session";
@@ -169,8 +172,11 @@ function allowedRoute(r: Route | null): Route | null {
   if (!r) return null;
   if (CLOUD_SCREENS.includes(r.screen) && !cloudConfig.enabled) return null;
   // An invitation link only ever opens where Shared Child Profiles itself is on (defense in depth: sharing stays
-  // off in production regardless of what a stale or copied link addresses).
-  if (r.screen === "invite" && !(cloudConfig.enabled && sharedSyncEnabled)) return null;
+  // off in production regardless of what a stale or copied link addresses), and only while this tab holds its token.
+  if (r.screen === "invite" && !(cloudConfig.enabled && sharedSyncEnabled && pendingInviteToken())) {
+    forgetInviteToken();
+    return null;
+  }
   return r;
 }
 
@@ -220,9 +226,9 @@ export default function App() {
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
-  // The token an invitation link (#/invite/<token>) addresses; "" once there is none to show (components/
-  // ChildCircle.tsx, pages/InvitePage.tsx). Never logged.
-  const [inviteToken, setInviteToken] = useState(start.invite ?? "");
+  // The token of the invitation being opened; "" when there is none. Held outside the address (lib/inviteToken.ts):
+  // the address is just #/invite. Never logged.
+  const [inviteToken, setInviteToken] = useState(() => (start.screen === "invite" ? pendingInviteToken() ?? "" : ""));
 
   // All persistent data comes from the data layer (src/lib/data): records are stored one by one with sync
   // timestamps, and removing one from a list soft-deletes it. A removed child is a soft-deleted child record,
@@ -230,7 +236,7 @@ export default function App() {
   const children = useCollection("children");
   const { items: childrenData, set: setChildrenData, commit: commitChildren } = children;
   const deletedChildren = children.deleted as DeletedChild[];
-  const { items: records, set: setRecords, commit: commitRecords } = useCollection("records");
+  const { items: records, deleted: deletedRecords, set: setRecords, commit: commitRecords } = useCollection("records");
   const { items: observations, set: setObservations } = useCollection("observations");
   const [seedVersion, setSeedVersion] = useSetting<number>("rootmap-seed-version", 0);
   // Every seed item this device has received ("child:emma", "record:r1", "obs:o1"); see mergeSeed.
@@ -259,7 +265,7 @@ export default function App() {
   };
   const { items: plans, set: setPlans, commit: commitPlans } = useCollection("plans");
   // Moments/Journal entries (per child) and goals (per parent) are never part of the seed merge.
-  const { items: entries, commit: commitEntries } = useCollection("entries");
+  const { items: entries, deleted: deletedEntries, commit: commitEntries } = useCollection("entries");
   const [migrated, setMigrated] = useSetting<string[]>(MIGRATED_KEY, []);
   const { items: goals, set: setGoals } = useCollection("goals");
   const [lastBackup, setLastBackup] = useSetting<string>(LAST_BACKUP_KEY, "");
@@ -353,6 +359,29 @@ export default function App() {
   // Screens only follow this; the server decides.
   const scopes = useScopes();
   const accessOf = useCallback((id: string) => childAccess(id, scopes), [scopes]);
+  // The user's own children that someone else helps with (Recently Deleted lists what was removed from them). Read
+  // from the server, which shows the person managing a profile everyone in its circle; asked when Profile or Recently
+  // Deleted opens. Unknown (offline, or sharing off): none, so nothing extra is listed.
+  const [sharedOwnChildren, setSharedOwnChildren] = useState<Set<string>>(() => new Set());
+  const homeFamily = cloud.status === "signed-in" ? cloud.account?.familyId ?? "" : "";
+  useEffect(() => {
+    if (!sharedSyncEnabled || !homeFamily || (screen !== "profile" && screen !== "deletedChildren")) return;
+    let live = true;
+    void getCloudClient().then(async client => {
+      if (!client) return;
+      const { data, error } = await client.from("child_memberships").select("child_id").eq("family_id", homeFamily).neq("role", "owner");
+      if (live && !error) setSharedOwnChildren(new Set((data as { child_id: string }[]).map(r => r.child_id)));
+    });
+    return () => { live = false; };
+  }, [homeFamily, screen]);
+  const deletedShared = useMemo<DeletedShared[]>(() => {
+    if (!sharedOwnChildren.size) return [];
+    const childOf = (id: string) => childrenData.find(c => c.id === id && sharedOwnChildren.has(id) && canManage(accessOf(id)));
+    return [
+      ...deletedEntries.flatMap(item => { const child = childOf(item.childId); return child ? [{ kind: "entry" as const, item, child }] : []; }),
+      ...deletedRecords.flatMap(item => { const child = childOf(item.childId); return child ? [{ kind: "record" as const, item, child }] : []; }),
+    ];
+  }, [sharedOwnChildren, deletedEntries, deletedRecords, childrenData, accessOf]);
   // Children a new Moment or activity record can be about; and My Week's children (the user's own family only).
   const writableChildren = useMemo(() => editableChildren(childrenData, scopes), [childrenData, scopes]);
   const ownChildren = useMemo(() => ownFamilyChildren(childrenData), [childrenData]);
@@ -482,7 +511,6 @@ export default function App() {
     entry: selectedEntry,
     discoverTab,
     childTab: childTab === "Activities" ? "Activities" : "Journal",
-    invite: inviteToken || undefined,
   });
   shownHash.current = hash;
   // Usage analytics (lib/analytics): a new page address is a new page visit, so its impressions may count again.
@@ -554,6 +582,8 @@ export default function App() {
   }, [hash, screen]);
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
+      // An invitation link opened in this tab while the app runs: its token leaves the address first.
+      captureInviteToken();
       const h = history.current;
       const r = allowedRoute(parseRoute(window.location.hash)) ?? { screen: "today" as Screen };
       if (h) {
@@ -584,7 +614,7 @@ export default function App() {
       if (r.screen === "entry" || r.screen === "entryEdit") setSelectedEntry(r.entry);
       if (r.screen === "recap") { setRecapWeek(r.week ?? ""); setRecapChild(r.child ?? ""); }
       if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
-      if (r.screen === "invite") setInviteToken(r.invite ?? "");
+      if (r.screen === "invite") setInviteToken(pendingInviteToken() ?? "");
       setScreen(r.screen);
     };
     window.addEventListener("popstate", onPop);
@@ -756,6 +786,7 @@ export default function App() {
   };
   // Signs out of this device only, then reloads into the guest space. Everything stored on the device stays.
   const signOut = async () => {
+    forgetInviteToken();
     afterSwitchTo({ toast: t.signedOut, screen: "profile" });
     await signOutHere();
   };
@@ -797,7 +828,10 @@ export default function App() {
     if (screen === "children") {
       return (
         <ChildrenPage
-          notice={<AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />}
+          notice={<>
+            {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <CircleJoins homeFamilyId={cloud.account.familyId} openChild={goChild} t={t} />}
+            <AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />
+          </>}
           childrenData={childrenData}
           entries={entries}
           goChild={goChild}
@@ -896,7 +930,7 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length + deletedShared.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "invite") {
@@ -905,11 +939,13 @@ export default function App() {
       const forgetInviteAddress = () => {
         const h = history.current;
         if (h) { window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", "#/today"); h.stack[h.idx] = "#/today"; }
+        forgetInviteToken();
       };
       return (
         <InvitePage
           key={inviteToken}
           token={inviteToken}
+          email={cloud.status === "signed-in" ? cloud.user.email ?? "" : ""}
           switchAccount={() => void signOutKeepingInvite()}
           declined={() => { forgetInviteAddress(); go("today"); }}
           notify={setToast}
@@ -1020,6 +1056,7 @@ export default function App() {
           entry={entry}
           child={childrenData.find(c => c.id === entry.childId)}
           canEdit={canAddAndEdit(accessOf(entry.childId))}
+          versions={sharedSyncEnabled && homeFamily ? <KeptVersions key={entry.id} entryId={entry.id} homeFamilyId={homeFamily} lang={lang} t={t} /> : undefined}
           lang={lang}
           back={() => goBack(originScreen)}
           edit={() => go("entryEdit")}
@@ -1162,6 +1199,15 @@ export default function App() {
           childrenData={childrenData}
           entries={entries}
           records={records}
+          shared={deletedShared}
+          restoreShared={async d => {
+            if (!canManage(accessOf(d.child.id))) return;
+            // The same record, its soft delete cleared: same id, author and photos, synced to the whole circle.
+            const { deletedAt: _deletedAt, ...item } = d.item;
+            const failure = d.kind === "entry" ? await commitEntries([...entries, item as Entry]) : await commitRecords([...records, item as LessonRecord]);
+            if (!savedOk(failure)) return;
+            setToast(t.recordRestoredToast.replace("{name}", d.child.first));
+          }}
           restore={async d => {
             if (childrenData.some(c => c.id === d.id)) return;
             // Runs once the parent confirms in the page's dialog.

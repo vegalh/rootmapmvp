@@ -782,3 +782,14 @@ html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="
   .toast { animation: none !important; }
   :is(button, .today-feature, .today-memory, .today-week, .book-tile, .journal-card):active { transform: none !important; }
 }
+
+/* Release readiness: someone joined a child's circle; shared records in Recently Deleted. */
+.circle-join + .circle-join { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.deleted-shared { margin-top: 28px; }
+.deleted-shared h2 { margin: 0 0 6px; font-size: 1.05rem; }
+.deleted-snippet { overflow-wrap: anywhere; }
+.kept-versions { margin-top: 28px; padding: 14px 16px; border-radius: 18px; background: var(--apricot); }
+.kept-versions h2 { margin: 0 0 4px; font-size: 1rem; }
+.kept-versions ul { list-style: none; margin: 10px 0 0; padding: 0; }
+.kept-versions li + li { margin-top: 10px; }
+.kept-versions li p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

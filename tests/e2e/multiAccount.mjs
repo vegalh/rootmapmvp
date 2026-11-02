@@ -77,6 +77,7 @@ async function openChild(p, id) {
   await p.eval(`location.hash = "#/child/" + encodeURIComponent(${JSON.stringify(id)})`);
   await p.waitFor(`document.querySelector(".child-profile .profile-hero")`, 10000, "child page");
 }
+const kids = async p => { await p.eval(`location.hash = "#/kids"`); await p.waitFor(`document.querySelector(".children-page")`, 10000, "My Children"); };
 const gate = p => p.waitFor(`document.querySelector("input[name=email]") || document.body.innerText.includes("Welcome to RootMap")`, 15000, "the sign-in gate");
 const noSideScroll = p => p.eval(`document.documentElement.scrollWidth <= window.innerWidth + 1`);
 
@@ -127,7 +128,7 @@ async function createInvite(d, role = "editor") {
 const manageRow = (p, name, js) => p.eval(`(() => { const li = [...document.querySelectorAll(".circle-manage li")].find(l => l.innerText.includes(${JSON.stringify(name)})); ${js} })()`);
 
 const Ana = await newAccount("multi-ana"), Ben = await newAccount("multi-ben");
-let dA, dB, FA, photoA, invite;
+let dA, dB, FA, photoA, photoA2, invite;
 
 try {
   dA = await signedIn("multi-ana", 9401, Ana);
@@ -138,6 +139,12 @@ try {
     photoA = (await savePhoto(dA.p)).ref;
     assert.equal(await write(dA.p, { children: [child("c-kai", "Kai")] }), null);
     assert.equal(await write(dA.p, { entries: [entry("m-a1", "c-kai", "Kai stacked five blocks", [photoA])] }), null);
+    // For Recently Deleted: another Moment with its own photo and an activity record of Kai, and a child of Ana's
+    // that nobody else helps with (its deletions stay as they always were).
+    photoA2 = (await savePhoto(dA.p)).ref;
+    assert.equal(await write(dA.p, { children: [child("c-solo", "Sol")] }), null);
+    assert.equal(await write(dA.p, { entries: [entry("m-a2", "c-kai", "Kai found a snail", [photoA2]), entry("m-solo", "c-solo", "Sol's own Moment")] }), null);
+    assert.equal(await write(dA.p, { records: [rec({ id: "r-a1", childId: "c-kai", lesson: "Water pouring", activityId: "water-pouring", area: "practical-life", date: "2026-10-21" })] }), null);
     await backedUp(dA.p, "Ana backed up");
     assert.ok((await serverRow("photos", FA, photoA)).verified_at, "photo verified on the server");
   });
@@ -160,7 +167,10 @@ try {
         await p.nav(`${BASE}/#/invite/${invite.token}`);
         await gate(p);
         assert.equal(await p.eval(`navigator.userAgent`), ua);
-        assert.ok((await p.eval(`location.hash`)).includes(`/invite/${invite.token}`), "the invitation address survives");
+        assert.equal(await p.eval(`location.hash`), "#/invite", "the token left the address bar at once");
+        assert.ok(!(await p.eval(`location.href + document.URL`)).includes(invite.token));
+        assert.ok((await p.eval(`sessionStorage.getItem("rootmap.pending-invite") ?? ""`)).includes(invite.token), "held for this tab only");
+        assert.ok(!(await p.eval(`JSON.stringify(Object.entries(localStorage))`)).includes(invite.token), "never in localStorage");
         assert.ok(!(await text(p)).includes("Kai"), "nothing about the child before sign-in");
         assert.ok(await noSideScroll(p), "no horizontal scrolling at 390px");
       }
@@ -179,6 +189,8 @@ try {
     await p.waitFor(`document.querySelector(".invite-page") && [...document.querySelectorAll(".invite-page button")].some(b => b.textContent === "Accept")`, 15000, "preview");
     const t = await text(p);
     assert.ok(t.includes("Join Kai’s Circle") && t.includes("Invited by Ana"), t);
+    assert.ok(t.includes(`Signed in as ${Ben.email}.`) && t.includes("Not you?"), "which account would accept");
+    assert.equal(await p.eval(`location.hash`), "#/invite", "restored after the sign-in reload without the token in the address");
     const box = await p.eval(`(() => { const b = [...document.querySelectorAll(".invite-page button")].find(b => b.textContent === "Accept").getBoundingClientRect(); return { h: b.height, bottom: b.bottom, right: b.right, vh: innerHeight, vw: innerWidth }; })()`);
     assert.ok(box.h >= 44, `Accept is at least 44px tall (${box.h})`);
     assert.ok(box.bottom <= box.vh && box.right <= box.vw, `Accept is on screen without scrolling (${JSON.stringify(box)})`);
@@ -240,6 +252,66 @@ try {
     assert.ok((await circleText(dA.p)).includes("Ben"), await circleText(dA.p));
   });
 
+  await step("Join notice: Ana's My Children says Ben joined Kai's Circle; View opens Kai; dismissed, it stays gone after a reload; Ben sees no such notice", async () => {
+    page = dA.p;
+    await kids(dA.p);
+    await dA.p.waitFor(`document.querySelector(".circle-joins")?.innerText.includes("Ben joined Kai’s Circle.")`, 10000, "join notice");
+    assert.ok(!(await dA.p.eval(`document.querySelector(".circle-joins").innerText`)).includes(Ben.email), "no email");
+    await dA.u.click("View Circle", ".circle-joins button");
+    await dA.p.waitFor(`location.hash === "#/child/c-kai" && document.querySelector(".child-circle")?.innerText.includes("Ben")`, 10000, "Kai's page with her circle");
+    await kids(dA.p);
+    await sleep(800);
+    assert.ok(!(await dA.p.eval(`!!document.querySelector(".circle-joins")`)), "dismissed");
+    await dA.p.reload(); await dA.u.appReady(); await kids(dA.p); await sleep(1200);
+    assert.ok(!(await dA.p.eval(`!!document.querySelector(".circle-joins")`)), "still dismissed after a reload");
+    page = dB.p;
+    await kids(dB.p); await sleep(1000);
+    assert.ok(!(await dB.p.eval(`!!document.querySelector(".circle-joins")`)), "members get no join notices");
+  });
+
+  await step("Recently Deleted: Ben deletes Ana's Moment offline and her activity record; Ana restores both, same records and photo, and Ben sees them again", async () => {
+    page = dB.p;
+    await until(dB.p, `all("entries").some(e => e.id === ${JSON.stringify(sid(FA, "m-a2"))}) && all("records").some(r => r.id === ${JSON.stringify(sid(FA, "r-a1"))})`, "Ben has the Moment and record");
+    await offline(dB.p, true);
+    assert.equal(await edit(dB.p, "entries", sid(FA, "m-a2"), { deletedAt: new Date().toISOString() }), null);
+    await offline(dB.p, false);
+    assert.equal(await edit(dB.p, "records", sid(FA, "r-a1"), { deletedAt: new Date().toISOString() }), null);
+    await backedUp(dB.p, "Ben's deletions sent");
+    const deletedRow = await serverRow("entries", FA, "m-a2");
+    assert.ok(deletedRow.deleted_at, "soft-deleted on the server, not removed");
+    assert.equal(deletedRow.updated_by, Ben.id);
+    assert.equal((await serverRow("photos", FA, photoA2)).deleted_at, null, "the photo itself is untouched");
+    // Ben (Add & Edit) has no shared section in his Recently Deleted: restoring is for the person managing the profile.
+    await dB.p.eval(`location.hash = "#/recently-deleted"`);
+    await dB.p.waitFor(`document.querySelector(".deleted-intro")`, 5000, "Ben's Recently Deleted");
+    await sleep(800);
+    assert.ok(!(await dB.p.eval(`!!document.querySelector(".deleted-shared")`)));
+    page = dA.p;
+    assert.equal(await edit(dA.p, "entries", "m-solo", { deletedAt: new Date().toISOString() }), null);
+    await until(dA.p, `all("entries").find(e => e.id === "m-a2")?.deletedAt && all("records").find(r => r.id === "r-a1")?.deletedAt`, "Ana has both deletions");
+    await dA.p.eval(`location.hash = "#/recently-deleted"`);
+    await dA.p.waitFor(`document.querySelectorAll(".deleted-shared .deleted-row").length === 2`, 10000, "two shared records listed");
+    const listed = await dA.p.eval(`document.querySelector(".deleted-shared").innerText`);
+    assert.ok(listed.includes("Moment · Kai") && listed.includes("Kai found a snail") && listed.includes("Activity record · Kai"), listed);
+    assert.ok(!listed.includes("Sol"), "a child nobody else helps with: not listed, unchanged behaviour");
+    for (let i = 0; i < 2; i++) {
+      await dA.p.eval(`document.querySelector(".deleted-shared .deleted-row button").click(); true`);
+      await dA.p.confirmDialog();
+      await dA.p.waitFor(`document.querySelectorAll(".deleted-shared .deleted-row").length === ${1 - i}`, 5000, "restored one");
+    }
+    await backedUp(dA.p, "restores sent");
+    const restored = await serverRow("entries", FA, "m-a2");
+    assert.equal(restored.deleted_at, null);
+    assert.equal(restored.text, "Kai found a snail");
+    assert.deepEqual(restored.photo_ids, [photoA2], "same photo");
+    assert.equal(restored.created_at, deletedRow.created_at, "same record");
+    assert.equal((await serverRow("activity_records", FA, "r-a1")).deleted_at, null);
+    assert.ok((await serverRow("entries", FA, "m-solo")).deleted_at, "Sol's Moment stays deleted");
+    page = dB.p;
+    await until(dB.p, `!all("entries").find(e => e.id === ${JSON.stringify(sid(FA, "m-a2"))})?.deletedAt && !all("records").find(r => r.id === ${JSON.stringify(sid(FA, "r-a1"))})?.deletedAt`, "Ben sees both again");
+    assert.ok(await dB.p.eval(`import("/src/lib/data/store.ts").then(S => S.hasPhotoBytes(${JSON.stringify(photoA2)}))`), "the photo stayed on Ben's device");
+  });
+
   await step("Same Moment edited by both while offline: the first to reach the server keeps the text; the other is kept as a version, not lost", async () => {
     await until(dB.p, `all("entries").find(e => e.id === ${JSON.stringify(sid(FA, "m-b1"))}) && !out.length`, "Ben settled");
     await offline(dA.p, true); await offline(dB.p, true);
@@ -266,16 +338,24 @@ try {
     await until(dB.p, `all("entries").find(e => e.id === ${JSON.stringify(sid(FA, "m-a1"))})?.text === "Ana's words"`, "Ben converges");
     await until(dA.p, `all("entries").find(e => e.id === "m-b1")?.text === "Kai and Ben fed the ducks by the pond"`, "Ana converges");
     const count = await admin(`/rest/v1/entries?family_id=eq.${FA}&child_id=eq.c-kai&select=id`);
-    assert.deepEqual(count.map(r => r.id).sort(), ["m-a1", "m-b1"], "no duplicates after reconnecting");
+    assert.deepEqual(count.map(r => r.id).sort(), ["m-a1", "m-a2", "m-b1"], "no duplicates after reconnecting");
     // Who can read the kept version: Ana (manages Kai) and Ben (kept it); the API decides, per account.
     for (const d of [dA, dB]) {
       const n = await d.p.eval(`import("/src/lib/cloud/client.ts").then(async C => { const c = await C.getCloudClient(); const { data } = await c.from("record_versions").select("id").eq("family_id", ${JSON.stringify(FA)}).eq("record_id", "m-a1"); return data?.length ?? -1; })`);
       assert.ok(n >= 1, "readable by Ana and by Ben");
     }
+    // The Moment's page shows the kept version to Ana (who manages Kai's profile) and to Ben (whose version it is).
+    for (const [d, id] of [[dA, "m-a1"], [dB, sid(FA, "m-a1")]]) {
+      await d.p.eval(`location.hash = "#/moment/" + encodeURIComponent(${JSON.stringify(id)})`);
+      await d.p.waitFor(`document.querySelector(".kept-versions")?.innerText.includes("Ben's words")`, 10000, "kept version shown");
+      assert.ok((await d.p.eval(`document.querySelector(".journal-entry-text").innerText`)).includes("Ana's words"), "the Moment itself shows the kept-first text");
+    }
   });
 
   await step("Ana makes Ben View Only in Manage; Ben's screens follow (no adding or editing), and his circle line updates in place", async () => {
     page = dA.p;
+    await openChild(dA.p, "c-kai");
+    await dA.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Manage button");
     await dA.u.click("Manage", ".child-circle button");
     await dA.p.waitFor(`[...document.querySelectorAll(".circle-manage li")].some(l => l.innerText.includes("Ben"))`, 5000, "Ben listed");
     await manageRow(dA.p, "Ben", `const s = li.querySelector("select"); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, "viewer"); s.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
@@ -301,6 +381,9 @@ try {
     for (let i = 0; i < 3; i++) { await syncNow(dB.p); await sleep(700); }
     assert.equal(patches(), before, "not sent again");
     assert.equal((await serverRow("entries", FA, "m-a1")).text, "Ana's words");
+    assert.equal(await edit(dB.p, "entries", sid(FA, "m-a2"), { deletedAt: new Date().toISOString() }), null);
+    await until(dB.p, `out.some(e => e.id === ${JSON.stringify(sid(FA, "m-a2"))} && e.rejected)`, "a viewer's deletion refused too");
+    assert.equal((await serverRow("entries", FA, "m-a2")).deleted_at, null, "not deleted on the server");
   });
 
   await step("Ana removes Ben; after confirmed membership checks Kai leaves Ben's device, his refused change is archived apart, and Ana's records are untouched", async () => {
@@ -331,6 +414,80 @@ try {
     page = dA.p;
     assert.equal((await get(dA.p, "entries", "m-b1")).deletedAt, null, "Ben's Moment stays with Kai");
   }, /status of 403 \(Forbidden\) \S+\/rest\/v1\/rpc\/child_circle/);
+  // A dev server like the others, but with a CAPTCHA site key: signing in loads the third-party script. Chrome serves
+  // a stand-in for Cloudflare's script (nothing leaves this computer), and records what the browser sends with the
+  // request for it.
+  const captchaServer = await startServer({ VITE_ROOTMAP_SHARED_SYNC: "on", VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA" });
+  const dC = { p: await newDevice("multi-cy", 9404) };
+  dC.u = ui(dC.p);
+  page = dC.p;
+  const thirdParty = [];
+  await dC.p.send("Fetch.enable", { patterns: [{ urlPattern: "https://challenges.cloudflare.com/*" }] });
+  const STAND_IN = `window.turnstile = { render(el, o) { window.__ts = o; return "w"; }, execute() { setTimeout(() => window.__ts.callback("stand-in-captcha-token"), 0); }, reset() {} };`;
+  dC.p.handlers.add(m => {
+    if (m.method !== "Fetch.requestPaused") return;
+    thirdParty.push({ url: m.params.request.url, referer: m.params.request.headers.Referer ?? m.params.request.headers.referer ?? "" });
+    void dC.p.send("Fetch.fulfillRequest", { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/javascript" }], body: Buffer.from(STAND_IN).toString("base64") });
+  });
+  // What the page's address was at the moment the third-party script element was added (the script reads it then).
+  await dC.p.send("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.tagName === "SCRIPT" && String(n.src).includes("challenges.cloudflare.com")) localStorage.setItem("test.addressWhenLoaded", location.href + " " + document.URL + " " + document.referrer); }).observe(document, { childList: true, subtree: true });` });
+  const Cy = await newAccount("multi-cy");
+  let cyInvite;
+  await step("CAPTCHA isolation: the third-party script loads during sign-in with an invitation open; the address, Referer and request hold no token", async () => {
+    page = dA.p;
+    await openChild(dA.p, "c-kai");
+    cyInvite = await createInvite(dA, "viewer");
+    page = dC.p;
+    await dC.p.nav(`${captchaServer.base}/#/invite/${cyInvite.token}`);
+    await gate(dC.p);
+    await dC.u.click("Continue with Email");
+    await dC.p.waitFor(`document.querySelector("input[name=email]")`, 5000, "email step");
+    await dC.u.type("input[name=email]", Cy.email);
+    await dC.u.type("input[name=password]", PASSWORD);
+    // Submitting asks for a CAPTCHA token first: the script is added to this page, then sign-in reloads it.
+    const reloaded = dC.p.waitEvent("Page.loadEventFired", 20000);
+    await dC.p.eval(`document.querySelector("form button[type=submit]").click(); true`);
+    await reloaded;
+    const address = (await dC.p.eval(`localStorage.getItem("test.addressWhenLoaded")`)) ?? "";
+    await dC.p.eval(`localStorage.removeItem("test.addressWhenLoaded")`);
+    assert.ok(address.includes("#/invite"), `recorded while the invitation was open (${address.replace(cyInvite.token, "<token>")})`);
+    assert.ok(!address.includes(cyInvite.token), "no token in the address the script could read");
+    assert.ok(thirdParty.length >= 1, "the CAPTCHA script was requested");
+    for (const r of thirdParty) assert.ok(!r.url.includes(cyInvite.token) && !r.referer.includes(cyInvite.token), `the script's request: ${r.url}`);
+    await dC.p.waitFor(`[...document.querySelectorAll(".invite-page button")].some(b => b.textContent === "Accept")`, 20000, "preview after the CAPTCHA sign-in");
+    await dC.p.eval(`[...document.querySelectorAll(".invite-page button")].find(b => b.textContent === "Accept").click(); true`);
+    await dC.p.waitFor(`document.querySelector(".child-profile .profile-hero")`, 20000, "Kai's profile");
+    assert.equal(await dC.p.eval(`sessionStorage.getItem("rootmap.pending-invite")`), null, "forgotten once accepted");
+    await until(dC.p, `all("entries").some(e => e.id === ${JSON.stringify(sid(FA, "m-a1"))})`, "Cy has the Moment");
+    await dC.p.eval(`location.hash = "#/moment/" + encodeURIComponent(${JSON.stringify(sid(FA, "m-a1"))})`);
+    await dC.p.waitFor(`document.querySelector(".journal-entry-text")`, 10000, "the Moment");
+    await sleep(1500);
+    assert.ok(!(await dC.p.eval(`!!document.querySelector(".kept-versions")`)), "someone else's kept version is never shown to a View Only member");
+  });
+
+  await step("Join notices follow the account, not the browser: on Cy's browser Ana sees 'Cy joined', Cy never does", async () => {
+    page = dC.p;
+    await kids(dC.p); await sleep(1000);
+    assert.ok(!(await dC.p.eval(`!!document.querySelector(".circle-joins")`)), "Cy (View Only) gets none");
+    await dC.u.signOut();
+    await dC.u.openProfile();
+    await dC.u.click("Sign in or create an account");
+    await dC.u.welcomeShown();
+    await dC.u.signInWithPassword(Ana.email);
+    await kids(dC.p);
+    await dC.p.waitFor(`document.querySelector(".circle-joins")?.innerText.includes("Cy joined Kai’s Circle.")`, 15000, "Ana's notice on this browser");
+    assert.ok(!(await dC.p.eval(`document.querySelector(".circle-joins").innerText`)).includes("Ben"), "Ben's was dismissed on Ana's other browser");
+    await dC.u.click("Done", ".circle-joins button");
+    await dC.p.waitFor(`!document.querySelector(".circle-joins")`, 5000, "dismissed");
+    page = dA.p;
+    await kids(dA.p);
+    await sleep(6000); // past the 5 s refresh throttle
+    await dA.p.eval(`window.dispatchEvent(new Event("focus"))`);
+    await sleep(1500);
+    assert.ok(!(await dA.p.eval(`!!document.querySelector(".circle-joins")`)), "dismissed on one device, gone on the other");
+  });
+  await dC.p.close().catch(() => {});
+  captchaServer.stop();
 } catch (e) {
   console.log(`FAIL  (set-up) ${e.message}`);
   process.exitCode = 1;

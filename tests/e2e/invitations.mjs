@@ -257,7 +257,9 @@ try {
     assert.equal(refused, "wrong_email", "the server itself refuses, not just the screen");
     await dQ.p.eval(`[...document.querySelectorAll(".invite-page button")].find(b => b.textContent === "Sign In With a Different Account").click(); true`);
     await dQ.p.waitFor(`document.querySelector("input[name=email]") || document.body.innerText.includes("Welcome to RootMap")`, 15000, "signed out, back at sign-in");
-    assert.ok((await dQ.p.eval(`location.hash`)).includes(`/invite/${restrictedInvite.token}`), "the same invitation is still the one being opened");
+    // The same invitation is still the one being opened: held for this tab, outside the address (lib/inviteToken.ts).
+    assert.equal(await dQ.p.eval(`location.hash`), "#/invite");
+    assert.ok((await dQ.p.eval(`sessionStorage.getItem("rootmap.pending-invite") ?? ""`)).includes(restrictedInvite.token), "the same invitation is still the one being opened");
     assert.ok(!(await text(dQ.p)).includes("Mia"), "still nothing about the child while signed out");
   });
 

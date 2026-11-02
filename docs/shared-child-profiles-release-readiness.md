@@ -15,6 +15,12 @@ read in code or docs, not executed. **Unverified** = not checked (says why).
 
 **Recommendation: READY FOR LOCAL CONTROLLED TESTING** (level 2 of 4). Section J explains why it isn't higher.
 
+**Update, 2026-11-02 (section K):** the follow-up fixed S2 (token out of the address before any third-party script
+can load), S10 (an owner's own link stays unused) and the visible part of S4 (kept versions shown on the Moment).
+It added join notices (S1, with the owner's decision to keep links without an email restriction) and Recently
+Deleted for shared records (S5, with the owner's decision that editors may delete). The blockers list below is
+updated; the original text is kept where it records what was true at the time.
+
 What holds up (verified):
 
 - Server-side rules: invitations, memberships, roles, removal, soft-deleted children, photo access and ownership.
@@ -39,10 +45,10 @@ Blockers before staging, all outside this branch's code:
 2. The CI changes are not pushed. The browser workflow has never been confirmed green on Linux, and branch
    protection is not verified.
 3. Nothing has been tested on a physical phone, in real Safari/WebKit or in WeChat.
-4. A third-party script (Cloudflare Turnstile, staging only) may see the invitation token (S2).
+4. ~~A third-party script may see the invitation token (S2).~~ Fixed (section K).
 5. Shared sync can't be enabled on staging without a deliberate code change. That is by design, and it still needs
    to be designed.
-6. Owner decisions are open on forwarded links (S1) and on editors deleting records (S5).
+6. ~~Owner decisions open on S1 and S5.~~ Decided; notices and Recently Deleted built (section K).
 
 ## B. Architecture
 
@@ -107,16 +113,16 @@ particular attention.
 
 | # | Severity | Finding | Evidence | Fix / status | Remaining risk |
 |---|---|---|---|---|---|
-| S1 | Medium | **A forwarded link admits whoever opens it first.** An invitation without an email restriction can be accepted by any signed-in account holding the link, for example after it is reposted in a group chat. The owner is not notified. | `accept_invitation` (by design, Phase 4 §4) | Not fixed (product decision). Mitigated by 7-day expiry, single use, revocation, removal, and Manage showing "Joined" and the new person. | Recommend making the email restriction the default, or adding owner approval, before testers outside one household. |
-| S2 | Medium (unverified) | **A third-party script may see the token.** On the sign-in gate the address bar holds `#/invite/<token>`. Staging builds with `VITE_TURNSTILE_SITE_KEY` load Cloudflare's Turnstile script there, and it can read `location.href`. Whether it sends the fragment anywhere was not verified. | `lib/cloud/captcha.ts`, `App.tsx` invite gate | Not fixed. Unreachable today: sharing is off in staging and production builds (verified, section 11). | **Staging prerequisite:** move the token out of the address bar (for example into `sessionStorage`) before any third-party script loads, or verify Turnstile's behaviour. |
+| S1 | Medium | **A forwarded link admits whoever opens it first.** An invitation without an email restriction can be accepted by any signed-in account holding the link, for example after it is reposted in a group chat. The owner is not notified. | `accept_invitation` (by design, Phase 4 §4) | **Mitigated (section K).** Owner decision: links without an email restriction stay, for WeChat and messaging apps. The person managing the profile now gets a "Nina joined Emma's Circle" notice, recorded atomically with the acceptance, and can review and remove. | Someone unintended can still join before the owner notices; they then see the child's shared records until removed. |
+| S2 | Medium (unverified) | **A third-party script may see the token.** On the sign-in gate the address bar holds `#/invite/<token>`. Staging builds with `VITE_TURNSTILE_SITE_KEY` load Cloudflare's Turnstile script there, and it can read `location.href`. Whether it sends the fragment anywhere was not verified. | `lib/cloud/captcha.ts`, `App.tsx` invite gate | **Fixed (section K):** the token leaves the address before the app renders, and the CAPTCHA script is only ever added to a page without it. Browser-tested with a stand-in script. | A script running in the page could still read `sessionStorage` (as it could the sign-in session itself). |
 | S3 | Medium | **A removed member's device keeps the child's data at rest** until that account next syncs on that device. If they never sign in there again, it stays indefinitely (offline-first by design). | Phase 2a/2b removal design; `multiAccount.mjs` shows cleanup only once the device syncs | Not fixed (inherent). | Tell testers. Removal can't wipe a device that never reconnects. |
-| S4 | Medium | **A concurrent edit can be hidden from the people involved.** When two people change the same field, the second to reach the server loses it on every screen. Their text is kept in `record_versions`, readable by the owner and its author, but no screen shows it. Not data loss, but a silent overwrite from the user's point of view. | `resolver.ts`; `multiAccount.mjs` concurrent step | Not fixed (see section D for the smallest improvement). | Testers may think an edit vanished. |
-| S5 | Medium | **Editors can soft-delete any of the child's records** (decided in Phase 1b), and the owner has no in-app way to restore a deleted Moment or activity record. Tombstones stay on the server. | Phase 1b matrix | Not fixed (product decision). | A mistaken or hostile editor can empty a child's journal. Recovery needs a server operator. |
+| S4 | Medium | **A concurrent edit can be hidden from the people involved.** When two people change the same field, the second to reach the server loses it on every screen. Their text is kept in `record_versions`, readable by the owner and its author, but no screen shows it. Not data loss, but a silent overwrite from the user's point of view. | `resolver.ts`; `multiAccount.mjs` concurrent step | **Partly fixed (section K):** the Moment's page shows "Kept versions" to the person managing the profile and to the version's author. | No notice at the moment of the conflict; activity records' kept versions are not shown. |
+| S5 | Medium | **Editors can soft-delete any of the child's records** (decided in Phase 1b), and the owner has no in-app way to restore a deleted Moment or activity record. Tombstones stay on the server. | Phase 1b matrix | **Mitigated (section K).** Owner decision: editors keep this. Recently Deleted now lists a shared child's removed Moments and activity records for the person managing the profile, who can restore them. | Deletions aren't announced; the owner has to look. |
 | S6 | Low | **The Circle could show stale or no-longer-permitted names**: it refreshed only on remount and kept names on screen after access ended. | Phase 4 §10 | **Fixed** (section D, Circle refresh). A 42501 answer now removes every name from the screen. | — |
 | S7 | Low | **Declining left the unspent token in browser history** (Back returned to it). | `App.tsx` `declined={() => go("today")}` pushed a new entry | **Fixed**: decline replaces the entry, as accept already did. Tested (`invitations.mjs` "Declining"). | — |
 | S8 | Low | **Record reads (`/rest/v1/`) were not explicitly kept out of the browser HTTP cache.** Only photo files were. The local stack sends no cache headers (verified with `curl`), so nothing is cached today. Hosted headers were not verified. | `lib/cloud/client.ts` | **Fixed** (defense in depth): `cache: "no-store"` for `/rest/v1/` too. | — |
 | S9 | Low | **Signed URLs** created before removal keep working until they expire. | Phase 2b tests | Accepted: the app never creates signed URLs. | Only links someone made by hand. |
-| S10 | Low | **An owner who opens their own invitation link and taps Accept spends it** (`accept_invitation` marks it accepted while leaving the owner row alone). | Migration `20261101000500` | Not fixed. Fix in a new migration: answer "already in the circle" without marking the invitation used. | Mild confusion; the owner can make another link. |
+| S10 | Low | **An owner who opens their own invitation link and taps Accept spends it** (`accept_invitation` marks it accepted while leaving the owner row alone). | Migration `20261101000500` | **Fixed** in `20261102000100`: the owner gets `already_member` and the invitation stays unused (database-tested). | — |
 | S11 | Low | **The upgrade backfill clears `record_versions.updated_by`** on versions kept before the upgrade. The column is a server stamp: a migration has no signed-in user. `created_by`, which decides access, is unchanged. | `tests/ops/upgrade.mjs` (reported column by column) | Accepted, documented. | Loss of a "last touched by" stamp on old versions only. |
 | S12 | Low | **Pending invitations of a soft-deleted child come back on restore** (if not yet expired). | `get_invitation_preview` checks `child_is_deleted` only at use | Accepted, documented. | The owner can cancel them in Manage. |
 | S13 | Info | `sharedSyncEnabled` checks `MODE === "development"`, so a bundle built with `vite build --mode development` (a Figma preview) and the flag would compute `true`. That build's cloud environment is "local" and accepts only loopback Supabase URLs, so it can't reach a hosted project. | `lib/sync/scopes.ts`, `lib/cloud/environment.ts` | Accepted. Optionally tie the flag to `import.meta.env.DEV` as well. | None found. |
@@ -435,16 +441,16 @@ build. Plan that first.
 1. No database or photo backups on staging (F).
 2. CI changes not pushed. Linux browser workflow unconfirmed. Branch protection not set or verified (G).
 3. No physical-device, real-Safari/WebKit or WeChat testing (H).
-4. S2: the invitation token is in the address bar while a third-party script (Turnstile) runs on staging sign-in.
+4. ~~S2~~ (fixed, section K).
 5. No way to enable shared sync on staging: `sharedSyncEnabled` requires a development server. A deliberate,
    reviewed staging switch is needed (with S13 in mind).
 6. Staging-data migration rehearsal and undo migrations (E).
-7. Owner decisions: S1 (forwarded links), S5 (editor deletions without owner undo).
+7. ~~Owner decisions on S1 and S5~~ (decided; built, section K).
+8. Migration `20261102000100_circle_joins.sql` is local only, like the five before it.
 
 **Should fix soon, not blocking local tests:**
 
-- S4: a note for a concurrent edit that lost.
-- S10: an owner spending their own link.
+- S4 (rest): a notice when a conflict happens, and kept versions of activity records.
 - **Link sharing fallback:** the link is never shown as text. Where neither Web Share nor the clipboard works (some
   in-app browsers, older WebViews), the owner can't get it. Consider a read-only, selectable field after a copy
   failure.
@@ -486,3 +492,179 @@ Why not higher:
 
 **Next step:** open a pull request from this branch (or run the workflows by hand) to get the first Linux CI run.
 Then, in parallel, have the owner decide on staging backups and S1/S5.
+
+## K. Follow-up: safety and recovery improvements (2026-11-02)
+
+Done after `8c84c71`, on the same branch, against local stacks only. Nothing pushed, merged or deployed; staging
+untouched. No staging or physical-device testing happened.
+
+### K.1 Audit of the unexpected commit `c9bef56`
+
+`c9bef56` (author `vegalh`, 2026-11-01 19:16 -0500) was made on this branch while the review was in progress, by
+neither this review's tooling nor an explicit request. Inspected with `git show --stat c9bef56` and `git show
+c9bef56` against `c19f10e`:
+
+| Question | Finding |
+|---|---|
+| Files changed | 16: the three workflows, `AGENTS.md`, `package.json`, `src/App.tsx`, `src/components/ChildCircle.tsx`, `src/lib/cloud/client.ts`, `src/lib/refresher.ts`, `tests/README.md`, `tests/e2e/flags.mjs`, `tests/e2e/invitations.mjs`, `tests/e2e/multiAccount.mjs`, `tests/ops/restoreRehearsal.mjs`, `tests/ops/upgrade.mjs`, `tests/unit/refresher.test.ts`. |
+| Unrelated changes | None. It is exactly the review's working tree at that moment (the working tree was clean against it straight afterwards). Its message mentions only the tests; the commit also holds the Circle refresh, the CI gate and the cache change. |
+| Security-sensitive files | `deploy-pages.yml`, `db-tests.yml`, `e2e-tests.yml` (deploy now gated on tests, section G), `client.ts` (`no-store` widened to record reads), `App.tsx` (decline forgets the address). All reviewed as part of the review itself. |
+| Tests removed or weakened | None. Removed lines are the replaced Circle loading code, a fixed `sleep(400)`, and the navigate-away workaround in `invitations.mjs`, replaced by stricter assertions. No `skip`, `only` or `todo` added. |
+| Credentials or secrets | None. The ops scripts and suites read the local stack's development keys from `supabase status` at run time and refuse any non-local stack. No `sb_secret_`, JWT or project URL in the diff. |
+| Overlap with `8c84c71` | None: `8c84c71` changes only the report and `tests/e2e/analytics.mjs`. |
+
+Not reverted and history not rewritten. No serious security issue.
+
+### K.2 Invitation token security (S2)
+
+**How it was exposed.** A link is `#/invite/<token>`. The app kept the token in the address while signed out. The
+sign-in CAPTCHA (Cloudflare Turnstile, `lib/cloud/captcha.ts`) is added to the page only when the sign-in form is
+submitted (`lib/cloud/session.ts`), and it can read `location.href`, as any script in the page can. A URL fragment
+is not private from JavaScript.
+
+**Now (`lib/inviteToken.ts`):**
+
+- `main.tsx` calls `captureInviteToken()` before anything else. The token moves into memory and `sessionStorage`
+  (this tab only, ending with it; never `localStorage`), and the address is replaced with `#/invite`
+  (`history.replaceState`, so no history entry keeps it).
+- The same happens when a link is opened in a tab where the app is already running (App's popstate handler), and
+  once more right before the CAPTCHA script is added (`loadTurnstile`). So the script never loads into a page
+  whose address holds a token.
+- It survives the sign-in reload and a refresh (same tab). A new tab at `#/invite` without a held token opens
+  Today.
+- It is forgotten when the invitation is accepted or declined, or is invalid, expired, revoked or already used. It
+  is also forgotten on an ordinary sign-out (kept only for "Sign In With a Different Account") and after 24 hours.
+- **Wrong account:** the preview now says "Signed in as {email}." with "Not you?" (switch account, keeping the
+  invitation). Acceptance still needs an explicit Accept, and the server checks the signed-in account (and the
+  email restriction) itself.
+- Not in analytics, logs or error messages (unchanged; no invitation code calls them). The only requests carrying
+  it are the two invitation calls to the project, in POST bodies.
+
+**Isolation, honestly stated.** Any script running in the page can read `sessionStorage`, just as it can read the
+sign-in session in `localStorage`, which is worth more. A same-page script that actively wants the token can't be
+stopped by a static site. The fix removes every passive path: the address, `document.URL`, the Referer, page-URL
+telemetry, history and logs. A stronger boundary would need the CAPTCHA in a separate origin, which Turnstile's
+domain check doesn't allow from an opaque iframe (not attempted).
+
+**Tests:**
+
+- `tests/unit/inviteToken.test.ts` (4): capture, reload, expiry, forgetting, never localStorage.
+- `multiAccount.mjs`:
+  - the address is `#/invite` at once under three phone user agents, held in sessionStorage only, and restored
+    after the sign-in reload;
+  - "Signed in as";
+  - **CAPTCHA isolation:** a dev server with a site key, and Chrome serving a stand-in for Turnstile's script
+    (nothing leaves the computer). The address recorded when the script element was added holds no token, and
+    neither does the script's request or its Referer. Acceptance then works and the held token is gone.
+- `invitations.mjs`: switch account keeps the invitation in sessionStorage, not the address.
+- `flags.mjs`: production and staging builds still open nothing.
+
+### K.3 Invitation acceptance notices (S1)
+
+- **Server** (migration `20261102000100_circle_joins.sql`): no new notification system. The invitation row gains
+  `joined_new` (set by `accept_invitation`, in its locked transaction, when the acceptance made a new member) and
+  `join_seen_at`.
+  - `circle_joins()` returns the caller's unseen joins only for children whose profile they manage (not deleted,
+    member still in the circle): child first name, member display name, time. No email, no user id.
+  - `dismiss_circle_joins(ids)`: only the person managing the profile; idempotent.
+  - One acceptance means one notice. An invitation is accepted once, and retries and concurrent attempts answer
+    `accepted` and change nothing.
+  - Someone already in the circle accepting a second link (an access change) is not announced.
+- **Screen:** My Children shows "Nina joined Emma's Circle." (or "Someone joined…" without a display name), with
+  View Circle (opens the child's page, where the circle is) and Done. It refreshes on returning to the page. No
+  email or push.
+- **Tests:**
+  - `tests/db/circleJoins.test.ts` (7): success; repeated and concurrent acceptance; several invitations and an
+    access change; visible to the person managing the profile only (members, outsiders and anonymous callers get
+    nothing; the table stays unreadable); dismissal by others has no effect; removed members and deleted children;
+    S10.
+  - `multiAccount.mjs`: the notice, View, dismissed for good across a reload, none for members, and following the
+    account across browsers (Cy sees none; Ana signed in on Cy's browser sees Cy's notice; dismissing it there
+    clears it on Ana's other browser).
+
+### K.4 Recently Deleted for shared growth records (S5)
+
+- **Reuses what exists.** Moments, Journal entries (the same `entries` records) and activity records were already
+  soft-deleted (`deleted_at`), synced and kept with their photos. Soft deletion never touched photo rows, files or
+  device copies (verified: the photo row stays, and the bytes stay on the editor's device).
+- **What's new:** the existing Recently Deleted page gains a section, "Moments and activities from shared
+  profiles", for the person managing a profile that someone else helps with.
+  - Which children count: from the server's membership rows, which that person may read; asked when Profile or
+    Recently Deleted opens. Offline, the section isn't shown.
+  - Restore clears `deleted_at` on the same record (same id, text, photos, `created_at`). It syncs to everyone in
+    the circle like any edit; the server records who restored it in `updated_by`.
+  - No migration and no new deletion system.
+- **Unchanged:** children nobody else helps with (their Moments aren't listed, and their deletion behaves as
+  before), the guest space, deleting and restoring children, no automatic permanent deletion.
+- **Permissions:**
+  - View Only can't delete; the server refuses it, it is marked, and it's never resent (tested).
+  - Add & Edit can delete but has no restore list (tested). The server would still let an editor clear
+    `deleted_at`, the same right they have to edit.
+  - Others never receive the records at all.
+- **Tested** (`multiAccount.mjs`): Ben (Add & Edit) deletes Ana's Moment while offline and her activity record
+  online. Ana sees both listed, plus none of her unshared child's. She restores both, and the server rows are back
+  with the same photo and `created_at`. Ben's device shows them again, with the photo still there. A viewer's
+  deletion is refused.
+
+### K.5 Concurrent editing
+
+Behaviour unchanged (section D, "Concurrent editing: exactly what happens"): eventual synchronization; different
+fields merge; for the same field the first to reach the server wins; the other version goes to `record_versions`.
+Nothing deletes kept versions (no client delete grant; no purge job exists).
+
+**New:** a Moment's page shows "Kept versions" (`components/KeptVersions.tsx`): the kept text and date, read-only.
+
+- Who sees them: RLS (Phase 1b) shows a version only to the person managing the child's profile and to its author.
+- Tested: Ana and Ben see Ben's losing text under the Moment, which itself shows Ana's; Cy (View Only) sees
+  nothing.
+- Only where sharing is on.
+
+Not done (scope): a notice at the moment of conflict, restoring a kept version with one tap, and versions of
+activity records.
+
+### K.6 Test results
+
+All on this Mac (macOS, Node 24.21.0, headless Chrome, Supabase CLI 2.120.0), local stacks only, 2026-11-02.
+
+| Command / check | Result |
+|---|---|
+| `npm run typecheck` | clean |
+| `npm test` | **213 / 213** (+4 `inviteToken.test.ts`) |
+| `npm run test:db` (main stack) | **259 / 259** (+7 `circleJoins.test.ts`) |
+| `npm run test:e2e` | **152 / 152** (14 suites) |
+| `npm run test:e2e:cloud` | **115 / 115** (10 suites): cloud 15, spaces 10, sync 12, guestImport 7, analytics 11, sharing 17, circle 9, invitations 14, multiAccount 17, flags 3 |
+| `npm run build` | builds (the existing chunk-size warning only) |
+| Disposable stack: `tests/ops/upgrade.mjs` (now 16 migrations) | 8 / 8 |
+| Disposable stack: all 16 migrations from empty, then `tests/db` | applied in order; **259 / 259** |
+
+Requested security and regression checks, by where they are covered:
+
+1. Token handling and 2. CAPTCHA isolation: `inviteToken.test.ts`, `multiAccount.mjs`.
+3. Acceptance: `invitations.mjs`, `multiAccount.mjs`, `invitations.test.ts`.
+4. Notification and 5. its authorization: `circleJoins.test.ts`, `multiAccount.mjs`.
+6. Removal and 7. role changes: `invitations.mjs`, `multiAccount.mjs`, db suites.
+8. Shared deletion, 9. restoration, 10. photo preservation and 13. offline deletion: `multiAccount.mjs`.
+11. Cross-family isolation: `childAccess`, `multiFamilySync`, `sharing.mjs`, `upgrade.mjs`.
+12. Account switching: `multiAccount.mjs`, `sharing.mjs`.
+14. Guest behaviour: `circle.mjs`, `test:e2e`.
+15. Production sharing disabled: `flags.mjs`.
+
+**Failures while building this follow-up** (all mine, all fixed, none in the final run):
+
+- My edit script truncated `multiAccount.mjs`; it was restored from `HEAD` and the edits re-applied.
+- Test assertions that didn't yet know about a new Moment, a page left open by an earlier step, and the Circle
+  loading asynchronously.
+- A probe observing `documentElement` before it exists, whose result was then lost in the sign-in reload.
+
+No flaky failure appeared in the final run. The known `analytics.test.ts` flake did not fail.
+
+### K.7 Remaining staging blockers
+
+Unchanged except S2, S1, S5 and S10 (section I):
+
+- staging backups (database and photo files);
+- CI pushed and green on Linux, plus branch protection;
+- physical-device, real Safari/WebKit and WeChat testing;
+- a deliberate staging switch for sharing;
+- a staging-data migration rehearsal and undo migrations;
+- all six sharing migrations are local only.

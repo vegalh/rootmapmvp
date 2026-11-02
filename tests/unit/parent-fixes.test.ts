@@ -153,8 +153,9 @@ test("routes: every page has an address that opens it again; unknown addresses o
 test("routes: an invitation link addresses only its token; without one it opens nothing", () => {
   assert.equal(formatRoute({ screen: "invite", invite: "abc123" }), "#/invite/abc123");
   assert.deepEqual(parseRoute("#/invite/abc123"), { screen: "invite", invite: "abc123" });
-  assert.equal(parseRoute("#/invite"), null);
-  assert.equal(formatRoute({ screen: "invite" }), "#/today", "never addresses a blank invitation");
+  // Once opened, the token is held outside the address (lib/inviteToken.ts): the address is just #/invite.
+  assert.deepEqual(parseRoute("#/invite"), { screen: "invite" });
+  assert.equal(formatRoute({ screen: "invite" }), "#/invite", "the address of an open invitation never carries its token");
 });
 
 test("routes: links to the former Music tab open Discover > Activities; a music activity's link still opens its page", () => {

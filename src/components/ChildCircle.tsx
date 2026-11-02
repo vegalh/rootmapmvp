@@ -5,7 +5,7 @@ import { syncNow } from "../lib/sync/runner";
 import { formatRoute } from "../lib/routes";
 import { fmt, localIsoDate } from "../lib/dates";
 import { RELATIONSHIPS, accessOfRole, type Access, type Relationship, type TechnicalRole } from "../lib/childAccess";
-import { unscope } from "../lib/data/schema";
+import { scopedId, unscope } from "../lib/data/schema";
 import { createRefresher, fromRpc, type Fetched, type Refresher } from "../lib/refresher";
 import type { Child, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
@@ -399,6 +399,41 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
       </section>
       <div className="sheet-buttons"><button onClick={close}>{t.done}</button></div>
     </Modal>
+  );
+}
+
+// "Nina joined Emma's Circle": for the person managing a child's profile, the people who joined by invitation since
+// they last looked (release readiness; migration 20261102000100_circle_joins.sql). The server keeps them with the
+// invitation itself, so each acceptance is announced once, on every device, until dismissed. Only a display name is
+// shown, never an email. View opens the child's page, where the circle is.
+type Join = { id: string; family_id: string; child_id: string; child_first: string; member_name: string };
+
+export function CircleJoins({ homeFamilyId, openChild, t }: { homeFamilyId: string; openChild: (id: string) => void; t: Copy }) {
+  const [joins, setJoins] = useState<Join[]>([]);
+  const reload = useServerList<Join[]>(
+    () => rpcList("circle_joins", {}),
+    result => { if (result.ok) setJoins(result.value); else if (result.denied) setJoins([]); },
+    homeFamilyId,
+  );
+  const dismiss = async (id: string) => {
+    setJoins(current => current.filter(j => j.id !== id));
+    const client = await getCloudClient();
+    await client?.rpc("dismiss_circle_joins", { p_ids: [id] });
+    void reload();
+  };
+  if (!joins.length) return null;
+  return (
+    <section className="access-notice circle-joins" role="status">
+      {joins.map(j => (
+        <div key={j.id} className="circle-join">
+          <p>{(j.member_name.trim() ? t.circleJoinedNamed.replace("{name}", j.member_name.trim()) : t.circleJoinedSomeone).replace("{child}", j.child_first)}</p>
+          <div className="access-notice-actions">
+            <button className="text-action" onClick={() => { void dismiss(j.id); openChild(j.family_id === homeFamilyId ? j.child_id : scopedId(j.family_id, j.child_id)); }}>{t.circleJoinedView}</button>
+            <button className="text-action" onClick={() => void dismiss(j.id)}>{t.done}</button>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 
