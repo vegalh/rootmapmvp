@@ -142,6 +142,8 @@ try {
     await grant(FL, "c-mia", Nina, "editor");
     dN = await signedIn("inv-nina", 9392, Nina);
     page = dN.p;
+    // Mia has to reach Nina's device first: an address for a child the device doesn't have opens My Children instead.
+    await until(dN.p, `all("children").some(c => c.id === ${JSON.stringify(sid(FL, "c-mia"))})`, "Mia reached Nina's device");
     await openChild(dN.p, sid(FL, "c-mia"));
     await dN.p.waitFor(`document.querySelector(".child-circle")`, 10000, "circle shown");
     assert.ok(!(await dN.p.eval(`!!([...document.querySelectorAll(".child-circle button")].find(b => b.textContent === "Manage"))`)), "no Manage button for an editor");
@@ -214,13 +216,29 @@ try {
     await dL.p.eval(`[...document.querySelectorAll(".invite-pending button")][0]?.click(); true`);
     await dL.p.waitFor(`[...document.querySelectorAll("button")].some(b => b.textContent === "Cancel Invitation")`, 5000, "confirm cancel");
     await dL.p.eval(`[...document.querySelectorAll("button")].filter(b => b.textContent === "Cancel Invitation").at(-1).click(); true`);
-    await sleep(400);
+    await dL.p.waitFor(`document.querySelector(".invite-pending")?.innerText.includes("Canceled")`, 5000, "the pending list shows it canceled");
     await dL.p.eval(`[...document.querySelectorAll("button")].find(b => b.textContent === "Done")?.click(); true`);
     page = dV.p;
     await dV.p.eval(`location.hash = "#/invite/${revokedInvite.token}"`);
     await waitInvite(dV.p, 10000);
     assert.ok((await text(dV.p)).includes("This invitation is no longer available."));
     assert.ok(!(await dV.p.eval(`!!([...document.querySelectorAll(".invite-page button")].find(b => b.textContent === "Accept"))`)));
+  });
+
+  await step("Declining (Not Now): Today opens, the token is in no history entry, and the invitation stays pending", async () => {
+    page = dL.p;
+    await openChild(dL.p, "c-mia");
+    const declined = await createInvite(dL, { role: "viewer" });
+    page = dV.p;
+    await dV.p.eval(`location.hash = "#/invite/${declined.token}"`);
+    await waitInvite(dV.p, 10000);
+    await dV.p.eval(`[...document.querySelectorAll(".invite-page button")].find(b => b.textContent === "Not Now").click(); true`);
+    await dV.p.waitFor(`location.hash === "#/today"`, 5000, "Today");
+    const history = await dV.p.send("Page.getNavigationHistory");
+    assert.ok(history.entries.every(e => !e.url.includes(declined.token)), "no history entry holds the token");
+    const row = await rest("GET", `/rest/v1/child_invitations?id=eq.${declined.id}&select=accepted_at,revoked_at`);
+    assert.deepEqual(row, [{ accepted_at: null, revoked_at: null }], "still pending: declining sends nothing");
+    await rest("PATCH", `/rest/v1/child_invitations?id=eq.${declined.id}`, { revoked_at: new Date().toISOString() });
   });
 
   let restrictedInvite;
@@ -260,10 +278,14 @@ try {
 
   await step("Manage: changing a member's role, and removing a member, through the Circle UI", async () => {
     page = dL.p;
-    // Lin's own Circle view has been open (on and off) since before Nina and Priya joined through their own links,
-    // and only ever refreshes on its own actions; a fresh look at the child's page picks up both new members.
-    await kids(dL.p);
-    await openChild(dL.p, "c-mia");
+    // Lin's page has stayed on Mia since before Priya joined on her own device. The circle catches up when the page
+    // comes back to the front (release readiness: no navigating away and back).
+    assert.equal(await dL.p.eval(`location.hash`), "#/child/c-mia");
+    for (let i = 0; i < 20 && !(await dL.p.eval(`document.querySelector(".child-circle")?.innerText ?? ""`)).includes("Priya"); i++) {
+      await dL.p.eval(`window.dispatchEvent(new Event("focus"))`);
+      await sleep(1000);
+    }
+    assert.ok((await dL.p.eval(`document.querySelector(".child-circle").innerText`)).includes("Priya"), "Priya shown without navigating");
     await dL.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Manage button");
     await dL.p.eval(`[...document.querySelectorAll(".child-circle button")].find(b => b.textContent === "Manage")?.click(); true`);
     await dL.p.waitFor(`document.querySelector(".circle-manage")`, 5000, "Manage sheet");
@@ -277,7 +299,28 @@ try {
     await sleep(600);
     assert.equal(await membership(FL, "c-mia", Priya), null, "Priya's membership is gone");
     page = dP.p;
+    // Priya's page is still on Mia: once the server refuses the circle, nobody's name stays on her screen.
+    for (let i = 0; i < 20 && (await dP.p.eval(`document.querySelector(".child-circle")?.innerText ?? ""`)).includes("Lin"); i++) {
+      await dP.p.eval(`window.dispatchEvent(new Event("focus"))`);
+      await sleep(1000);
+    }
+    assert.ok(!(await dP.p.eval(`document.querySelector(".child-circle")?.innerText ?? ""`)).includes("Lin"), "names taken off a removed member's screen");
     await until(dP.p, `!all("children").some(c => c.id === ${JSON.stringify(sid(FL, "c-mia"))})`, "Mia removed from Priya's device (revocation cleanup)");
+  }, /status of 403 \(Forbidden\) \S+\/rest\/v1\/rpc\/child_circle/);
+
+  await step("Circle refresh: a relationship Lin sets for Nina, and Nina's new access, show on Nina's open circle", async () => {
+    page = dN.p;
+    await openChild(dN.p, sid(FL, "c-mia"));
+    await dN.p.waitFor(`document.querySelector(".child-circle")?.innerText.includes("View Only")`, 30000, "Nina's line follows her new access");
+    const ok = await dL.p.eval(`import("/src/lib/cloud/client.ts").then(async C => { const c = await C.getCloudClient(); const { error } = await c.rpc("set_circle_relationship", { p_family_id: ${JSON.stringify(FL)}, p_child_id: "c-mia", p_user_id: ${JSON.stringify(Nina.id)}, p_relationship: "teacher" }); return !error; })`);
+    assert.ok(ok, "Lin set the relationship");
+    // The list's own label, not the relationship picker's options (which always include "Teacher").
+    const shown = () => dN.p.eval(`[...document.querySelectorAll(".child-circle .circle-people small")].some(s => s.textContent === "Teacher")`);
+    for (let i = 0; i < 20 && !(await shown()); i++) {
+      await dN.p.eval(`document.dispatchEvent(new Event("visibilitychange"))`);
+      await sleep(1000);
+    }
+    assert.ok(await shown(), "shown without navigating");
   });
 
   await step("Leaving the Circle: an editor-turned-viewer leaves on her own; server access and the local copy are both gone", async () => {

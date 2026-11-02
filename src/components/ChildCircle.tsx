@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Field, Modal, useConfirm } from "./ui";
 import { getCloudClient } from "../lib/cloud/client";
 import { syncNow } from "../lib/sync/runner";
@@ -6,6 +6,7 @@ import { formatRoute } from "../lib/routes";
 import { fmt, localIsoDate } from "../lib/dates";
 import { RELATIONSHIPS, accessOfRole, type Access, type Relationship, type TechnicalRole } from "../lib/childAccess";
 import { unscope } from "../lib/data/schema";
+import { createRefresher, fromRpc, type Fetched, type Refresher } from "../lib/refresher";
 import type { Child, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -18,6 +19,12 @@ import type { Copy } from "../lib/i18n";
 // Read from the server (`child_circle`), which returns names and relationships to anyone in the circle and each
 // person's access only to the person managing the profile. Nothing here decides what is allowed: every change goes
 // through a server function (child_memberships itself is never written to directly) that re-checks the caller.
+//
+// Kept fresh (release readiness): read again after every change made here, when the parent's own access changes
+// (sync noticed a new role), when Manage opens, when the page comes back to the foreground or the network returns,
+// and, while Manage is open with an invitation still pending, every POLL_MS so someone joining by link shows up.
+// One request at a time and never a stale answer over a newer one (lib/refresher.ts). Once the server says this
+// person is no longer in the circle, the names are taken off the screen.
 
 type Person = { user_id: string | null; display_name: string; relationship: Relationship | null; role: TechnicalRole | null; is_me: boolean };
 type TechnicalInviteRole = "editor" | "viewer";
@@ -27,6 +34,37 @@ type InvitationState = "pending" | "accepted" | "expired" | "canceled";
 export const accessLabel = (access: Access, t: Copy) => (access === "manage" ? t.accessManage : access === "edit" ? t.accessEdit : t.accessView);
 export const accessInfo = (access: Access, t: Copy) => (access === "manage" ? t.accessManageInfo : access === "edit" ? t.accessEditInfo : t.accessViewInfo);
 const relationshipLabel = (r: Relationship, t: Copy) => t[`rel_${r}` as const];
+
+const POLL_MS = 15000;
+
+// A list read from the server for this child, refreshed as described above. Returns `reload(force = true)`.
+function useServerList<T>(fetch: () => Promise<Fetched<T>>, apply: (result: Fetched<T>) => void, key: string) {
+  const latest = useRef({ fetch, apply });
+  latest.current = { fetch, apply };
+  const refresher = useRef<Refresher | null>(null);
+  useEffect(() => {
+    const r = createRefresher<T>(() => latest.current.fetch(), result => latest.current.apply(result));
+    refresher.current = r;
+    void r.refresh({ force: true });
+    const passive = () => { if (document.visibilityState === "visible") void r.refresh(); };
+    document.addEventListener("visibilitychange", passive);
+    window.addEventListener("focus", passive);
+    window.addEventListener("online", passive);
+    return () => {
+      r.stop();
+      document.removeEventListener("visibilitychange", passive);
+      window.removeEventListener("focus", passive);
+      window.removeEventListener("online", passive);
+    };
+  }, [key]);
+  return useCallback((force = true) => refresher.current?.refresh({ force }) ?? Promise.resolve(), []);
+}
+
+const rpcList = async <T,>(fn: string, args: Record<string, unknown>): Promise<Fetched<T>> => {
+  const client = await getCloudClient();
+  if (!client) return { ok: false, denied: false };
+  return fromRpc<T>(await client.rpc(fn, args));
+};
 
 const invitationState = (inv: Invitation): InvitationState => {
   if (inv.revoked_at) return "canceled";
@@ -55,15 +93,23 @@ export function ChildCircle({ child, homeFamilyId, access, afterLeave, notify, l
   const [managing, setManaging] = useState(false);
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
-    const client = await getCloudClient();
-    if (!client) return;
-    const { data, error } = await client.rpc("child_circle", { p_family_id: familyId, p_child_id: childId });
-    if (error) { setFailed(true); return; }
-    setFailed(false);
-    setPeople(data as Person[]);
-  }, [familyId, childId]);
-  useEffect(() => { void load(); }, [load]);
+  const load = useServerList<Person[]>(
+    () => rpcList("child_circle", { p_family_id: familyId, p_child_id: childId }),
+    result => {
+      setFailed(!result.ok);
+      if (result.ok) setPeople(result.value);
+      // No longer in the circle: nobody's name stays on this screen. Offline: the last list stays.
+      else if (result.denied) { setPeople(null); setManaging(false); }
+    },
+    `${familyId}/${childId}`,
+  );
+  // Sync noticed a different role for this person (the Owner changed it): their own line and the list follow.
+  const shownAccess = useRef(access);
+  useEffect(() => {
+    if (shownAccess.current === access) return;
+    shownAccess.current = access;
+    void load();
+  }, [access, load]);
 
   const name = (p: Person) => (p.is_me ? t.circleYou : p.display_name.trim() || t.circleSomeone);
   const title = t.circleTitle.replace("{name}", child.first);
@@ -98,7 +144,7 @@ export function ChildCircle({ child, homeFamilyId, access, afterLeave, notify, l
     <section className="child-circle" aria-label={title}>
       <div className="section-title">
         <h2>{title}</h2>
-        {access === "manage" && people && <button className="text-action" onClick={() => setManaging(true)}>{t.circleManage}</button>}
+        {access === "manage" && people && <button className="text-action" onClick={() => { setManaging(true); void load(); }}>{t.circleManage}</button>}
       </div>
       {failed && !people && <p className="circle-note">{t.circleUnavailable}</p>}
       {people && (
@@ -145,7 +191,7 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
   familyId: string;
   childId: string;
   name: (p: Person) => string;
-  reload: () => Promise<void>;
+  reload: (force?: boolean) => Promise<void>;
   close: () => void;
   notify: (message: string) => void;
   lang: Lang;
@@ -193,14 +239,30 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
   const [link, setLink] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
 
-  const loadInvitations = useCallback(async () => {
-    const client = await getCloudClient();
-    if (!client) return;
-    const { data, error: e } = await client.rpc("list_invitations", { p_family_id: familyId, p_child_id: childId });
-    if (e) return;
-    setInvitations(data as Invitation[]);
-  }, [familyId, childId]);
-  useEffect(() => { void loadInvitations(); }, [loadInvitations]);
+  const loadInvitations = useServerList<Invitation[]>(
+    () => rpcList("list_invitations", { p_family_id: familyId, p_child_id: childId }),
+    result => {
+      if (result.ok) setInvitations(result.value);
+      else if (result.denied) setInvitations(null);
+    },
+    `${familyId}/${childId}`,
+  );
+  // Someone joining by link happens on their own device: while an invitation is pending and the page is in front,
+  // look again now and then. An invitation newly marked joined brings the people list up to date.
+  const pending = invitations?.filter(inv => invitationState(inv) === "pending").length ?? 0;
+  useEffect(() => {
+    if (!pending) return;
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") void loadInvitations(false); }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [pending, loadInvitations]);
+  const joined = invitations?.filter(inv => inv.accepted_at).length ?? null;
+  const seenJoined = useRef(joined);
+  useEffect(() => {
+    if (joined === null || joined === seenJoined.current) return;
+    const first = seenJoined.current === null;
+    seenJoined.current = joined;
+    if (!first) void reload();
+  }, [joined, reload]);
 
   const generate = async () => {
     setCreating(true);
@@ -242,7 +304,8 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
     onConfirm: async () => {
       const client = await getCloudClient();
       if (!client) return;
-      await client.rpc("revoke_invitation", { p_id: inv.id });
+      const { error: e } = await client.rpc("revoke_invitation", { p_id: inv.id });
+      setError(!!e);
       await loadInvitations();
     },
   });

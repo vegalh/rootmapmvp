@@ -5,12 +5,14 @@ name: Browser tests
 # built-in development keys: no secrets, and nothing remote (staging, the public website) is touched. The cloud suites
 # refuse any stack that isn't on localhost (tests/e2e/cloudkit.mjs).
 #
-# Runs on pull requests and by hand, not on push to main, and does not gate deployment (yet). Added in Shared Child
-# Profiles Phase 0 (docs/shared-child-profiles-phase0.md); both suites pass locally on macOS, the Linux runner is new.
+# Runs on pull requests and by hand, and is called by deploy-pages.yml (workflow_call), which deploys only if it
+# passes. Added in Shared Child Profiles Phase 0 (docs/shared-child-profiles-phase0.md); both suites pass locally on
+# macOS. Its first green run on the Linux runner has not been confirmed yet (release readiness, section G).
 
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

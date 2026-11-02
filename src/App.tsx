@@ -900,18 +900,21 @@ export default function App() {
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "invite") {
+      // Once an invitation is accepted or declined its address is replaced with Today (rather than another page
+      // pushed on top of it), so browser Back can't return to it and the token stays in no history entry.
+      const forgetInviteAddress = () => {
+        const h = history.current;
+        if (h) { window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", "#/today"); h.stack[h.idx] = "#/today"; }
+      };
       return (
         <InvitePage
           key={inviteToken}
           token={inviteToken}
           switchAccount={() => void signOutKeepingInvite()}
-          declined={() => go("today")}
+          declined={() => { forgetInviteAddress(); go("today"); }}
           notify={setToast}
           accepted={(familyId, childId) => {
-            // The invitation link is spent the moment it's accepted: replacing it with Today (rather than pushing
-            // the child's page on top of it) means Back from the child's profile can't return to it.
-            const h = history.current;
-            if (h) { window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", "#/today"); h.stack[h.idx] = "#/today"; }
+            forgetInviteAddress();
             goChild(scopedId(familyId, childId));
           }}
           t={t}
