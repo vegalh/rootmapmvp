@@ -1,7 +1,8 @@
 name: Browser tests
 
 # Runs the browser suites in headless Chrome: `test:e2e` (cloud off) and `test:e2e:cloud` (cloud on, against a fresh
-# local Supabase stack started on this runner). The stack is created and thrown away with the job and uses only its
+# local Supabase stack started on this runner), then the cloud suites that don't need sharing again on that stack reset
+# to the pre-sharing schema (tests/ops/oldSchema.mjs). The stack is created and thrown away with the job and uses only its
 # built-in development keys: no secrets, and nothing remote (staging, the public website) is touched. The cloud suites
 # refuse any stack that isn't on localhost (tests/e2e/cloudkit.mjs).
 #
@@ -41,6 +42,12 @@ jobs:
         run: npx supabase start -x realtime,studio,imgproxy,logflare,vector,supavisor,postgres-meta
       - name: Browser suites (cloud on, local stack)
         run: npm run test:e2e:cloud
+      # The public website's database (rootmap-staging) has only the pre-sharing migrations: the app, sharing off, must
+      # still work there and never call what the sharing migrations add (tests/ops/oldSchema.mjs).
+      - name: Browser suites on the pre-sharing schema
+        run: |
+          npx supabase db reset --local --version 20261027000200
+          node tests/ops/oldSchema.mjs
       - name: Stop local Supabase
         if: always()
         run: npx supabase stop --no-backup

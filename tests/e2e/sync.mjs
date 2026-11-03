@@ -2,7 +2,8 @@
 // `npm run test:e2e:cloud`.
 //
 // Two browser profiles signed in to the same account sync children and memories both ways, including after being
-// offline; photos are uploaded privately, verified by the server, then downloaded and shown on the other device;
+// offline; a backup restored while signed in only adds; a child restored from Recently Deleted comes back on the other
+// device; photos are uploaded privately, verified by the server, then downloaded and shown on the other device;
 // backup status never says "All backed up" while anything (or a photo) is waiting; the guest space (with its photo)
 // is never uploaded or changed; another account receives nothing.
 import assert from "node:assert/strict";
@@ -176,6 +177,60 @@ try {
     assert.equal(versions.length, 1);
     assert.equal(versions[0].reason, "text_conflict");
     assert.notEqual(versions[0].version.notes, a.notes, "the losing notes are kept");
+  });
+
+  const serverRow = (table, id) => admin(`/rest/v1/${table}?family_id=eq.${familyA}&id=eq.${id}&select=*`).then(rows => rows[0] ?? null);
+  const backedUp = async (p, label) => {
+    for (let i = 0; i < 60; i++) {
+      if ((await status(p)).allBackedUp) return;
+      await syncNow(p);
+      await sleep(500);
+    }
+    throw new Error(`timed out: ${label}`);
+  };
+
+  await step("A backup restored while signed in only adds: what the account lacked reaches device 2; nothing is deleted or reverted", async () => {
+    page = one;
+    const backup = await store(one, `return S.backupData();`);
+    const now = new Date().toISOString();
+    const moment = (id, text) => ({ id, childId: "c-ada", date: "2026-10-14", title: "", text, photos: [], createdAt: now, updatedAt: now, deletedAt: null, origin: "user", position: 0 });
+    assert.equal(await store(one, `return S.write({ collections: { entries: [${JSON.stringify(moment("m-after-backup", "after the backup"))}] } }, { rollback: true });`), null);
+    await backedUp(one, "new Moment sent");
+    backup["rootmap-journal"].push(moment("m-from-file", "only in the file"));
+    backup["rootmap-children"] = backup["rootmap-children"].map(c => (c.id === "c-ada" ? { ...c, first: "Old name from the file" } : c));
+    assert.equal(await store(one, `return S.restoreData(${JSON.stringify(backup)});`), true);
+    await one.reload();
+    await u1.appReady();
+    await backedUp(one, "restore result backed up");
+    assert.equal((await serverRow("entries", "m-after-backup")).deleted_at, null, "a record missing from the file is not deleted");
+    assert.ok(await serverRow("entries", "m-from-file"), "what the account lacked is uploaded");
+    assert.equal((await serverRow("children", "c-ada")).first, "Adaline", "an existing record is not reverted");
+    assert.equal((await localChild(one, "c-ada")).first, "Adaline");
+    page = two;
+    await syncNow(two);
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.getCollection("entries").some(e => e.id === "m-from-file"))`, 30000, "arrived on device 2");
+    assert.equal((await localChild(two, "c-ada")).first, "Adaline");
+  });
+
+  await step("A child deleted on device 1 and restored from Recently Deleted comes back on device 2", async () => {
+    page = one;
+    await store(one, `const c = S.getCollection("children").find(c => c.id === "c-off"); return S.write({ collections: { children: [{ ...c, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }] } }, { rollback: true });`);
+    await backedUp(one, "deletion sent");
+    assert.ok((await serverRow("children", "c-off")).deleted_at, "deleted on the server");
+    page = two;
+    await syncNow(two);
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.getCollection("children").find(c => c.id === "c-off")?.deletedAt)`, 30000, "deletion arrived on device 2");
+    page = one;
+    await one.eval(`location.hash = "#/recently-deleted"`);
+    await one.waitFor(`[...document.querySelectorAll(".deleted-row")].some(r => r.innerText.includes("Otto"))`, 5000, "listed in Recently Deleted");
+    await one.eval(`[...document.querySelectorAll(".deleted-row")].find(r => r.innerText.includes("Otto")).querySelector("button").click()`);
+    assert.ok((await one.confirmDialog()).includes("Restore Otto"));
+    await one.waitFor(`document.querySelector(".toast")?.textContent.includes("restored")`, 5000, "restored");
+    await backedUp(one, "restore sent");
+    assert.equal((await serverRow("children", "c-off")).deleted_at, null, "restored on the server");
+    page = two;
+    await syncNow(two);
+    await two.waitFor(`import("/src/lib/data/store.ts").then(S => S.getCollection("children").find(c => c.id === "c-off")?.deletedAt === null)`, 30000, "restore arrived on device 2");
   });
 
   await step("A photo added offline is kept; back online it is uploaded privately and verified, and only then 'All backed up'", async () => {
