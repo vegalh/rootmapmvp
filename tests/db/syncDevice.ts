@@ -3,24 +3,31 @@
 // expectation no longer holds; photo bytes kept by id, never replaced once present.
 import { randomBytes, randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { outboxKey, type OutboxEntry, type SyncRecord } from "../../src/lib/data/schema.ts";
+import { outboxKey, type ArchiveItem, type OutboxEntry, type SyncRecord } from "../../src/lib/data/schema.ts";
 import { outboxEntries } from "../../src/lib/data/records.ts";
 import { sha256Hex, syncRound, type SyncBatch, type SyncLocal } from "../../src/lib/sync/engine.ts";
 import type { SyncedCollection } from "../../src/lib/sync/mapping.ts";
 import { syncPhotos, type LocalPhoto, type PhotoLocal } from "../../src/lib/sync/photos.ts";
+import { syncScopes, type CleanupBatch, type CleanupLocal, type ScopeBase, type ScopeState } from "../../src/lib/sync/scopes.ts";
 import { localEnv, newFamily, newUser, type TestUser } from "./helpers.ts";
 
 export type Rec = Record<string, unknown> & { id: string };
 
 // A device's account space, in memory.
-export class Device implements SyncLocal, PhotoLocal {
+export class Device implements SyncLocal, PhotoLocal, ScopeBase, CleanupLocal {
   records = new Map<string, Rec>();
   out = new Map<string, OutboxEntry>();
   synced = new Map<string, SyncRecord>();
   blobs = new Map<string, Uint8Array>();
-  m = { familyId: null as string | null, cursors: {} as Record<string, number>, deviceId: `d-${randomUUID()}` };
+  m = { familyId: null as string | null, cursors: {} as Record<string, number>, deviceId: `d-${randomUUID()}`, scopeCursors: {} as Record<string, Record<string, number>>, scopes: undefined as unknown };
+  // Changes never sent for a child whose access was removed (the store's "archive").
+  archive: ArchiveItem[] = [];
+  // Test hook: the next cleanup is interrupted before anything is applied.
+  interruptCleanup = false;
   seq = 0;
   offline = false;
+  // Requests to matching URLs fail as if offline (only some of the network is down).
+  failing: RegExp | null = null;
   client: SupabaseClient;
   userId: string;
   familyId: string;
@@ -49,20 +56,44 @@ export class Device implements SyncLocal, PhotoLocal {
   syncRecord(key: string) { return this.synced.get(key); }
   async record(collection: SyncedCollection, id: string) { const r = this.get(collection, id); return r && { ...r }; }
   async photoChecksum(id: string) { const b = this.blobs.get(id); return b ? sha256Hex(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer) : null; }
-  meta() { return { ...this.m, cursors: { ...this.m.cursors } }; }
+  meta() { return { ...this.m, cursors: { ...this.m.cursors }, scopeCursors: structuredClone(this.m.scopeCursors) }; }
   async refresh() {}
   async commit(batch: SyncBatch): Promise<"ok" | "stale"> {
     const expect = new Map<string, number | null>();
     for (const e of batch.expect ?? []) expect.set(e.key, e.seq);
     for (const r of batch.outboxRemove ?? []) expect.set(r.key, r.seq);
+    for (const r of batch.outboxMark ?? []) expect.set(r.key, r.seq);
     for (const [key, seq] of expect) if ((this.out.get(key)?.seq ?? null) !== seq) return "stale";
     for (const { collection, record } of batch.records ?? []) this.records.set(outboxKey(collection, String(record.id)), record as Rec);
     for (const r of batch.syncRecords ?? []) this.synced.set(r.key, r);
     for (const r of batch.outboxRemove ?? []) this.out.delete(r.key);
     for (const e of batch.outboxAdd ?? []) { this.out.set(e.key, e); this.seq = Math.max(this.seq, e.seq); }
+    for (const { key, rejected } of batch.outboxMark ?? []) {
+      const { rejected: _old, ...entry } = this.out.get(key)!;
+      this.out.set(key, rejected ? { ...entry, rejected } : entry);
+    }
     if (batch.meta?.familyId) this.m.familyId = batch.meta.familyId;
     if (batch.meta?.cursors) this.m.cursors = batch.meta.cursors;
+    if (batch.meta?.scopeCursors) this.m.scopeCursors = structuredClone(batch.meta.scopeCursors);
+    if (batch.meta && "scopes" in batch.meta) this.m.scopes = structuredClone(batch.meta.scopes);
     return "ok";
+  }
+  // Shared children (lib/sync/scopes.ts).
+  photoFamily(id: string) { return this.get("photos", id)?.familyId as string | undefined; }
+  all(collection: "children" | "entries" | "records" | "photos") { return [...this.records.entries()].filter(([k]) => k.startsWith(`${collection}:`)).map(([, r]) => r); }
+  async commitCleanup(batch: CleanupBatch, scopes: ScopeState): Promise<"ok" | "stale"> {
+    if (this.interruptCleanup) { this.interruptCleanup = false; throw new Error("interrupted"); }
+    for (const r of batch.outboxRemove) if (this.out.get(r.key)?.seq !== r.seq) return "stale";
+    for (const { collection, id } of batch.deleteRecords) this.records.delete(outboxKey(collection, id));
+    for (const id of batch.deletePhotos) { this.records.delete(outboxKey("photos", id)); this.blobs.delete(id); }
+    for (const key of batch.deleteSyncRecords) this.synced.delete(key);
+    for (const r of batch.outboxRemove) this.out.delete(r.key);
+    this.archive.push(...batch.archive);
+    this.m.scopes = structuredClone(scopes);
+    return "ok";
+  }
+  scopes(opts: { enabled?: boolean; homeChildren?: string[] } = {}) {
+    return syncScopes(this.client, this, { userId: this.userId, homeFamilyId: this.familyId, enabled: opts.enabled ?? true, homeChildren: opts.homeChildren, pageSize: 500 });
   }
   sync(opts: Parameters<typeof syncRound>[2] extends infer O ? Partial<O> : never = {}) {
     return syncRound(this.client, this, { familyId: this.familyId, userId: this.userId, pageSize: 500, ...opts });
@@ -93,7 +124,7 @@ export async function device(user: TestUser, familyId: string): Promise<Device> 
   let d: Device;
   const client = createClient(localEnv().url, localEnv().anonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { fetch: (input, init) => (d?.offline ? Promise.reject(new TypeError("Failed to fetch")) : fetch(input, init)) },
+    global: { fetch: (input, init) => (d?.offline || d?.failing?.test(String(input)) ? Promise.reject(new TypeError("Failed to fetch")) : fetch(input, init)) },
   });
   const { error } = await client.auth.signInWithPassword({ email: user.email, password: user.password });
   if (error) throw error;

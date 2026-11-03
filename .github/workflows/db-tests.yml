@@ -3,12 +3,19 @@ name: Database tests
 # Applies every migration in supabase/migrations to a fresh local Supabase stack and runs the database test
 # suite (tests/db) plus the existing unit tests and typecheck. Uses only the stack's built-in development
 # keys: no secrets, and nothing remote is touched.
+#
+# Migrations are checked twice: `supabase start` applies all of them to an empty database (a failure stops the job),
+# then the throwaway database is reset to the last pre-sharing migration, filled with representative data and
+# upgraded (tests/ops/upgrade.mjs; docs/shared-child-profiles-release-readiness.md section E). The database tests
+# then run on that upgraded database.
+#
+# Also called by deploy-pages.yml (workflow_call): the website is deployed only if this passes. Pushes to main run
+# it from there, so it has no push trigger of its own.
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -28,9 +35,17 @@ jobs:
         # Mailpit stays on: the sign-in tests (tests/db/auth.test.ts) read the emailed codes from it.
         # The Edge runtime stays on: the photo tests (tests/db/photos.test.ts) call verify-photo.
         run: npx supabase start -x realtime,studio,imgproxy,logflare,vector,supavisor,postgres-meta
+      - name: Migrations applied to an empty database
+        run: npx supabase migration list --local
+      - name: Upgrade from the pre-sharing schema, with data
+        run: |
+          npx supabase db reset --local --version 20261027000200
+          node tests/ops/upgrade.mjs .
       - run: npm run test:db
       - run: npm test
       - run: npm run typecheck
+      - name: Production build
+        run: npm run build
       - name: Stop local Supabase
         if: always()
         run: npx supabase stop --no-backup

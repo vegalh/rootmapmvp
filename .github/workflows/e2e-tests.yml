@@ -1,0 +1,53 @@
+name: Browser tests
+
+# Runs the browser suites in headless Chrome: `test:e2e` (cloud off) and `test:e2e:cloud` (cloud on, against a fresh
+# local Supabase stack started on this runner), then the cloud suites that don't need sharing again on that stack reset
+# to the pre-sharing schema (tests/ops/oldSchema.mjs). The stack is created and thrown away with the job and uses only its
+# built-in development keys: no secrets, and nothing remote (staging, the public website) is touched. The cloud suites
+# refuse any stack that isn't on localhost (tests/e2e/cloudkit.mjs).
+#
+# Runs on pull requests and by hand, and is called by deploy-pages.yml (workflow_call), which deploys only if it
+# passes. Added in Shared Child Profiles Phase 0 (docs/shared-child-profiles-phase0.md); both suites pass locally on
+# macOS. Its first green run on the Linux runner has not been confirmed yet (release readiness, section G).
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Google Chrome is preinstalled on GitHub's Ubuntu images.
+      CHROME_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Ubuntu 24.04 blocks the unprivileged user namespaces Chrome's sandbox needs; allow them on this runner only.
+      - name: Allow Chrome's sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Browser suites (cloud off)
+        run: npm run test:e2e
+      - name: Start local Supabase
+        # Mailpit stays on (sign-in codes) and the Edge runtime stays on (verify-photo), as in db-tests.yml.
+        run: npx supabase start -x realtime,studio,imgproxy,logflare,vector,supavisor,postgres-meta
+      - name: Browser suites (cloud on, local stack)
+        run: npm run test:e2e:cloud
+      # The public website's database (rootmap-staging) has only the pre-sharing migrations: the app, sharing off, must
+      # still work there and never call what the sharing migrations add (tests/ops/oldSchema.mjs).
+      - name: Browser suites on the pre-sharing schema
+        run: |
+          npx supabase db reset --local --version 20261027000200
+          node tests/ops/oldSchema.mjs
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup

@@ -17,10 +17,13 @@ export function ModalOverlay({ closing = false, ...props }: OverlayProps & { clo
   return <SheetContext.Provider value={sheet}><ModalSheets {...props} /></SheetContext.Provider>;
 }
 
-function ModalSheets({ modal, close, childrenData, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
+function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
   modal: ModalKind;
   close: (destination?: Screen | ModalKind) => void;
   childrenData: Child[];
+  // Children a record can be about (lib/childAccess.ts), and the user's own family's (My Week).
+  writableChildren: Child[];
+  ownChildren: Child[];
   // Resolves to false (with an error already shown) when the device couldn't save.
   setChildrenData: (c: Child[]) => Promise<boolean>;
   filters: { age: string; group: string; recent: string; sort: string };
@@ -55,7 +58,7 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
   // A plan starts with today's date and the child already chosen (or the only child); never a removed child.
   useEffect(() => {
     if (modal !== "plan") return;
-    const preset = defaultChildId(childrenData, selectedChild);
+    const preset = defaultChildId(ownChildren, selectedChild);
     setChosen(preset ? [preset] : []);
     setDate(localIsoToday());
     setPlanNote("");
@@ -112,7 +115,7 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
   };
 
   if (modal === "tried") {
-    return <TriedSheet activity={selectedActivity} childrenData={childrenData} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
+    return <TriedSheet activity={selectedActivity} childrenData={writableChildren} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
   }
 
   if (modal === "quick") {
@@ -180,7 +183,8 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
 
   // modal === "plan"
   const planActivity = localizeActivity(selectedActivity, t);
-  const validChosen = chosen.filter(id => isActiveChild(childrenData, id));
+  // My Week belongs to the user's own family: only its children can be planned for.
+  const validChosen = chosen.filter(id => isActiveChild(ownChildren, id));
   return (
     <Modal title={t.addWeek} close={close}>
       <div className="sheet-fields">
@@ -189,9 +193,9 @@ function ModalSheets({ modal, close, childrenData, setChildrenData, filters, set
         <fieldset>
           <legend>{t.selectChildren}</legend>
           <div className="child-checks">
-            {childrenData.map(c => (
+            {ownChildren.map(c => (
               <button aria-pressed={chosen.includes(c.id)} className={chosen.includes(c.id) ? "active" : ""} data-child={c.id} onClick={() => setChosen(current => (current.includes(c.id) ? current.filter(x => x !== c.id) : [...current, c.id]))} key={c.id}>
-                <ChildPhoto child={c} />{childShortName(c, childrenData)}
+                <ChildPhoto child={c} />{childShortName(c, ownChildren)}
               </button>
             ))}
           </div>

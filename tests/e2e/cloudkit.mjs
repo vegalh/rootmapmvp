@@ -2,6 +2,7 @@
 // a dev server with cloud on, one browser profile per simulated device, sign-in through the app's own screens,
 // and reading any of the app's local databases.
 import { execFileSync, spawn } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import pg from "pg";
@@ -47,6 +48,11 @@ window.__s = {
   },
 };`;
 
+// RM_REQUEST_LOG=<file>: every request a device sends to the stack, and its response status, appended as JSON lines
+// (tests/ops/oldSchema.mjs reads them). Off unless set.
+const REQUEST_LOG = process.env.RM_REQUEST_LOG;
+const SUITE = path.basename(process.argv[1] ?? "");
+
 // A simulated device: its own browser profile. `requests` collects every request to the stack, across reloads.
 export async function newDevice(name, devtoolsPort, setup) {
   // A free DevTools port, so a browser left over from an interrupted run is never mistaken for this one.
@@ -59,6 +65,27 @@ export async function newDevice(name, devtoolsPort, setup) {
   page.handlers.add(m => {
     if (m.method === "Network.requestWillBeSent" && m.params.request.url.startsWith(API)) page.requests.push(`${m.params.request.method} ${m.params.request.url.replace(API, "").split("?")[0]}`);
   });
+  if (REQUEST_LOG) {
+    // A line when a request is sent (so one still in flight when the browser closes is never missed), and one with
+    // its result.
+    const ours = new Set();
+    const log = line => appendFileSync(REQUEST_LOG, JSON.stringify(line) + "\n");
+    page.handlers.add(m => {
+      const id = m.params?.requestId && `${name}:${m.params.requestId}`;
+      if (m.method === "Network.requestWillBeSent" && m.params.request.url.startsWith(API)) {
+        ours.add(id);
+        const { method, url, postData } = m.params.request;
+        const r = { suite: SUITE, device: name, id, method, path: url.replace(API, "").split("?")[0] };
+        // For writes to tables: the field names sent (never their values).
+        if (r.path.startsWith("/rest/v1/") && !r.path.startsWith("/rest/v1/rpc/") && postData) {
+          try { const body = JSON.parse(postData); r.fields = [...new Set((Array.isArray(body) ? body : [body]).flatMap(Object.keys))].sort(); } catch { /* not JSON */ }
+        }
+        log(r);
+      }
+      if (m.method === "Network.responseReceived" && ours.has(id)) log({ id, status: m.params.response.status });
+      if (m.method === "Network.loadingFailed" && ours.has(id)) log({ id, status: `failed: ${m.params.errorText}` });
+    });
+  }
   return page;
 }
 

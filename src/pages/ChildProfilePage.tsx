@@ -10,13 +10,20 @@ import { recordView } from "../lib/activityRecords";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
 import { childAge, childTabLabel, localizeActivity, noteText, skillLabel, type Copy } from "../lib/i18n";
 import { childOptionLabel } from "../lib/children";
+import { canAddAndEdit, canManage, type Access } from "../lib/childAccess";
 import { localIsoToday } from "../lib/dates";
 import { Field } from "../components/ui";
 
-export function ChildProfilePage({ child, childrenData, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
+export function ChildProfilePage({ child, childrenData, moveTargets, access, circle, records, entries, pendingNotes, tab, setTab, lang, openEntry, writeEntry, importNotes, edit, back, record, remove, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
   child: Child;
-  // Every child in My Children (a record can be moved to another child).
+  // Every child in My Children (names are told apart against all of them).
   childrenData: Child[];
+  // The children a record of this child can be moved to: ones of the same family the parent can add to.
+  moveTargets: Child[];
+  // What this parent can do with this child (lib/childAccess.ts); the server decides, this only shows it.
+  access: Access;
+  // The child's circle (components/ChildCircle.tsx), when children can be shared.
+  circle?: React.ReactNode;
   records: LessonRecord[];
   // The shared Moments collection; the Journal tab shows this child's part of it.
   entries: Entry[];
@@ -72,16 +79,19 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
       <header className="child-header">
         <button onClick={back} aria-label={t.backToChildren}><Icon name="back" size={18} /> {t.backToChildren}</button>
         <TreeLogo />
-        <div className="child-header-actions">
-          <button onClick={edit}>{t.edit}</button>
-          <button onClick={confirmRemove} aria-label={t.deleteChildLabel.replace("{name}", child.first)}><Icon name="trash" size={18} /></button>
-        </div>
+        {canManage(access) ? (
+          <div className="child-header-actions">
+            <button onClick={edit}>{t.edit}</button>
+            <button onClick={confirmRemove} aria-label={t.deleteChildLabel.replace("{name}", child.first)}><Icon name="trash" size={18} /></button>
+          </div>
+        ) : <div className="child-header-actions" />}
       </header>
       <section className="profile-hero">
         <ChildPhoto child={child} />
         <h1>{child.first} {child.last}</h1>
         <p>{childAge(child, t)}</p>
       </section>
+      {circle}
       <div className="tabs">
         {["Journal", "Activities"].map(x => (
           <button className={tab === x ? "active" : ""} onClick={() => setTab(x)} key={x}>{childTabLabel(x, t)}</button>
@@ -91,11 +101,13 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
         {tab === "Activities" ? (
           <>
             <div className="section-title"><h2>{t.lessonHistory}</h2></div>
-            <LessonList records={lessons} childrenData={childrenData} lang={lang} editRecord={editRecord} deleteRecord={deleteRecord} focusRecord={focusRecord} focusedRecord={focusedRecord} t={t} />
-            <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.addActivity}</button>
+            <LessonList records={lessons} childrenData={moveTargets} canEdit={canAddAndEdit(access)} lang={lang} editRecord={editRecord} deleteRecord={deleteRecord} focusRecord={focusRecord} focusedRecord={focusedRecord} t={t} />
+            {canAddAndEdit(access)
+              ? <button className="wide-primary" onClick={record}><Icon name="plus" size={18} />{t.addActivity}</button>
+              : <p className="circle-note view-only-note">{t.viewOnlyNote.replace("{name}", child.first)}</p>}
           </>
         ) : (
-          <ChildJournal child={child} entries={entries} pendingNotes={pendingNotes} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />
+          <ChildJournal child={child} entries={entries} pendingNotes={pendingNotes} canEdit={canAddAndEdit(access)} lang={lang} open={openEntry} write={writeEntry} importNotes={importNotes} t={t} />
         )}
       </div>
     </main>
@@ -103,10 +115,11 @@ export function ChildProfilePage({ child, childrenData, records, entries, pendin
 }
 
 // One child's view of the shared Moments collection, read like a memory book.
-function ChildJournal({ child, entries, pendingNotes, lang, open, write, importNotes, t }: {
+function ChildJournal({ child, entries, pendingNotes, canEdit, lang, open, write, importNotes, t }: {
   child: Child;
   entries: Entry[];
   pendingNotes: boolean;
+  canEdit: boolean;
   lang: Lang;
   open: (id: string) => void;
   write: () => void;
@@ -126,7 +139,9 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
         <SearchToggle searching={searching} setSearching={setSearching} setQuery={setQuery} t={t} />
       </div>
       {searching && <SearchField query={query} setQuery={setQuery} t={t} />}
-      {!searching && <WriteButton label={t.writeEntry} draft={readDraft(draftKey(child.id))} write={write} lang={lang} t={t} />}
+      {!searching && (canEdit
+        ? <WriteButton label={t.writeEntry} draft={readDraft(draftKey(child.id))} write={write} lang={lang} t={t} />
+        : <p className="circle-note view-only-note">{t.viewOnlyNote.replace("{name}", child.first)}</p>)}
 
       {mine.length === 0 && !legacyNotes && !searching && <p className="journal-empty">{t.journalEmpty}</p>}
       {searching && query.trim() && shown.length === 0 && <p className="journal-empty">{t.journalNoResults}</p>}
@@ -137,7 +152,7 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
           <h3>{t.earlierNotes}</h3>
           <p className="journal-legacy-hint">{t.earlierNotesHint}</p>
           <p className="journal-legacy-text">{legacyNotes}</p>
-          <button onClick={importNotes}>{t.saveToJournal}</button>
+          {canEdit && <button onClick={importNotes}>{t.saveToJournal}</button>}
         </section>
       )}
     </div>
@@ -148,9 +163,10 @@ function ChildJournal({ child, entries, pendingNotes, lang, open, write, importN
 const LESSON_INITIAL_REVEAL = 80;
 const LESSON_REVEAL_STEP = 80;
 
-function LessonList({ records, childrenData, lang, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
+function LessonList({ records, childrenData, canEdit, lang, editRecord, deleteRecord, focusRecord, focusedRecord, t }: {
   records: LessonRecord[];
   childrenData: Child[];
+  canEdit: boolean;
   lang: Lang;
   editRecord: (id: string, patch: { date: string; notes: string; childId: string }) => Promise<string | null>;
   deleteRecord: (id: string) => Promise<boolean>;
@@ -225,7 +241,7 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, foc
             {noteText(open.notes, open.notesZh, t) && <p className="record-notes">{noteText(open.notes, open.notesZh, t)}</p>}
           </div>
           <div className="sheet-buttons even">
-            <button
+            {canEdit && <button
               className="danger"
               onClick={() => {
                 // Removes only this record (by id): other attempts, the Discover activity and journal entries stay.
@@ -237,8 +253,8 @@ function LessonList({ records, childrenData, lang, editRecord, deleteRecord, foc
                   onConfirm: () => latestDelete.current(open.id).then(ok => ok && close()),
                 });
               }}
-            ><Icon name="trash" size={17} />{t.deleteRecord}</button>
-            <button onClick={() => setEditing(true)}>{t.editRecord}</button>
+            ><Icon name="trash" size={17} />{t.deleteRecord}</button>}
+            {canEdit && <button onClick={() => setEditing(true)}>{t.editRecord}</button>}
             <button onClick={close}>{t.done}</button>
           </div>
         </Modal>

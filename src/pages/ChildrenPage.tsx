@@ -7,7 +7,9 @@ import type { Child, Entry } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName } from "../lib/children";
 
-export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAddChild, openMoments, t }: {
+export function ChildrenPage({ notice, childrenData, entries, goChild, openEntry, openAddChild, openMoments, t }: {
+  // A note about children no longer shared with this parent (components/AccessNotice.tsx), when there is one.
+  notice?: React.ReactNode;
   childrenData: Child[];
   // The shared Moments collection.
   entries: Entry[];
@@ -34,6 +36,7 @@ export function ChildrenPage({ childrenData, entries, goChild, openEntry, openAd
       </header>
       <main className="page-content children-page">
         <div className="hero-title"><h1>{t.myChildren}</h1><p>{t.childSubtitle}</p></div>
+        {notice}
         {childrenData.length ? (
           <div className="children-carousel">
             {childrenData.map(c => {

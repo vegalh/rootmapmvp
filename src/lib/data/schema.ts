@@ -85,6 +85,8 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-welcome": "string",
   // The Family Bookshelf (lib/bookshelf.ts): which curated books the family owns or wishes for.
   "rootmap-bookshelf": "array",
+  // Shared children whose "no longer have access" notice was seen on this device (scopedId keys). Device-only.
+  "rootmap-access-notices": "array",
 };
 // Notification toggles ("rootmap-pref-<label>").
 export const PREF_PREFIX = "rootmap-pref-";
@@ -163,6 +165,9 @@ export type OutboxEntry = {
   deviceId: string;
   // "versions" entries only: what to keep (see lib/sync).
   payload?: { table: string; recordId: string; version: Record<string, unknown>; baseRev: number | null; reason: string };
+  // The server refused this change (seq) for lack of access: not sent again until the record changes (a new seq) or
+  // the user's memberships change (lib/sync/scopes.ts clears it).
+  rejected?: { seq: number; at: string; reason: string };
 };
 export const outboxKey = (collection: OutboxCollection, id: string) => `${collection}:${id}`;
 
@@ -171,7 +176,12 @@ export type SyncRecord = { key: string; collection: OutboxCollection; id: string
 
 // The account space's own description, in "meta".
 // `cursors`: per server table, the highest change number applied on this device (sync, M4).
-export type SpaceMeta = { key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number; cursors?: Record<string, number> };
+// `scopeCursors`: the same, per family whose children are shared with this user (lib/sync/scopes.ts); `cursors` stays
+// the user's own family's. `scopes`: what sync knows about those memberships (ScopeState).
+export type SpaceMeta = {
+  key: "space"; userId: string; deviceId: string; createdAt: string; familyId: string | null; cursor: number; cursors?: Record<string, number>;
+  scopeCursors?: Record<string, Record<string, number>>; scopes?: unknown;
+};
 
 // Photo ids look like "photo-<uuid>"; anything else in a photo field is an image URL (bundled asset, remote
 // image, or a legacy data URL that could not be converted) and is used as-is.
@@ -190,5 +200,18 @@ export function uuid(): string {
 }
 
 export const newPhotoId = () => `photo-${uuid()}`;
+
+// A record of a family that shares children with this user is stored under `scopedId(familyId, id)` (lib/sync/
+// scopes.ts). The separator is a control character, which the server refuses in every id, so a scoped id never equals
+// an id of the user's own family. Such records also carry `familyId`; so does a shared photo.
+const SCOPE_SEP = "\u001f";
+export const scopedId = (familyId: string, id: string) => `${familyId}${SCOPE_SEP}${id}`;
+export const isScopedId = (id: unknown): boolean => typeof id === "string" && id.includes(SCOPE_SEP);
+export function unscope(localId: string): { familyId: string; id: string } | null {
+  const i = localId.indexOf(SCOPE_SEP);
+  return i < 0 ? null : { familyId: localId.slice(0, i), id: localId.slice(i + 1) };
+}
+// A record (or photo) of another family: never part of the user's own data (backups, restores, guest import).
+export const isShared = (r: { id?: unknown; familyId?: unknown }) => isScopedId(r.id) || typeof r.familyId === "string";
 // Stable, globally unique record id. The prefix keeps ids readable ("m-…" entry, "c-…" child).
 export const newRecordId = (prefix: string) => `${prefix}-${uuid()}`;

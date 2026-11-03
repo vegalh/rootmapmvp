@@ -309,6 +309,40 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .journal-card strong { display: block; margin-top: 11px; font: 600 24px/1.2 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
 .journal-card p { margin: 8px 0 0; font-size: 15.5px; line-height: 1.65; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .journal-card time + strong, .journal-card time + p { margin-top: 6px; }
+/* Shared Child Profiles (Phase 3): a child's circle, the "no longer shared" note, kept unsent changes. */
+.child-circle { margin: 4px 20px 8px; padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; }
+.child-circle .section-title { margin: 0 0 10px; }
+.child-circle h2 { margin: 0; font: 600 20px var(--font-heading); color: var(--dark-purple); }
+.circle-people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.circle-people li { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.circle-people span:last-child { display: flex; flex-direction: column; }
+.circle-people small, .circle-manage small, .archived-list small { color: var(--muted); font-size: 13.5px; }
+.circle-initial { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--lavender); color: var(--dark-purple); font-weight: 700; }
+.circle-note { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.view-only-note { margin: 14px 0; text-align: center; }
+.circle-manage, .archived-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 12px; }
+.circle-manage li { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.circle-manage li > span, .archived-list li > span { display: flex; flex-direction: column; }
+.archived-list li { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+.circle-access { margin: 0 0 14px; display: grid; gap: 8px; }
+.circle-access dt { font-weight: 700; color: var(--dark-purple); }
+.circle-access dd { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.circle-invite { padding: 12px 14px; border: 1px dashed var(--silver); border-radius: 16px; margin-bottom: 14px; }
+.circle-invite h3 { margin: 0 0 4px; font: 600 18px var(--font-heading); color: var(--dark-purple); }
+.circle-invite p { margin: 4px 0 0; font-size: 14px; }
+.text-action.danger { color: var(--danger); }
+.invite-form { display: grid; gap: 10px; margin-top: 10px; }
+.invite-link-ready { margin-top: 10px; }
+.invite-link-ready p { margin: 0 0 8px; font-size: 14px; }
+.invite-pending { margin-top: 16px; }
+.invite-pending h4 { margin: 0 0 8px; font: 600 15px var(--font-heading); color: var(--dark-purple); }
+.invite-pending ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.invite-pending li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.invite-pending li span { display: flex; flex-direction: column; font-size: 14px; }
+.access-notice { margin: 0 0 16px; padding: 14px 16px; background: var(--apricot); border-radius: 18px; }
+.access-notice p { margin: 0 0 6px; line-height: 1.5; }
+.access-notice-actions { display: flex; gap: 18px; justify-content: flex-end; }
+.access-notice-actions button { min-height: 44px; }
 .journal-legacy { margin-top: 26px; padding: 16px; border: 1px dashed var(--silver); border-radius: 18px; }
 .journal-legacy h3 { margin: 0; font: 600 21px var(--font-heading); color: var(--dark-purple); }
 .journal-legacy-hint { margin: 3px 0 10px; font-size: 13.5px; color: var(--muted); }
@@ -748,3 +782,14 @@ html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="
   .toast { animation: none !important; }
   :is(button, .today-feature, .today-memory, .today-week, .book-tile, .journal-card):active { transform: none !important; }
 }
+
+/* Release readiness: someone joined a child's circle; shared records in Recently Deleted. */
+.circle-join + .circle-join { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+.deleted-shared { margin-top: 28px; }
+.deleted-shared h2 { margin: 0 0 6px; font-size: 1.05rem; }
+.deleted-snippet { overflow-wrap: anywhere; }
+.kept-versions { margin-top: 28px; padding: 14px 16px; border-radius: 18px; background: var(--apricot); }
+.kept-versions h2 { margin: 0 0 4px; font-size: 1rem; }
+.kept-versions ul { list-style: none; margin: 10px 0 0; padding: 0; }
+.kept-versions li + li { margin-top: 10px; }
+.kept-versions li p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

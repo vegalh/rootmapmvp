@@ -11,12 +11,21 @@ const loadSupabase = import.meta.env.VITE_ROOTMAP_CLOUD === "on" ? () => import(
 
 let client: Promise<SupabaseClient | null> | undefined;
 
+// Private photo files and record reads are never kept in the browser's HTTP cache: the cache is keyed by address, not
+// by account, so another account signed in later on the same browser could otherwise be served a file or rows it may
+// not read. (The app keeps its own copy of every photo and record in IndexedDB, per account.) Record reads carry no
+// caching headers today; `no-store` keeps it that way whatever a proxy in front of the project adds.
+const privateFetch: typeof fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  return url.includes("/storage/v1/object/") || url.includes("/rest/v1/") ? fetch(input, { ...init, cache: "no-store" }) : fetch(input, init);
+};
+
 // Resolves to null when cloud features are off (the default).
 export function getCloudClient(): Promise<SupabaseClient | null> {
   client ??= (async () => {
     if (!cloudConfig.enabled || !loadSupabase) return null;
     const { createClient } = await loadSupabase();
-    return createClient(cloudConfig.supabaseUrl, cloudConfig.publishableKey, { auth: authOptions(platform.sessionStore) });
+    return createClient(cloudConfig.supabaseUrl, cloudConfig.publishableKey, { auth: authOptions(platform.sessionStore), global: { fetch: privateFetch } });
   })();
   return client;
 }

@@ -15,7 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The website is built and deployed only after the database, unit, typecheck, build and browser tests pass on this
+  # commit (docs/shared-child-profiles-release-readiness.md section G). A failure or cancellation stops the deploy.
+  db-tests:
+    uses: ./.github/workflows/db-tests.yml
+  browser-tests:
+    uses: ./.github/workflows/e2e-tests.yml
+
   build:
+    needs: [db-tests, browser-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

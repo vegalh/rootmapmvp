@@ -7,9 +7,13 @@ import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
 // Full view of a single entry: who it's about, large photos and the complete written memory.
-export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
+export function EntryDetailPage({ entry, child, canEdit = true, versions, lang, back, edit, remove, t }: {
   entry: Entry;
   child?: Child;
+  // Whether this parent can change Moments of this child (lib/childAccess.ts).
+  canEdit?: boolean;
+  // Versions kept from a concurrent edit (components/KeptVersions.tsx), where sharing is on.
+  versions?: React.ReactNode;
   lang: Lang;
   back: () => void;
   edit: () => void;
@@ -23,10 +27,10 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
     <main className="journal-entry">
       <header className="journal-editor-bar">
         <button onClick={back}><Icon name="back" size={18} />{t.back}</button>
-        <div>
+        {canEdit && <div>
           <button onClick={edit}>{t.editEntry}</button>
           <button aria-label={t.deleteEntry} onClick={() => confirm({ title: t.confirmDeleteEntry, body: <p>{t.confirmDeleteEntryBody}</p>, confirmLabel: t.deleteEntry, destructive: true, onConfirm: () => latestRemove.current() })}><Icon name="trash" size={18} /></button>
-        </div>
+        </div>}
       </header>
       {child && (
         <div className="entry-child">
@@ -42,6 +46,7 @@ export function EntryDetailPage({ entry, child, lang, back, edit, remove, t }: {
         </div>
       )}
       {text && <p className="journal-entry-text">{text}</p>}
+      {versions}
     </main>
   );
 }

@@ -19,9 +19,11 @@ import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { WeeklyRecapPage } from "./pages/WeeklyRecapPage";
 import { BackupPage } from "./pages/BackupPage";
-import { DeletedChildrenPage } from "./pages/DeletedChildrenPage";
+import { DeletedChildrenPage, type DeletedShared } from "./pages/DeletedChildrenPage";
 import { AccountPage } from "./pages/AccountPage";
 import { GuestImportPage } from "./pages/GuestImportPage";
+import { InvitePage } from "./pages/InvitePage";
+import { captureInviteToken, forgetInviteToken, pendingInviteToken } from "./lib/inviteToken";
 import BookDetailPage from "./pages/BookDetailPage";
 import MusicDetailPage from "./pages/MusicDetailPage";
 import BookshelfPage from "./pages/BookshelfPage";
@@ -32,12 +34,19 @@ import PasswordForm from "./components/PasswordForm";
 import BetaNotice from "./components/BetaNotice";
 import { onStorageError, type StorageFailure } from "./lib/storage";
 import { LAST_BACKUP_KEY, RESTORED_AT_KEY, applyBackup } from "./lib/backup";
-import { saveSetting, useCollection, useSetting } from "./lib/data/hooks";
-import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreData, syncMeta } from "./lib/data/store";
-import { newRecordId } from "./lib/data/schema";
+import { saveSetting, useCollection, useScopes, useSetting } from "./lib/data/hooks";
+import { NO_DEMO_KEY, activeSpace, backupData, dataMode, guestImportState, readSetting, restoreAddsOnly, restoreData, syncMeta, archivedChanges } from "./lib/data/store";
+import { photosForChildren } from "./lib/sharedPhotos";
+import { newRecordId, scopedId } from "./lib/data/schema";
+import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
+import { sharedSyncEnabled } from "./lib/sync/scopes";
+import ChildCircle, { CircleJoins } from "./components/ChildCircle";
+import KeptVersions from "./components/KeptVersions";
+import AccessNotice, { ArchivedChangesSheet } from "./components/AccessNotice";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
+import { getCloudClient } from "./lib/cloud/client";
 import { useCloudState } from "./lib/cloud/hooks";
 import type { AuthResult } from "./lib/cloud/auth";
 import { cloudState, confirmSignInCode, sendSignInCode, signInWithPasswordHere, signOutHere } from "./lib/cloud/session";
@@ -160,7 +169,15 @@ function changePage(motion: PageMotion, update: () => void) {
 // Pages that exist only in builds with cloud features; elsewhere their address opens Today.
 const CLOUD_SCREENS: Screen[] = ["signIn", "account", "guestImport"];
 function allowedRoute(r: Route | null): Route | null {
-  return r && (cloudConfig.enabled || !CLOUD_SCREENS.includes(r.screen)) ? r : null;
+  if (!r) return null;
+  if (CLOUD_SCREENS.includes(r.screen) && !cloudConfig.enabled) return null;
+  // An invitation link only ever opens where Shared Child Profiles itself is on (defense in depth: sharing stays
+  // off in production regardless of what a stale or copied link addresses), and only while this tab holds its token.
+  if (r.screen === "invite" && !(cloudConfig.enabled && sharedSyncEnabled && pendingInviteToken())) {
+    forgetInviteToken();
+    return null;
+  }
+  return r;
 }
 
 export default function App() {
@@ -209,6 +226,9 @@ export default function App() {
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
+  // The token of the invitation being opened; "" when there is none. Held outside the address (lib/inviteToken.ts):
+  // the address is just #/invite. Never logged.
+  const [inviteToken, setInviteToken] = useState(() => (start.screen === "invite" ? pendingInviteToken() ?? "" : ""));
 
   // All persistent data comes from the data layer (src/lib/data): records are stored one by one with sync
   // timestamps, and removing one from a list soft-deletes it. A removed child is a soft-deleted child record,
@@ -216,7 +236,7 @@ export default function App() {
   const children = useCollection("children");
   const { items: childrenData, set: setChildrenData, commit: commitChildren } = children;
   const deletedChildren = children.deleted as DeletedChild[];
-  const { items: records, set: setRecords, commit: commitRecords } = useCollection("records");
+  const { items: records, deleted: deletedRecords, set: setRecords, commit: commitRecords } = useCollection("records");
   const { items: observations, set: setObservations } = useCollection("observations");
   const [seedVersion, setSeedVersion] = useSetting<number>("rootmap-seed-version", 0);
   // Every seed item this device has received ("child:emma", "record:r1", "obs:o1"); see mergeSeed.
@@ -245,7 +265,7 @@ export default function App() {
   };
   const { items: plans, set: setPlans, commit: commitPlans } = useCollection("plans");
   // Moments/Journal entries (per child) and goals (per parent) are never part of the seed merge.
-  const { items: entries, commit: commitEntries } = useCollection("entries");
+  const { items: entries, deleted: deletedEntries, commit: commitEntries } = useCollection("entries");
   const [migrated, setMigrated] = useSetting<string[]>(MIGRATED_KEY, []);
   const { items: goals, set: setGoals } = useCollection("goals");
   const [lastBackup, setLastBackup] = useSetting<string>(LAST_BACKUP_KEY, "");
@@ -334,6 +354,48 @@ export default function App() {
   // The open child's page; undefined once that child is removed (the page then returns to My Children).
   const child = childrenData.find(c => c.id === selectedChild);
   const activeChildIds = useMemo(() => childrenData.map(c => c.id), [childrenData]);
+  // What this parent can do with each child (lib/childAccess.ts). Every child of the user's own family (and every child
+  // in the guest space) is theirs to manage, so without children shared from other families nothing here changes.
+  // Screens only follow this; the server decides.
+  const scopes = useScopes();
+  const accessOf = useCallback((id: string) => childAccess(id, scopes), [scopes]);
+  // The user's own children that someone else helps with (Recently Deleted lists what was removed from them). Read
+  // from the server, which shows the person managing a profile everyone in its circle; asked when Profile or Recently
+  // Deleted opens. Unknown (offline, or sharing off): none, so nothing extra is listed.
+  const [sharedOwnChildren, setSharedOwnChildren] = useState<Set<string>>(() => new Set());
+  const homeFamily = cloud.status === "signed-in" ? cloud.account?.familyId ?? "" : "";
+  useEffect(() => {
+    if (!sharedSyncEnabled || !homeFamily || (screen !== "profile" && screen !== "deletedChildren")) return;
+    let live = true;
+    void getCloudClient().then(async client => {
+      if (!client) return;
+      const { data, error } = await client.from("child_memberships").select("child_id").eq("family_id", homeFamily).neq("role", "owner");
+      if (live && !error) setSharedOwnChildren(new Set((data as { child_id: string }[]).map(r => r.child_id)));
+    });
+    return () => { live = false; };
+  }, [homeFamily, screen]);
+  const deletedShared = useMemo<DeletedShared[]>(() => {
+    if (!sharedOwnChildren.size) return [];
+    const childOf = (id: string) => childrenData.find(c => c.id === id && sharedOwnChildren.has(id) && canManage(accessOf(id)));
+    return [
+      ...deletedEntries.flatMap(item => { const child = childOf(item.childId); return child ? [{ kind: "entry" as const, item, child }] : []; }),
+      ...deletedRecords.flatMap(item => { const child = childOf(item.childId); return child ? [{ kind: "record" as const, item, child }] : []; }),
+    ];
+  }, [sharedOwnChildren, deletedEntries, deletedRecords, childrenData, accessOf]);
+  // Children a new Moment or activity record can be about; and My Week's children (the user's own family only).
+  const writableChildren = useMemo(() => editableChildren(childrenData, scopes), [childrenData, scopes]);
+  const ownChildren = useMemo(() => ownFamilyChildren(childrenData), [childrenData]);
+  // Children no longer shared with this parent (removed from their circle, or their profile deleted), whose note on
+  // My Children hasn't been acknowledged on this device, and the unsent changes kept here because of it.
+  const [accessNoticesSeen, setAccessNoticesSeen] = useSetting<string[]>("rootmap-access-notices", []);
+  const unseenRevoked = useMemo(() => {
+    const revoked = (scopes as { revoked?: Record<string, { state: string }> } | undefined)?.revoked ?? {};
+    return Object.keys(revoked).filter(k => revoked[k].state === "done" && !accessNoticesSeen.includes(k));
+  }, [scopes, accessNoticesSeen]);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [reviewingArchive, setReviewingArchive] = useState(false);
+  const countArchived = useCallback(() => { void archivedChanges().then(a => setArchivedCount(a.length), () => setArchivedCount(0)); }, []);
+  useEffect(countArchived, [scopes, countArchived]);
   const activity = findActivity(selectedActivity) || activities[0];
   const music = findMusic(selectedActivity) || musicActivities[0];
   const book = books.find(b => b.id === selectedBook) || books[0];
@@ -520,6 +582,8 @@ export default function App() {
   }, [hash, screen]);
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
+      // An invitation link opened in this tab while the app runs: its token leaves the address first.
+      captureInviteToken();
       const h = history.current;
       const r = allowedRoute(parseRoute(window.location.hash)) ?? { screen: "today" as Screen };
       if (h) {
@@ -550,6 +614,7 @@ export default function App() {
       if (r.screen === "entry" || r.screen === "entryEdit") setSelectedEntry(r.entry);
       if (r.screen === "recap") { setRecapWeek(r.week ?? ""); setRecapChild(r.child ?? ""); }
       if (r.screen === "entryEdit" && !r.entry) { setEditorChild(r.child); setEditorPrefill(undefined); setEditorReturn("observations"); }
+      if (r.screen === "invite") setInviteToken(pendingInviteToken() ?? "");
       setScreen(r.screen);
     };
     window.addEventListener("popstate", onPop);
@@ -596,9 +661,10 @@ export default function App() {
   const openEntry = (id: string, origin: "moments" | "child" | "today" | "children" | "recap") => { setSelectedEntry(id); setEntryOrigin(origin); go("entry"); };
   const startEntry = (origin: "moments" | "child" | "activity", childId?: string, prefill?: EntryPrefill) => {
     if (!childrenData.length) { setModal("addChild"); return; }
+    if (!writableChildren.length) return;
     setSelectedEntry(undefined);
     setEntryOrigin(origin);
-    setEditorChild(defaultChildId(childrenData, childId) || undefined);
+    setEditorChild(defaultChildId(writableChildren, childId) || undefined);
     setEditorPrefill(prefill);
     setEditorReturn(screen);
     go("entryEdit");
@@ -622,6 +688,10 @@ export default function App() {
   // stay as recorded). Resolves to an error message, or null once stored.
   const editActivityRecord = async (id: string, patch: { date: string; notes: string; childId: string }) => {
     if (!isActiveChild(childrenData, patch.childId)) return t.chooseChildFirst;
+    // Rows never move between families (the server keeps each in its family): a record only moves to a child of the
+    // same family that the parent can add to.
+    const current = records.find(r => r.id === id);
+    if (current && (familyOfId(current.childId) !== familyOfId(patch.childId) || !canAddAndEdit(accessOf(patch.childId)))) return t.cannotMoveFamily;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) return t.chooseDateFirst;
     const notes = patch.notes.trim();
     const next = records.map((r): LessonRecord => {
@@ -655,7 +725,7 @@ export default function App() {
   };
   // Completed › Repeat: the same activity planned again for today, for the children still in My Children.
   const repeatPlan = (plan: Plan) => {
-    const childIds = plan.childIds.filter(id => isActiveChild(childrenData, id));
+    const childIds = plan.childIds.filter(id => isActiveChild(ownChildren, id));
     setPlans(current => [...current, { id: newRecordId("p"), activityId: plan.activityId, date: localIsoToday(), childIds, ...(plan.note ? { note: plan.note } : {}) }]);
     setToast(t.planRepeated);
   };
@@ -676,6 +746,7 @@ export default function App() {
     setLeavingModal(null);
     if (destination === "record") {
       if (!childrenData.length) { setModal("addChild"); return; }
+      if (!writableChildren.length) return;
       setRecordFrom("quick");
       go("record");
     }
@@ -715,7 +786,15 @@ export default function App() {
   };
   // Signs out of this device only, then reloads into the guest space. Everything stored on the device stays.
   const signOut = async () => {
+    forgetInviteToken();
     afterSwitchTo({ toast: t.signedOut, screen: "profile" });
+    await signOutHere();
+  };
+  // Same, but for signing out of the wrong account mid-invitation (pages/InvitePage.tsx, "wrong_email"): omitting
+  // `screen` keeps the #/invite/<token> address through the reload, so the next sign-in returns to the same
+  // invitation instead of Profile.
+  const signOutKeepingInvite = async () => {
+    afterSwitchTo({ toast: t.signedOut });
     await signOutHere();
   };
 
@@ -749,6 +828,10 @@ export default function App() {
     if (screen === "children") {
       return (
         <ChildrenPage
+          notice={<>
+            {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <CircleJoins homeFamilyId={cloud.account.familyId} openChild={goChild} t={t} />}
+            <AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />
+          </>}
           childrenData={childrenData}
           entries={entries}
           goChild={goChild}
@@ -847,9 +930,33 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length + deletedShared.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
+    if (screen === "invite") {
+      // Once an invitation is accepted or declined its address is replaced with Today (rather than another page
+      // pushed on top of it), so browser Back can't return to it and the token stays in no history entry.
+      const forgetInviteAddress = () => {
+        const h = history.current;
+        if (h) { window.history.replaceState({ ...window.history.state, rmIdx: h.idx }, "", "#/today"); h.stack[h.idx] = "#/today"; }
+        forgetInviteToken();
+      };
+      return (
+        <InvitePage
+          key={inviteToken}
+          token={inviteToken}
+          email={cloud.status === "signed-in" ? cloud.user.email ?? "" : ""}
+          switchAccount={() => void signOutKeepingInvite()}
+          declined={() => { forgetInviteAddress(); go("today"); }}
+          notify={setToast}
+          accepted={(familyId, childId) => {
+            forgetInviteAddress();
+            goChild(scopedId(familyId, childId));
+          }}
+          t={t}
+        />
+      );
+    }
     if (screen === "guestImport" && syncUser) {
       // Back is intentionally not a dismissal: it only navigates away, leaving guestImportState() at null so the
       // offer can resurface later. Only "Not Now" inside GuestImportPage calls dismissImport() to record a real
@@ -877,7 +984,24 @@ export default function App() {
             setToast(t.entrySaved);
           }}
           edit={() => setModal("editChild")}
+          access={accessOf(child.id)}
+          moveTargets={sameFamilyChildren(writableChildren, child.id)}
+          circle={sharedSyncEnabled && cloud.status === "signed-in" && cloud.account
+            ? (
+              <ChildCircle
+                key={child.id}
+                child={child}
+                homeFamilyId={cloud.account.familyId}
+                access={accessOf(child.id)}
+                afterLeave={() => goBack("children")}
+                notify={setToast}
+                lang={lang}
+                t={t}
+              />
+            )
+            : undefined}
           remove={async () => {
+            if (!canManage(accessOf(child.id))) return;
             // Runs once the parent confirms in the page's dialog. The child's journal entries, activity records,
             // plans and drafts are never deleted with the profile.
             // One write: the profile is soft-deleted (kept with its photo and id) and appears in Recently Deleted.
@@ -904,9 +1028,9 @@ export default function App() {
     if (screen === "record") {
       return (
         <RecordFormPage
-          childrenData={childrenData}
+          childrenData={writableChildren}
           // From a child's page that child; from Quick Add the only child, or none so the parent chooses.
-          childId={recordFrom === "child" && child ? child.id : defaultChildId(childrenData)}
+          childId={recordFrom === "child" && child ? child.id : defaultChildId(writableChildren)}
           lockChild={recordFrom === "child" && !!child}
           records={records}
           // Cancel returns to wherever the form was opened (a child's page, or any tab through Quick Add).
@@ -931,6 +1055,8 @@ export default function App() {
         <EntryDetailPage
           entry={entry}
           child={childrenData.find(c => c.id === entry.childId)}
+          canEdit={canAddAndEdit(accessOf(entry.childId))}
+          versions={sharedSyncEnabled && homeFamily ? <KeptVersions key={entry.id} entryId={entry.id} homeFamilyId={homeFamily} lang={lang} t={t} /> : undefined}
           lang={lang}
           back={() => goBack(originScreen)}
           edit={() => go("entryEdit")}
@@ -947,8 +1073,9 @@ export default function App() {
       return (
         <EntryEditorPage
           key={`${entryOrigin}:${entry?.id || "new"}:${editorChild || ""}:${editorPrefill?.title || ""}`}
-          childrenData={childrenData}
-          childId={entry?.childId || defaultChildId(childrenData, editorChild)}
+          // A Moment can only be about children the parent can add to; an existing one stays within its family.
+          childrenData={entry ? sameFamilyChildren(writableChildren, entry.childId) : writableChildren}
+          childId={entry?.childId || defaultChildId(writableChildren, editorChild)}
           lockChild={entryOrigin === "child"}
           entry={entry}
           prefill={entry ? undefined : editorPrefill}
@@ -967,7 +1094,10 @@ export default function App() {
             } else {
               // A moment about several children is one entry per child (each child's Journal keeps its own copy),
               // with the same content and timestamps, stored together. Lists of every child show it once (mergeShared).
-              const created = (childIds.length ? childIds : [fields.childId]).map(childId => ({ id: newRecordId("m"), ...fields, childId, createdAt: now, updatedAt: now }));
+              const forChildren = childIds.length ? childIds : [fields.childId];
+              const photosByChild = await photosForChildren(forChildren, fields.photos);
+              if (!photosByChild) { setToast(t.photoCopyFailed); return false; }
+              const created = forChildren.map(childId => ({ id: newRecordId("m"), ...fields, photos: photosByChild[childId], childId, createdAt: now, updatedAt: now }));
               if (!(await storeEntries([...created, ...entries], draft))) return false;
             }
             setToast(t.entrySaved);
@@ -995,7 +1125,7 @@ export default function App() {
           repeatPlan={repeatPlan}
           childFilter={weekFilter}
           setChildFilter={setWeekFilter}
-          childrenData={childrenData}
+          childrenData={ownChildren}
           openActivity={openActivity}
           openAdd={() => setModal("weekAdd")}
           // Usually opened from Profile, but "Add to My Week" on an activity/music page lands here too —
@@ -1030,6 +1160,7 @@ export default function App() {
             if (dataMode() === "localStorage") return applyBackup(localStorage, backup);
             return (await restoreData(backup.data)) ? { ok: true as const } : { ok: false as const, rolledBack: true };
           }}
+          addOnly={dataMode() === "indexeddb" && restoreAddsOnly()}
           lastBackup={lastBackup}
           setLastBackup={setLastBackup}
           restored={() => {
@@ -1068,6 +1199,15 @@ export default function App() {
           childrenData={childrenData}
           entries={entries}
           records={records}
+          shared={deletedShared}
+          restoreShared={async d => {
+            if (!canManage(accessOf(d.child.id))) return;
+            // The same record, its soft delete cleared: same id, author and photos, synced to the whole circle.
+            const { deletedAt: _deletedAt, ...item } = d.item;
+            const failure = d.kind === "entry" ? await commitEntries([...entries, item as Entry]) : await commitRecords([...records, item as LessonRecord]);
+            if (!savedOk(failure)) return;
+            setToast(t.recordRestoredToast.replace("{name}", d.child.first));
+          }}
           restore={async d => {
             if (childrenData.some(c => c.id === d.id)) return;
             // Runs once the parent confirms in the page's dialog.
@@ -1090,15 +1230,20 @@ export default function App() {
     return <SettingsPage screen={screen} go={go} back={() => goBack(screen === "notes" ? previous : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
   };
 
-  if (cloudConfig.enabled && (showWelcome || screen === "signIn")) {
-    const fromProfile = !showWelcome;
+  // An invitation link opened while signed out asks to sign in first (spec §5, §9): the invitation itself is never
+  // shown to a signed-out visitor. The #/invite/<token> address stays in the hash throughout (afterSwitchTo above
+  // omits `screen`, so the reload after signing in returns straight to it) and "Continue as guest" doesn't apply
+  // here, so it is left out by going straight to the sign-in form (no "welcome" screen in between).
+  const invitingSignedOut = screen === "invite" && cloud.status === "signed-out";
+  if (cloudConfig.enabled && (showWelcome || screen === "signIn" || invitingSignedOut)) {
+    const fromProfile = !showWelcome && !invitingSignedOut;
     return (
       <div className="opening-screen">
         <div>
           <OpeningExperience
             lang={lang}
             setLang={setLang}
-            startAt={fromProfile ? "final" : "animation"}
+            startAt={fromProfile || invitingSignedOut ? "final" : "animation"}
             auth={openingAuth}
             onContinueAsGuest={() => (fromProfile ? go("profile") : setWelcome("done"))}
           />
@@ -1119,11 +1264,14 @@ export default function App() {
       <Shell active={screen} go={go} openQuick={() => setModal("quick")} t={t} nav={topLevel && !needsPassword}>
         {content()}
       </Shell>
+      {reviewingArchive && <ArchivedChangesSheet close={() => setReviewingArchive(false)} changed={countArchived} t={t} />}
       <ModalOverlay
         modal={modal ?? leavingModal}
         closing={!modal && !!leavingModal}
         close={closeModal}
         childrenData={childrenData}
+        writableChildren={writableChildren}
+        ownChildren={ownChildren}
         setChildrenData={async next => savedOk(await commitChildren(next))}
         filters={filters}
         setFilters={setFilters}

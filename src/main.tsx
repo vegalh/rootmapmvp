@@ -7,8 +7,11 @@ import { startCloud } from "./lib/cloud/session";
 import { startSpace } from "./lib/cloud/space";
 import { lockNativeZoom, platform } from "./lib/platform";
 import { startViewportTracking } from "./lib/native";
+import { captureInviteToken } from "./lib/inviteToken";
 import "./index.css";
 
+// Before anything else: an invitation link's token leaves the address bar (lib/inviteToken.ts).
+captureInviteToken();
 lockNativeZoom();
 startViewportTracking();
 // Styles that only apply inside the iOS app (no text-selection callouts on controls, for example).

@@ -24,6 +24,9 @@ export type Route = {
   childTab?: ChildTabRoute;
   // Weekly recap: the Monday that starts the week ("2026-10-05"); `child` narrows it to one child.
   week?: string;
+  // A Circle invitation link's token (components/ChildCircle.tsx). Only in a link being made: once opened, the token
+  // is taken out of the address (lib/inviteToken.ts). Never logged or shown.
+  invite?: string;
 };
 
 // Screens addressed by name alone.
@@ -81,6 +84,10 @@ export function formatRoute(r: Route): string {
       return r.entry ? `#/moment/${enc(r.entry)}/edit` : `#/new-moment${q(r.child)}`;
     case "recap":
       return `#/moments-week${r.week ? `/${enc(r.week)}` : ""}${q(r.child)}`;
+    case "invite":
+      // With a token: the link someone shares (components/ChildCircle.tsx). Without: the address while an invitation
+      // is open, the token held outside it (lib/inviteToken.ts).
+      return r.invite ? `#/invite/${enc(r.invite)}` : "#/invite";
     default:
       return `#/${NAMED[r.screen] ?? "today"}`;
   }
@@ -116,6 +123,8 @@ export function parseRoute(hash: string): Route | null {
       return { screen: "entryEdit", child };
     case "moments-week":
       return { screen: "recap", week: id && /^\d{4}-\d{2}-\d{2}$/.test(id) ? id : undefined, child };
+    case "invite":
+      return id ? { screen: "invite", invite: id } : { screen: "invite" };
     default:
       return BY_NAME[head] ? { screen: BY_NAME[head] } : null;
   }

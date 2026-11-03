@@ -21,7 +21,7 @@ export const SYNC_ORDER: SyncedCollection[] = ["photos", "children", "entries", 
 export const isSyncedCollection = (c: string): c is SyncedCollection => c in TABLE;
 
 // Columns that can't change after insert (sent on insert only).
-export const INSERT_ONLY: Partial<Record<Table, string[]>> = { goals: ["owner_user_id"], photos: ["sha256", "mime_type", "byte_size"] };
+export const INSERT_ONLY: Partial<Record<Table, string[]>> = { goals: ["owner_user_id"], photos: ["sha256", "mime_type", "byte_size", "child_id"] };
 
 // The image a new child gets when the parent picks none (ModalOverlay). Stored on the server as a bundled key.
 export const DEFAULT_CHILD_PHOTO = "https://images.unsplash.com/photo-1606386666595-d135abc1e3b2?auto=format&fit=crop&w=300&q=85";
@@ -89,9 +89,11 @@ export function toRow(collection: SyncedCollection, r: Record<string, unknown>, 
     case "savedCollections":
       return base;
     case "photos": {
-      const p = r as PhotoMeta & { sha256?: string };
+      const p = r as PhotoMeta & { sha256?: string; childHint?: string };
       if (!p.sha256) throw new UnsyncableRecord(`photo ${p.id}: no checksum yet`);
-      return { ...base, mime_type: p.mimeType, byte_size: p.byteSize, width: p.width, height: p.height, sha256: p.sha256, uploaded_at: p.uploadedAt ?? null };
+      // `child_id`: the shared child a photo was added for (lib/sync/scopes.ts), sent once with the new row. The
+      // user's own photos never send it, so they work with a server that doesn't have the column.
+      return { ...base, mime_type: p.mimeType, byte_size: p.byteSize, width: p.width, height: p.height, sha256: p.sha256, uploaded_at: p.uploadedAt ?? null, ...(p.childHint ? { child_id: p.childHint } : {}) };
     }
   }
 }

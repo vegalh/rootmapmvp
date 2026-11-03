@@ -30,7 +30,10 @@ export type SyncBatch = {
   outboxAdd?: OutboxEntry[];
   // The outbox entry each key must have (seq), or none (null), for the batch to apply.
   expect?: { key: string; seq: number | null }[];
-  meta?: { familyId?: string; cursors?: Record<string, number> };
+  // Marks (or, with null, clears) an entry the server refused for lack of access, only if it still has this seq.
+  outboxMark?: { key: string; seq: number; rejected: OutboxEntry["rejected"] | null }[];
+  // `scopeCursors` and `scopes`: shared-children sync (lib/sync/scopes.ts), written through its adapters.
+  meta?: { familyId?: string; cursors?: Record<string, number>; scopeCursors?: Record<string, Record<string, number>>; scopes?: unknown };
 };
 
 // The account space, as sync sees it (lib/data/store.ts in the app; an in-memory version in the tests).
@@ -66,7 +69,13 @@ export type SyncHooks = {
 export class SyncOffline extends Error {}
 export class SyncStopped extends Error {}
 
-type Ctx = { client: SupabaseClient; local: SyncLocal; familyId: string; userId: string; pageSize: number; hooks: SyncHooks };
+type Ctx = { client: SupabaseClient; local: SyncLocal; familyId: string; userId: string; childIds: string[] | null; pageSize: number; hooks: SyncHooks };
+
+// The server refused a write because this user may not make it (lost access, or a role that can't write).
+// Permanent until the record changes again or the user's memberships change: never retried every round.
+export const isAccessDenied = (e: unknown) => (e as { code?: string } | null)?.code === "42501";
+// The tables a shared scope holds: a child's own records (and the photos they show).
+export const CHILD_COLLECTIONS: SyncedCollection[] = ["photos", "children", "entries", "records"];
 
 const isNetwork = (e: unknown) => {
   const x = e as { name?: string; message?: string; status?: number; code?: string } | null;
@@ -81,8 +90,10 @@ function check<T>(res: { data: T; error: { message: string; code?: string } | nu
   return res.data;
 }
 
-export async function syncRound(client: SupabaseClient, local: SyncLocal, opts: { familyId: string; userId: string; pageSize?: number; hooks?: SyncHooks }): Promise<RoundResult> {
-  const ctx: Ctx = { client, local, familyId: opts.familyId, userId: opts.userId, pageSize: opts.pageSize ?? 500, hooks: opts.hooks ?? {} };
+// `childIds`: sync only these children of the family, and only their own records (a family the user isn't a member of,
+// whose children are shared with them; lib/sync/scopes.ts). Without it, the whole family, as always.
+export async function syncRound(client: SupabaseClient, local: SyncLocal, opts: { familyId: string; userId: string; childIds?: string[]; pageSize?: number; hooks?: SyncHooks }): Promise<RoundResult> {
+  const ctx: Ctx = { client, local, familyId: opts.familyId, userId: opts.userId, childIds: opts.childIds ?? null, pageSize: opts.pageSize ?? 500, hooks: opts.hooks ?? {} };
   await local.refresh();
   const meta = local.meta();
   if (meta.familyId && meta.familyId !== ctx.familyId) throw new SyncStopped("this space belongs to another family");
@@ -107,7 +118,12 @@ async function push(ctx: Ctx, result: RoundResult) {
   // Records not on the server after this round (so records that need them wait).
   const missing = new Set<string>();
   for (const entry of entries) {
-    if (entry.collection === "versions") { await pushVersion(ctx, entry); continue; }
+    if (entry.rejected && entry.rejected.seq === entry.seq) {
+      result.notSent[entry.key] = { state: "failed", reason: `access denied (not sent again until it changes): ${entry.rejected.reason}` };
+      missing.add(entry.key);
+      continue;
+    }
+    if (entry.collection === "versions") { await pushVersion(ctx, entry, result); continue; }
     if (!isSyncedCollection(entry.collection)) {
       // Local-only collection (legacy observations live on inside entries): nothing to send.
       await ctx.local.commit({ outboxRemove: [{ key: entry.key, seq: entry.seq }] });
@@ -121,9 +137,17 @@ async function push(ctx: Ctx, result: RoundResult) {
   }
 }
 
-async function pushVersion(ctx: Ctx, entry: OutboxEntry) {
+async function pushVersion(ctx: Ctx, entry: OutboxEntry, result: RoundResult) {
   const p = entry.payload!;
-  await keepVersion(ctx, p.table as Table, p.recordId, p.version, p.baseRev, p.reason);
+  try {
+    await keepVersion(ctx, p.table as Table, p.recordId, p.version, p.baseRev, p.reason);
+  } catch (e) {
+    if (!isAccessDenied(e)) throw e;
+    const reason = (e as Error).message;
+    await ctx.local.commit({ outboxMark: [{ key: entry.key, seq: entry.seq, rejected: { seq: entry.seq, at: new Date().toISOString(), reason } }] });
+    result.notSent[entry.key] = { state: "failed", reason: `access denied: ${reason}` };
+    return;
+  }
   await ctx.local.commit({ outboxRemove: [{ key: entry.key, seq: entry.seq }] });
 }
 
@@ -163,18 +187,24 @@ async function pushRecord(ctx: Ctx, entry: OutboxEntry, collection: SyncedCollec
   let resolution: Resolution | null = null;
   try {
     let written: Row | null = null;
-    if (sr) written = await conditionalUpdate(ctx, table, collection, entry.id, row, sr.rev);
+    // The revision the last conditional update was made against.
+    let triedRev: number | null = null;
+    if (sr) { triedRev = sr.rev; written = await conditionalUpdate(ctx, table, collection, entry.id, row, sr.rev); }
     else written = await insertIfAbsent(ctx, table, collection, row);
     // Conflict (or a repeat of an upload that wasn't recorded): resolve against the server's version.
     for (let attempt = 0; !written && attempt < 3; attempt++) {
       server = await fetchRow(ctx, table, entry.id);
-      if (!server) throw new Error(`${table} ${entry.id} not readable`);
+      // There, but hidden from this user: access to it is gone.
+      if (!server) throw Object.assign(new Error(`${table} ${entry.id} not readable`), { code: "42501" });
+      // Still at the revision the update was made against, so it wasn't overtaken: this user may read it but not change
+      // it (Row Level Security leaves such an update with nothing to change).
+      if (triedRev !== null && Number(server.rev) === triedRev) throw Object.assign(new Error(`${table} ${entry.id} is read-only for this user`), { code: "42501" });
       const base = sr ? sr.syncBase : null;
       resolution = resolve(collection, base, row, clientRow(collection, server));
       for (const loser of resolution.losers) await keepVersion(ctx, table, entry.id, loser.version, Number(server.rev), loser.reason);
       if (resolution.losers.length) result.conflicts++;
       if (sameContent(resolution.merged, clientRow(collection, server))) written = server;
-      else written = await conditionalUpdate(ctx, table, collection, entry.id, resolution.merged, Number(server.rev));
+      else { triedRev = Number(server.rev); written = await conditionalUpdate(ctx, table, collection, entry.id, resolution.merged, triedRev); }
     }
     if (!written) return { state: "waiting", reason: "the record keeps changing on the server; retried next round" };
     await ctx.hooks.afterServerWrite?.(entry.key);
@@ -194,6 +224,11 @@ async function pushRecord(ctx: Ctx, entry: OutboxEntry, collection: SyncedCollec
     const code = (e as { code?: string }).code;
     // A referenced record isn't on the server (it may be held or failed): wait for it.
     if (code === "23503") return { state: "waiting", reason: (e as Error).message };
+    if (isAccessDenied(e)) {
+      const reason = (e as Error).message;
+      await ctx.local.commit({ outboxMark: [{ key: entry.key, seq: entry.seq, rejected: { seq: entry.seq, at: new Date().toISOString(), reason } }] });
+      return { state: "failed", reason: `access denied: ${reason}` };
+    }
     return { state: "failed", reason: (e as Error).message };
   }
 }
@@ -231,11 +266,16 @@ export async function sha256Hex(text: string | ArrayBuffer): Promise<string> {
 // ---- Pull ----------------------------------------------------------------------------------------------------
 
 async function pull(ctx: Ctx, result: RoundResult) {
-  for (const collection of SYNC_ORDER) {
+  const children = ctx.childIds;
+  for (const collection of children ? SYNC_ORDER.filter(c => CHILD_COLLECTIONS.includes(c)) : SYNC_ORDER) {
+    if (children && !children.length) break;
     const table = TABLE[collection];
     for (let page = 0; ; page++) {
       const cursor = ctx.local.meta().cursors[table] ?? 0;
-      const rows = check(await ctx.client.from(table).select("*").eq("family_id", ctx.familyId).gt("change_seq", cursor).order("change_seq").limit(ctx.pageSize)) as Row[];
+      let query = ctx.client.from(table).select("*").eq("family_id", ctx.familyId).gt("change_seq", cursor);
+      if (children && collection === "children") query = query.in("id", children);
+      if (children && (collection === "entries" || collection === "records")) query = query.in("child_id", children);
+      const rows = check(await query.order("change_seq").limit(ctx.pageSize)) as Row[];
       if (!rows.length) break;
       let applied = false;
       for (let attempt = 0; attempt < 3 && !applied; attempt++) {
