@@ -181,6 +181,7 @@ describe("record sync: conflicts", () => {
     await a.sync();
     const r = await b.sync();
     assert.equal(r.conflicts, 1);
+    assert.deepEqual(r.keptEdits, ["m-1"], "B is told its change to this Moment was kept, not shown");
     await a.sync();
     for (const d of [a, b]) assert.equal(d.get("entries", "m-1")?.text, "A's words");
     const v = await versions(p.familyId);
@@ -198,7 +199,9 @@ describe("record sync: conflicts", () => {
     await a.sync(); await b.sync();
     a.edit("children", { ...a.get("children", "c-1")!, dob: "2022-01-01" });
     b.edit("children", { ...b.get("children", "c-1")!, dob: "2022-02-02" });
-    await a.sync(); await b.sync(); await a.sync();
+    await a.sync();
+    assert.deepEqual((await b.sync()).keptEdits, [], "only Moments are noted");
+    await a.sync();
     for (const d of [a, b]) assert.equal(d.get("children", "c-1")?.dob, "2022-01-01");
     const v = await versions(p.familyId);
     assert.deepEqual(v.map(x => [x.reason, (x.version as Rec).dob]), [["field_conflict", "2022-02-02"]]);

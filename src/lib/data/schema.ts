@@ -87,6 +87,8 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-bookshelf": "array",
   // Shared children whose "no longer have access" notice was seen on this device (scopedId keys). Device-only.
   "rootmap-access-notices": "array",
+  // Moments where this device's change lost to a concurrent one, not yet looked at (lib/sync/runner.ts). Device-only.
+  "rootmap-kept-edits": "array",
 };
 // Notification toggles ("rootmap-pref-<label>").
 export const PREF_PREFIX = "rootmap-pref-";

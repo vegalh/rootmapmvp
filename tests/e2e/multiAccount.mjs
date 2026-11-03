@@ -344,12 +344,27 @@ try {
       const n = await d.p.eval(`import("/src/lib/cloud/client.ts").then(async C => { const c = await C.getCloudClient(); const { data } = await c.from("record_versions").select("id").eq("family_id", ${JSON.stringify(FA)}).eq("record_id", "m-a1"); return data?.length ?? -1; })`);
       assert.ok(n >= 1, "readable by Ana and by Ben");
     }
+    // Phase 5: Ben (whose change lost) is told on My Children; Ana (whose change stayed) is not.
+    await kids(dB.p);
+    await dB.p.waitFor(`[...document.querySelectorAll(".access-notice")].some(n => n.innerText.includes("Someone else changed"))`, 15000, "Ben's kept-edit note");
+    await kids(dA.p); await sleep(800);
+    assert.ok(!(await text(dA.p)).includes("Someone else changed"), "no note for the change that stayed");
     // The Moment's page shows the kept version to Ana (who manages Kai's profile) and to Ben (whose version it is).
     for (const [d, id] of [[dA, "m-a1"], [dB, sid(FA, "m-a1")]]) {
       await d.p.eval(`location.hash = "#/moment/" + encodeURIComponent(${JSON.stringify(id)})`);
       await d.p.waitFor(`document.querySelector(".kept-versions")?.innerText.includes("Ben's words")`, 10000, "kept version shown");
       assert.ok((await d.p.eval(`document.querySelector(".journal-entry-text").innerText`)).includes("Ana's words"), "the Moment itself shows the kept-first text");
     }
+    // Who wrote it (Phase 5): Ana added and last changed m-a1, so her own page says nothing; Ben's names her.
+    await dB.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ana")`, 10000, "Ben sees who added it");
+    assert.ok(!(await dB.p.eval(`document.querySelector(".entry-authors").innerText`)).includes("Last changed"), "the same person is named once");
+    assert.ok(!(await dA.p.eval(`!!document.querySelector(".entry-authors")`)), "nothing on a Moment written and changed only by Ana");
+    // Opening the Moment cleared Ben's note.
+    await kids(dB.p); await sleep(800);
+    assert.ok(!(await text(dB.p)).includes("Someone else changed"), "the note is gone once the Moment was opened");
+    // Ana's view of Ben's Moment m-b1: he added it.
+    await dA.p.eval(`location.hash = "#/moment/m-b1"`);
+    await dA.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ben")`, 10000, "Ana sees Ben added m-b1");
   });
 
   await step("Ana makes Ben View Only in Manage; Ben's screens follow (no adding or editing), and his circle line updates in place", async () => {

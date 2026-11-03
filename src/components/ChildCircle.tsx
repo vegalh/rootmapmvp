@@ -237,6 +237,8 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
   const [email, setEmail] = useState("");
   const [creating, setCreating] = useState(false);
   const [link, setLink] = useState<string | null>(null);
+  // Neither sharing nor copying worked (some in-app browsers, e.g. WeChat's): the link is shown to copy by hand.
+  const [showLink, setShowLink] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
 
   const loadInvitations = useServerList<Invitation[]>(
@@ -283,7 +285,7 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
 
   const copyLink = async () => {
     if (!link) return;
-    try { await navigator.clipboard.writeText(link); notify(t.linkCopied); } catch { notify(t.shareFailed); }
+    try { await navigator.clipboard.writeText(link); notify(t.linkCopied); } catch { setShowLink(true); }
   };
   const shareLink = async () => {
     if (!link) return;
@@ -292,7 +294,7 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
       await navigator.clipboard.writeText(link);
       notify(t.linkCopied);
     } catch (e) {
-      if ((e as Error)?.name !== "AbortError") notify(t.shareFailed);
+      if ((e as Error)?.name !== "AbortError") setShowLink(true);
     }
   };
 
@@ -364,11 +366,16 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
         {link && (
           <div className="invite-link-ready">
             <p>{t.inviteLinkReady}</p>
+            {showLink && (
+              <Field label={t.inviteLinkManual}>
+                <input readOnly value={link} onFocus={e => e.currentTarget.select()} />
+              </Field>
+            )}
             <div className="sheet-buttons even">
               <button onClick={() => void copyLink()}>{t.inviteCopyLink}</button>
               <button onClick={() => void shareLink()}>{t.inviteShareLink}</button>
             </div>
-            <button className="text-action" onClick={() => { setLink(null); setInviting(false); setRole("editor"); }}>{t.inviteAnother}</button>
+            <button className="text-action" onClick={() => { setLink(null); setShowLink(false); setInviting(false); setRole("editor"); }}>{t.inviteAnother}</button>
           </div>
         )}
         {invitations && invitations.length > 0 && (

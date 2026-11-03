@@ -58,6 +58,8 @@ export type RoundResult = {
   // migration), waiting (needs a record or photo that isn't on the server yet), failed (the server refused it).
   notSent: Record<string, { state: EntryState; reason: string }>;
   conflicts: number;
+  // Moments (server ids) where this device's change lost to someone else's and was kept in record_versions.
+  keptEdits: string[];
 };
 
 // Test hooks: called at the points where a real device can be interrupted.
@@ -98,7 +100,7 @@ export async function syncRound(client: SupabaseClient, local: SyncLocal, opts: 
   const meta = local.meta();
   if (meta.familyId && meta.familyId !== ctx.familyId) throw new SyncStopped("this space belongs to another family");
   if (!meta.familyId) await local.commit({ meta: { familyId: ctx.familyId } });
-  const result: RoundResult = { pushed: 0, pulled: 0, notSent: {}, conflicts: 0 };
+  const result: RoundResult = { pushed: 0, pulled: 0, notSent: {}, conflicts: 0, keptEdits: [] };
   try {
     await push(ctx, result);
     await pull(ctx, result);
@@ -141,6 +143,7 @@ async function pushVersion(ctx: Ctx, entry: OutboxEntry, result: RoundResult) {
   const p = entry.payload!;
   try {
     await keepVersion(ctx, p.table as Table, p.recordId, p.version, p.baseRev, p.reason);
+    if (lostEdit(p.table as Table, p.reason)) result.keptEdits.push(p.recordId);
   } catch (e) {
     if (!isAccessDenied(e)) throw e;
     const reason = (e as Error).message;
@@ -201,7 +204,10 @@ async function pushRecord(ctx: Ctx, entry: OutboxEntry, collection: SyncedCollec
       if (triedRev !== null && Number(server.rev) === triedRev) throw Object.assign(new Error(`${table} ${entry.id} is read-only for this user`), { code: "42501" });
       const base = sr ? sr.syncBase : null;
       resolution = resolve(collection, base, row, clientRow(collection, server));
-      for (const loser of resolution.losers) await keepVersion(ctx, table, entry.id, loser.version, Number(server.rev), loser.reason);
+      for (const loser of resolution.losers) {
+        await keepVersion(ctx, table, entry.id, loser.version, Number(server.rev), loser.reason);
+        if (lostEdit(table, loser.reason)) result.keptEdits.push(entry.id);
+      }
       if (resolution.losers.length) result.conflicts++;
       if (sameContent(resolution.merged, clientRow(collection, server))) written = server;
       else { triedRev = Number(server.rev); written = await conditionalUpdate(ctx, table, collection, entry.id, resolution.merged, triedRev); }
@@ -246,6 +252,10 @@ async function conditionalUpdate(ctx: Ctx, table: Table, collection: SyncedColle
 async function fetchRow(ctx: Ctx, table: Table, id: string): Promise<Row | null> {
   return check(await ctx.client.from(table).select("*").eq("family_id", ctx.familyId).eq("id", id).maybeSingle()) as Row | null;
 }
+
+// A Moment's text or fields changed here lost to a change that reached the server first (resolver.ts keeps this
+// device's version for these reasons). Not "edited_after_delete": the Moment is gone, nothing is shown instead.
+const lostEdit = (table: Table, reason: string) => table === "entries" && (reason === "text_conflict" || reason === "field_conflict");
 
 // Keeps a losing version. Its id is derived from what it is, so keeping it again (after an interruption) adds
 // nothing.

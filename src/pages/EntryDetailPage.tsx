@@ -7,13 +7,15 @@ import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
 // Full view of a single entry: who it's about, large photos and the complete written memory.
-export function EntryDetailPage({ entry, child, canEdit = true, versions, lang, back, edit, remove, t }: {
+export function EntryDetailPage({ entry, child, canEdit = true, versions, authors, lang, back, edit, remove, t }: {
   entry: Entry;
   child?: Child;
   // Whether this parent can change Moments of this child (lib/childAccess.ts).
   canEdit?: boolean;
   // Versions kept from a concurrent edit (components/KeptVersions.tsx), where sharing is on.
   versions?: React.ReactNode;
+  // Who added and last changed it (components/EntryAuthors.tsx), where sharing is on.
+  authors?: React.ReactNode;
   lang: Lang;
   back: () => void;
   edit: () => void;
@@ -39,6 +41,7 @@ export function EntryDetailPage({ entry, child, canEdit = true, versions, lang, 
         </div>
       )}
       {!child && <time>{fmtLong(entry.date, lang)}</time>}
+      {authors}
       {entry.title && <h1>{entry.title}</h1>}
       {entry.photos.length > 0 && (
         <div className="journal-entry-photos">

@@ -21,11 +21,11 @@ import pg from "pg";
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const LAST_PRE_SHARING = "20261027000200";
 const SUITES = ["cloud", "spaces", "sync", "guestImport", "analytics", "flags"];
-// Everything the six sharing migrations add that a client could call.
+// Everything the sharing migrations add that a client could call.
 const SHARING_TABLES = ["child_memberships", "child_invitations"];
 const SHARING_RPCS = ["create_invitation", "list_invitations", "revoke_invitation", "get_invitation_preview", "accept_invitation",
-  "set_member_role", "remove_member", "leave_circle", "child_circle", "set_circle_relationship", "circle_joins", "dismiss_circle_joins"];
-const NEW_COLUMNS = { photos: ["child_id"], record_versions: ["child_id"] };
+  "set_member_role", "remove_member", "leave_circle", "child_circle", "set_circle_relationship", "circle_joins", "dismiss_circle_joins", "entry_people"];
+const NEW_COLUMNS = { photos: ["child_id"], record_versions: ["child_id"], entries: ["created_by"] };
 
 const status = JSON.parse(execFileSync("npx", ["supabase", "status", "-o", "json"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
 for (const u of [status.API_URL, status.DB_URL]) if (!["127.0.0.1", "localhost"].includes(new URL(u).hostname)) throw new Error(`refusing non-local stack ${u}`);

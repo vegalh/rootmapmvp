@@ -14,7 +14,7 @@ import {
   type ImportContext, type ImportProgress, type Prepared,
 } from "./guestImport";
 import { SyncOffline, sha256Hex, type RoundResult } from "./engine";
-import { isShared } from "../data/schema";
+import { isShared, scopedId } from "../data/schema";
 import { familyPhotos, sharedScopes, sharedSyncEnabled, syncScopes, type CleanupLocal, type ScopeBase } from "./scopes";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import { EMPTY_PROFILE, syncProfile, type ProfileLocal, type ProfileRow } from "./profile";
@@ -53,6 +53,9 @@ const photoLocal: PhotoLocal = {
 // Bookkeeping only (never shown): the profile row this device last knew the server to hold, kept as a plain
 // setting alongside `rootmap-profile` so a reload doesn't lose track of it.
 const PROFILE_KNOWN_KEY = "rootmap-profile-known-server";
+// Moments (local ids) where a change made on this device lost to someone else's; My Children says so until the
+// parent opens the Moment or dismisses the note (App.tsx). Shared Child Profiles Phase 5.
+export const KEPT_EDITS_KEY = "rootmap-kept-edits";
 const profileLocal: ProfileLocal = {
   get: () => readSetting<ProfileInfo>("rootmap-profile", EMPTY_PROFILE),
   set: next => void write({ settings: [["rootmap-profile", next]] }),
@@ -197,6 +200,9 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       const homeChildren = getCollection("children").filter(c => !isShared(c) && !c.deletedAt).map(c => c.id);
       const scopes = await syncScopes(client, local, { userId, homeFamilyId: familyId, enabled: sharedSyncEnabled, homeChildren });
       notSent = Object.assign({}, scopes.home.notSent, ...Object.values(scopes.shared).map(r => r.notSent));
+      const kept = [...scopes.home.keptEdits, ...Object.entries(scopes.shared).flatMap(([fid, r]) => r.keptEdits.map(id => scopedId(fid, id)))];
+      const known = readSetting<string[]>(KEPT_EDITS_KEY, []);
+      if (kept.some(id => !known.includes(id))) await write({ settings: [[KEPT_EDITS_KEY, [...new Set([...known, ...kept])]]] });
       // The parent's own profile (name/photo/contact): a user-scoped singleton, so it syncs on its own, not
       // through the record-sync engine above.
       await syncProfile(client, userId, profileLocal);
