@@ -2,8 +2,8 @@
 
 Phase 5 is the smallest practical step toward real families using shared profiles day to day. It builds only on what
 Phases 1–4 and the release-readiness follow-up already provide. Branch `feature/shared-child-profiles-phase5`, from
-`main` after PR #4 (`e35e944`). One new migration, applied to the local stack only. Sharing stays switched off outside
-a development server (`sharedSyncEnabled`), and nothing here changes that.
+`main` after PR #4 (`e35e944`). One new migration, applied to the local stack only. Sharing stays switched off unless
+the build sets `VITE_ROOTMAP_SHARED_SYNC=on` (see [the tester rollout](shared-child-profiles-tester-rollout.md)).
 
 ## 1. What was already complete (reviewed, not rebuilt)
 
@@ -127,8 +127,8 @@ pre-sharing migrations. CI runs it.
 - **Physical devices, real Safari/WebKit, WeChat**: still untested (release readiness, section H). That includes
   this phase's link fallback.
 
-## 6. Blockers (unchanged by this phase)
+## 6. Rollout
 
-Before staging: staging backups (database and photo files); a deliberate, reviewed switch to enable sharing on
-staging; a migration rehearsal on a copy of staging data; real-device testing. The seven sharing migrations,
-including this one, are local only. Nothing was deployed and no staging or production migration was applied.
+The original staging blockers were written for a public launch. For the existing testers, the shortest path is in
+[shared-child-profiles-tester-rollout.md](shared-child-profiles-tester-rollout.md): merge, apply the 7 migrations
+after a data dump, then set one repository variable. Both remote steps wait for the owner's approval.

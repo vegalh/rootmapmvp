@@ -1,9 +1,10 @@
-// Shared Child Profiles stays switched off outside a development server (docs/shared-child-profiles-release-readiness.md
-// section 11). Run with `npm run test:e2e:cloud` (the dev-server part uses the local Supabase stack).
+// Shared Child Profiles stays switched off unless the build sets VITE_ROOTMAP_SHARED_SYNC=on
+// (docs/shared-child-profiles-tester-rollout.md). Run with `npm run test:e2e:cloud` (the dev-server part uses the local
+// Supabase stack).
 //
-// 1. Real production and staging builds (`vite build`), served by `vite preview`, built with every switch on —
-//    VITE_ROOTMAP_CLOUD=on and VITE_ROOTMAP_SHARED_SYNC=on — against a made-up HTTPS project (production builds refuse
-//    plain http): an invitation link opens nothing, its token leaves the address bar and is never sent anywhere.
+// 1. Real production and staging builds (`vite build`), served by `vite preview`, with cloud features on and
+//    VITE_ROOTMAP_SHARED_SYNC unset (the website until the owner sets it), against a made-up HTTPS project (production
+//    builds refuse plain http): an invitation link opens nothing, its token leaves the address bar and is never sent.
 // 2. A development server with cloud features on but VITE_ROOTMAP_SHARED_SYNC unset: a signed-in parent's child page
 //    has no circle, an invitation link opens nothing, and no circle or invitation call is ever made.
 import assert from "node:assert/strict";
@@ -23,7 +24,7 @@ async function built(mode) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), `rootmap-flags-${mode}-`));
   execFileSync(path.join(ROOT, "node_modules/.bin/vite"), ["build", "--mode", mode, "--outDir", out, "--emptyOutDir", "--logLevel", "error"], {
     cwd: ROOT, stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, VITE_ROOTMAP_CLOUD: "on", VITE_ROOTMAP_SHARED_SYNC: "on", VITE_SUPABASE_URL: FAKE, VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_flagstest", VITE_ROOTMAP_ANALYTICS: "", VITE_TURNSTILE_SITE_KEY: "" },
+    env: { ...process.env, VITE_ROOTMAP_CLOUD: "on", VITE_ROOTMAP_SHARED_SYNC: "", VITE_SUPABASE_URL: FAKE, VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_flagstest", VITE_ROOTMAP_ANALYTICS: "", VITE_TURNSTILE_SITE_KEY: "" },
   });
   const port = 6100 + Math.floor(Math.random() * 800);
   const proc = spawn(path.join(ROOT, "node_modules/.bin/vite"), ["preview", "--outDir", out, "--port", String(port), "--strictPort"], { cwd: ROOT, stdio: "ignore" });
@@ -40,7 +41,7 @@ for (const mode of ["production", "staging"]) {
   const p = await newDevice(`flags-${mode}`, 9411);
   page = p;
   watch(p);
-  await step(`A ${mode} build with VITE_ROOTMAP_SHARED_SYNC=on: an invitation link opens nothing and the token goes nowhere`, async () => {
+  await step(`A ${mode} build without VITE_ROOTMAP_SHARED_SYNC: an invitation link opens nothing and the token goes nowhere`, async () => {
     const site = await built(mode);
     try {
       const js = fs.readdirSync(path.join(site.out, "assets")).filter(f => f.endsWith(".js")).map(f => fs.readFileSync(path.join(site.out, "assets", f), "utf8")).join("\n");

@@ -18,11 +18,12 @@ import type { PhotoLocal } from "./photos";
 // id of the user's own family or of another family. Photo ids are already global ("photo-<uuid>", unique across the
 // bucket) and keep them; a shared photo carries its `familyId`.
 //
-// Switched off. Only a development server started with VITE_ROOTMAP_SHARED_SYNC=on (the browser tests) switches it
-// on; a production or staging build never does, whatever its variables say. Otherwise the app syncs only its own
-// family, as before.
+// Switched off unless the build sets VITE_ROOTMAP_SHARED_SYNC to exactly "on": a development server for the browser
+// tests, and the testers' website once the owner sets the repository variable of that name (deploy-pages.yml; the
+// database needs the sharing migrations first, docs/shared-child-profiles-tester-rollout.md). Otherwise the app syncs
+// only its own family, as before.
 const env = (import.meta as { env?: Record<string, string | boolean | undefined> }).env;
-export const sharedSyncEnabled = env?.VITE_ROOTMAP_SHARED_SYNC === "on" && env?.MODE === "development";
+export const sharedSyncEnabled = env?.VITE_ROOTMAP_SHARED_SYNC === "on";
 
 export { isScopedId, scopedId, unscope };
 
