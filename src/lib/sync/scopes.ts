@@ -184,6 +184,9 @@ export type ScopeState = {
   homeFamilyId: string;
   // Shared children (scopedId(familyId, childId)) and the user's role for each, as last confirmed.
   shared: Record<string, Role>;
+  // The user's own family's children (plain ids) whose profile someone else now manages (an ownership transfer),
+  // and the user's role for each. A child of the user's own family not listed here is theirs to manage.
+  home?: Record<string, Role>;
   // Shared children missing from the last successful answers, and how many in a row.
   absent: Record<string, number>;
   revoked: Record<string, Revocation>;
@@ -212,21 +215,27 @@ export function scopeStateFor(stored: unknown, userId: string, homeFamilyId: str
 //   older than its cursor were never sent for this child
 // - role changed (including an ownership transfer): updated; refused changes for that family may be sent again
 // - shared child missing: counted; removed (and its data with it) after CONFIRM_REMOVAL_AFTER answers in a row
-// - the user's own family is never touched here: its children are the user's own
+// - the user's own family's children are never removed here; only the user's role for them is kept (`home`), for
+//   the rare child whose profile was handed to someone else
 export function observeMemberships(state: ScopeState, answer: MembershipFetch, opts: { userId: string; now: string; homeChildren?: string[] }): { state: ScopeState; actions: ScopeAction[] } {
   if (state.userId !== opts.userId) throw new Error("scope state belongs to another account");
   if (!answer.ok) return { state, actions: [] };
-  const home = state.homeFamilyId;
-  if (opts.homeChildren?.length && !answer.memberships.some(m => m.familyId === home)) return { state, actions: [] };
+  const homeFamily = state.homeFamilyId;
+  if (opts.homeChildren?.length && !answer.memberships.some(m => m.familyId === homeFamily)) return { state, actions: [] };
 
   const next: ScopeState = { ...state, shared: { ...state.shared }, absent: { ...state.absent }, revoked: { ...state.revoked } };
+  // A child of the user's own family missing from the answer (its new owner deleted the profile) keeps its last role.
+  const home: Record<string, Role> = Object.fromEntries(Object.entries(state.home ?? {}).filter(([id]) => !answer.memberships.some(m => m.familyId === homeFamily && m.childId === id)));
   const actions: ScopeAction[] = [];
   const add = (a: ScopeAction) => {
     if (!actions.some(x => JSON.stringify(x) === JSON.stringify(a))) actions.push(a);
   };
   const seen = new Set<string>();
   for (const m of answer.memberships) {
-    if (m.familyId === home) continue;
+    if (m.familyId === homeFamily) {
+      if (m.role !== "owner") home[m.childId] = m.role;
+      continue;
+    }
     const key = scopedId(m.familyId, m.childId);
     seen.add(key);
     delete next.absent[key];
@@ -238,6 +247,11 @@ export function observeMemberships(state: ScopeState, answer: MembershipFetch, o
       next.shared[key] = m.role;
       add({ kind: "clearRejections", familyId: m.familyId });
     }
+  }
+  if (JSON.stringify(home) !== JSON.stringify(state.home ?? {})) {
+    if (Object.keys(home).length) next.home = home;
+    else delete next.home;
+    add({ kind: "clearRejections", familyId: homeFamily });
   }
   for (const key of Object.keys(state.shared)) {
     if (seen.has(key)) continue;
@@ -403,7 +417,7 @@ export async function syncScopes(
     if (a.kind === "fullResync") scopeCursors[a.familyId] = {};
     if (a.kind === "dropScope") delete scopeCursors[a.familyId];
     if (a.kind === "clearRejections") {
-      for (const e of base.outbox()) if (e.rejected && entryFamily(base, e) === a.familyId) marks.push({ key: e.key, seq: e.seq, rejected: null });
+      for (const e of base.outbox()) if (e.rejected && (entryFamily(base, e) ?? opts.homeFamilyId) === a.familyId) marks.push({ key: e.key, seq: e.seq, rejected: null });
     }
   }
   if (observed.actions.length || JSON.stringify(state) !== JSON.stringify(base.meta().scopes)) await base.commit({ meta: { scopeCursors, scopes: state }, outboxMark: marks });

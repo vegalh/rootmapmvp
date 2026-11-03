@@ -9,6 +9,9 @@ import type { Copy } from "../lib/i18n";
 // (`entry_people`), which answers anyone who can read the Moment with names and relationships only. Nothing is shown
 // when the parent wrote and last changed it themselves (a Journal kept alone looks as it always has), offline, or for
 // Moments written before children could be shared. Read again when the Moment changes (`updatedAt`).
+//
+// Deliberately quiet: one small line under the Moment, never on cards, Journal lists or activity records, and never
+// counted or compared. RootMap is about caring for a child together, not about who wrote more.
 type Person = { kind: "added" | "changed"; display_name: string; relationship: Relationship | null; is_me: boolean };
 
 export function authorLines(rows: Person[], t: Copy): string[] {
@@ -43,7 +46,7 @@ export function EntryAuthors({ entryId, updatedAt, homeFamilyId, t }: { entryId:
   }, [familyId, recordId, updatedAt]);
   const lines = authorLines(rows, t);
   if (!lines.length) return null;
-  return <p className="entry-authors">{lines.map(line => <span key={line}>{line}</span>)}</p>;
+  return <p className="entry-authors">{lines.join(" · ")}</p>;
 }
 
 export default EntryAuthors;

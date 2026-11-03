@@ -41,7 +41,6 @@ export function EntryDetailPage({ entry, child, canEdit = true, versions, author
         </div>
       )}
       {!child && <time>{fmtLong(entry.date, lang)}</time>}
-      {authors}
       {entry.title && <h1>{entry.title}</h1>}
       {entry.photos.length > 0 && (
         <div className="journal-entry-photos">
@@ -49,6 +48,7 @@ export function EntryDetailPage({ entry, child, canEdit = true, versions, author
         </div>
       )}
       {text && <p className="journal-entry-text">{text}</p>}
+      {authors}
       {versions}
     </main>
   );

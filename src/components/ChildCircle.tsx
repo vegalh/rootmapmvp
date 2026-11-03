@@ -30,6 +30,9 @@ type Person = { user_id: string | null; display_name: string; relationship: Rela
 type TechnicalInviteRole = "editor" | "viewer";
 type Invitation = { id: string; role: TechnicalInviteRole; email: string | null; created_at: string; expires_at: string; accepted_at: string | null; revoked_at: string | null };
 type InvitationState = "pending" | "accepted" | "expired" | "canceled";
+// A live offer to hand a child's profile to someone (Phase 5, migration 20261103000200_ownership_transfer.sql): made by
+// the caller as the person managing it (`incoming` false, with the recipient's id), or made to the caller.
+type Transfer = { id: string; family_id: string; child_id: string; child_first: string; from_name: string; to_user: string | null; to_name: string; expires_at: string; incoming: boolean };
 
 export const accessLabel = (access: Access, t: Copy) => (access === "manage" ? t.accessManage : access === "edit" ? t.accessEdit : t.accessView);
 export const accessInfo = (access: Access, t: Copy) => (access === "manage" ? t.accessManageInfo : access === "edit" ? t.accessEditInfo : t.accessViewInfo);
@@ -163,6 +166,7 @@ export function ChildCircle({ child, homeFamilyId, access, afterLeave, notify, l
       {access !== "manage" && (
         <>
           <p className="circle-note"><span>{t.circleYourAccess}: </span><strong>{accessLabel(access, t)}</strong> · {accessInfo(access, t)}</p>
+          {access === "edit" && <OwnershipOffers familyId={familyId} childId={childId} notify={notify} t={t} />}
           {me?.user_id && (
             <>
               <Field label={t.relationshipLabel}>
@@ -171,7 +175,8 @@ export function ChildCircle({ child, homeFamilyId, access, afterLeave, notify, l
                   {RELATIONSHIPS.map(r => <option value={r} key={r}>{relationshipLabel(r, t)}</option>)}
                 </select>
               </Field>
-              <button className="text-action danger" onClick={leave}>{t.circleLeave}</button>
+              {/* The child's own family stays in its circle (after handing its profile to someone else). */}
+              {scope && <button className="text-action danger" onClick={leave}>{t.circleLeave}</button>}
             </>
           )}
         </>
@@ -229,6 +234,34 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
       await reload();
     },
   });
+
+  // ---- Handing the profile to someone with Add & Edit (Phase 5) ---------------------------------------------
+
+  const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const loadTransfer = useServerList<Transfer[]>(
+    () => rpcList("ownership_transfers", {}),
+    result => { if (result.ok) setTransfer(result.value.find(x => !x.incoming && x.family_id === familyId && x.child_id === childId) ?? null); },
+    `${familyId}/${childId}`,
+  );
+  const offerTransfer = (person: Person) => confirm({
+    title: t.transferTitle.replace("{child}", child.first).replace("{name}", name(person)),
+    body: t.transferBody.replace("{child}", child.first).replace(/\{name\}/g, name(person)),
+    confirmLabel: t.transferSend,
+    onConfirm: async () => {
+      const client = await getCloudClient();
+      if (!client || !person.user_id) return;
+      const { error: e } = await client.rpc("offer_ownership_transfer", { p_family_id: familyId, p_child_id: childId, p_to_user: person.user_id });
+      setError(!!e);
+      await loadTransfer();
+    },
+  });
+  const cancelTransfer = async () => {
+    const client = await getCloudClient();
+    if (!client || !transfer) return;
+    const { error: e } = await client.rpc("cancel_ownership_transfer", { p_id: transfer.id });
+    setError(!!e);
+    await loadTransfer();
+  };
 
   // ---- Inviting someone new (Phase 4) ------------------------------------------------------------------------
 
@@ -332,6 +365,15 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
                 {RELATIONSHIPS.map(r => <option value={r} key={r}>{relationshipLabel(r, t)}</option>)}
               </select>
             </Field>
+            {p.role === "editor" && p.user_id && transfer?.to_user === p.user_id && (
+              <p className="circle-transfer">
+                <span>{t.transferWaiting.replace("{name}", name(p))}</span>
+                <button className="text-action" onClick={() => void cancelTransfer()}>{t.transferCancel}</button>
+              </p>
+            )}
+            {p.role === "editor" && p.user_id && !transfer && (
+              <button className="text-action" onClick={() => offerTransfer(p)}>{t.transferOffer}</button>
+            )}
             {p.role && p.role !== "owner" && p.user_id && (
               <button className="text-action danger" onClick={() => removeMember(p)}>{t.circleRemoveMember}</button>
             )}
@@ -406,6 +448,54 @@ function ManageCircle({ child, people, familyId, childId, name, reload, close, n
       </section>
       <div className="sheet-buttons"><button onClick={close}>{t.done}</button></div>
     </Modal>
+  );
+}
+
+// "Ana would like you to manage Emma's profile": offers made to this person to take over a child's profile, on My
+// Children (every child) and on that child's page (`familyId` + `childId`). Accepting asks once more, then sync picks
+// up the new roles (the previous Owner keeps Add & Edit). The server re-checks everything; an offer that was
+// cancelled, expired or went stale meanwhile just says it is no longer available.
+export function OwnershipOffers({ familyId, childId, notify, t }: { familyId?: string; childId?: string; notify: (message: string) => void; t: Copy }) {
+  const [offers, setOffers] = useState<Transfer[]>([]);
+  const confirm = useConfirm();
+  const reload = useServerList<Transfer[]>(
+    () => rpcList("ownership_transfers", {}),
+    result => { if (result.ok) setOffers(result.value.filter(x => x.incoming && (!childId || (x.family_id === familyId && x.child_id === childId)))); else if (result.denied) setOffers([]); },
+    `${familyId ?? ""}/${childId ?? ""}`,
+  );
+  const from = (o: Transfer) => o.from_name.trim() || t.circleSomeone;
+  const accept = (o: Transfer) => confirm({
+    title: t.transferAcceptTitle.replace("{child}", o.child_first),
+    body: t.transferIncomingInfo.replace("{name}", from(o)),
+    confirmLabel: t.transferAccept,
+    onConfirm: async () => {
+      const client = await getCloudClient();
+      if (!client) return;
+      const { data, error } = await client.rpc("accept_ownership_transfer", { p_id: o.id });
+      notify(!error && (data === "ok" || data === "accepted") ? t.transferDone.replace("{child}", o.child_first) : t.transferUnavailable);
+      syncNow();
+      await reload();
+    },
+  });
+  const decline = async (o: Transfer) => {
+    setOffers(current => current.filter(x => x.id !== o.id));
+    const client = await getCloudClient();
+    await client?.rpc("decline_ownership_transfer", { p_id: o.id });
+    void reload();
+  };
+  if (!offers.length) return null;
+  return (
+    <section className="access-notice circle-joins" role="status">
+      {offers.map(o => (
+        <div key={o.id} className="circle-join">
+          <p>{t.transferIncoming.replace("{name}", from(o)).replace("{child}", o.child_first)}</p>
+          <div className="access-notice-actions">
+            <button className="text-action" onClick={() => accept(o)}>{t.transferAccept}</button>
+            <button className="text-action" onClick={() => void decline(o)}>{t.transferDecline}</button>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 

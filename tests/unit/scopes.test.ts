@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { outboxKey, type OutboxEntry } from "../../src/lib/data/schema.ts";
+import { childAccess } from "../../src/lib/childAccess.ts";
 import {
   CONFIRM_REMOVAL_AFTER, homeLocal, initialScopeState, isScopedId, observeMemberships, planRevocation, scopeStateFor, scopedId, scopedLocal, sharedScopes, unscope,
   type Membership, type ScopeBase, type ScopeState,
@@ -50,6 +51,21 @@ test("memberships: a role change (also an ownership transfer) updates the role a
   const { state, actions } = observe(s1, ok([own, { familyId: F1, childId: "emma", role: "owner" }]));
   assert.equal(state.shared[scopedId(F1, "emma")], "owner");
   assert.deepEqual(actions, [{ kind: "clearRejections", familyId: F1 }]);
+});
+
+test("memberships: a child of the user's own family handed to someone else keeps its data and shows the user's new role", () => {
+  const handed = observe(initialScopeState(U, HOME), ok([{ ...own, role: "editor" }]));
+  assert.deepEqual(handed.state.home, { emma: "editor" });
+  assert.deepEqual(handed.state.shared, {}, "never a shared scope, never removed");
+  assert.deepEqual(handed.actions, [{ kind: "clearRejections", familyId: HOME }]);
+  assert.equal(childAccess("emma", handed.state), "edit");
+  // Its new owner deleted the profile (the membership is hidden): the last role stays.
+  const hidden = observe(handed.state, ok([{ familyId: HOME, childId: "leo", role: "owner" }]));
+  assert.equal(childAccess("emma", hidden.state), "edit");
+  // Handed back: the user's to manage again.
+  const back = observe(handed.state, ok([own]));
+  assert.equal(back.state.home, undefined);
+  assert.equal(childAccess("emma", back.state), "manage");
 });
 
 test("memberships: removal needs answers in a row; an unknown answer or a one-off gap removes nothing", () => {

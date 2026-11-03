@@ -367,6 +367,60 @@ try {
     await dA.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ben")`, 10000, "Ana sees Ben added m-b1");
   });
 
+  await step("Ownership transfer: Ana hands Kai's profile to Ben, who accepts on My Children; Ana keeps Add & Edit (no Manage, no Leave); Ben hands it back from Manage and Ana accepts on Kai's page", async () => {
+    const confirmWith = async (p, label) => {
+      await p.waitFor(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).length`, 5000, `confirm ${label}`);
+      await p.eval(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).at(-1).click(); true`);
+    };
+    const roleOf = async (who, role) => { for (let i = 0; i < 20 && (await membership(FA, "c-kai", who)).role !== role; i++) await sleep(250); assert.equal((await membership(FA, "c-kai", who)).role, role); };
+    page = dA.p;
+    await openChild(dA.p, "c-kai");
+    await dA.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Manage button");
+    await dA.u.click("Manage", ".child-circle button");
+    await dA.p.waitFor(`[...document.querySelectorAll(".circle-manage li button")].some(b => b.textContent === "Hand Over Profile")`, 5000, "Hand Over Profile");
+    await manageRow(dA.p, "Ben", `[...li.querySelectorAll("button")].find(b => b.textContent === "Hand Over Profile").click(); return true;`);
+    await confirmWith(dA.p, "Send Request");
+    await dA.p.waitFor(`document.querySelector(".circle-transfer")?.innerText.includes("Waiting for Ben")`, 5000, "pending offer shown");
+    assert.equal((await membership(FA, "c-kai", Ana)).role, "owner", "nothing changes before acceptance");
+    await dA.u.click("Done", ".sheet-buttons button");
+
+    page = dB.p;
+    await kids(dB.p);
+    for (let i = 0; i < 20 && !(await text(dB.p)).includes("would like you to manage Kai"); i++) { await dB.p.eval(`window.dispatchEvent(new Event("focus"))`); await sleep(500); }
+    await confirmWith(dB.p, "Accept");
+    await confirmWith(dB.p, "Accept");
+    await roleOf(Ben, "owner");
+    await roleOf(Ana, "editor");
+    await until(dB.p, `meta.scopes?.shared?.[${JSON.stringify(sid(FA, "c-kai"))}] === "owner"`, "Ben's device knows he manages Kai");
+    await openChild(dB.p, sid(FA, "c-kai"));
+    await dB.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Ben manages");
+
+    page = dA.p;
+    await until(dA.p, `meta.scopes?.home?.["c-kai"] === "editor"`, "Ana's device knows");
+    await openChild(dA.p, "c-kai");
+    await dA.p.waitFor(`document.querySelector(".child-circle")?.innerText.includes("Add & Edit")`, 10000, "Ana's circle line");
+    const circle = await circleText(dA.p);
+    assert.ok(!circle.includes("Leave the Circle"), "the child's own family stays");
+    assert.ok(!(await dA.p.eval(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`)), "no Manage");
+
+    page = dB.p;
+    await dB.u.click("Manage", ".child-circle button");
+    await dB.p.waitFor(`[...document.querySelectorAll(".circle-manage li")].some(l => l.innerText.includes("Ana"))`, 5000, "Ana listed");
+    await manageRow(dB.p, "Ana", `[...li.querySelectorAll("button")].find(b => b.textContent === "Hand Over Profile").click(); return true;`);
+    await confirmWith(dB.p, "Send Request");
+    await dB.p.waitFor(`document.querySelector(".circle-transfer")`, 5000, "pending");
+    await dB.u.click("Done", ".sheet-buttons button");
+
+    page = dA.p;
+    for (let i = 0; i < 20 && !(await circleText(dA.p)).includes("would like you to manage Kai"); i++) { await dA.p.eval(`window.dispatchEvent(new Event("focus"))`); await sleep(500); }
+    await dA.p.eval(`[...document.querySelectorAll(".child-circle button")].find(b => b.textContent === "Accept").click(); true`);
+    await confirmWith(dA.p, "Accept");
+    await roleOf(Ana, "owner");
+    await roleOf(Ben, "editor");
+    await until(dA.p, `!meta.scopes?.home`, "Ana manages Kai again");
+    await until(dB.p, `meta.scopes?.shared?.[${JSON.stringify(sid(FA, "c-kai"))}] === "editor"`, "Ben is Add & Edit again");
+  });
+
   await step("Ana makes Ben View Only in Manage; Ben's screens follow (no adding or editing), and his circle line updates in place", async () => {
     page = dA.p;
     await openChild(dA.p, "c-kai");

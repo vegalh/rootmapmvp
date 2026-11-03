@@ -40,7 +40,7 @@ import { photosForChildren } from "./lib/sharedPhotos";
 import { newRecordId, scopedId } from "./lib/data/schema";
 import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
 import { sharedSyncEnabled } from "./lib/sync/scopes";
-import ChildCircle, { CircleJoins } from "./components/ChildCircle";
+import ChildCircle, { CircleJoins, OwnershipOffers } from "./components/ChildCircle";
 import KeptVersions from "./components/KeptVersions";
 import AccessNotice, { ArchivedChangesSheet, KeptEditsNotice } from "./components/AccessNotice";
 import EntryAuthors from "./components/EntryAuthors";
@@ -838,6 +838,7 @@ export default function App() {
         <ChildrenPage
           notice={<>
             {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <CircleJoins homeFamilyId={cloud.account.familyId} openChild={goChild} t={t} />}
+            {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <OwnershipOffers notify={setToast} t={t} />}
             <KeptEditsNotice entries={keptEditEntries} open={id => openEntry(id, "children")} dismiss={() => setKeptEdits([])} t={t} />
             <AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />
           </>}
