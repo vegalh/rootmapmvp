@@ -167,6 +167,13 @@ Targeted runs only. CI runs the full suites on the PR.
 
 `tests/ops/oldSchema.mjs` now also lists the transfer table and functions as sharing objects.
 
+**CI on PR #5 (2026-11-04).** The first Browser tests run (41771627426, at `013149d`) failed in `multiAccount.mjs`: step
+1 timed out waiting for Ana's first backup ("Ana backed up"). Everything after it failed in consequence: her Moments
+never reached Ben, and an `entries` insert logged a 409. That failure didn't reproduce: not on this Mac (full chain,
+UTC, CPU throttled 6×), and not in CI after test-only diagnostics were added (`468edb2`: a failed step prints the
+server's error responses, the app's sync warnings and the outbox), where every check passed. Treated as a possible
+intermittent issue. If it happens again, those lines under the first FAIL show the cause.
+
 ### Results: the first part of Phase 5 (this Mac, local stack only, 2026-11-03)
 
 | Command | Result |
