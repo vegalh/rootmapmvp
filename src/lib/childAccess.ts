@@ -8,8 +8,9 @@ import { unscope } from "./data/schema";
 //   editor → "edit"   (Add & Edit / 一起记录)       adding, editing and tidying the child's records
 //   viewer → "view"   (View Only / 看看成长)        looking only
 //
-// The user's own children (the user's own family, and everything in the guest space) are always "manage". A child
-// shared from another family takes the role the server last confirmed (ScopeState.shared, lib/sync/scopes.ts).
+// The user's own children (the user's own family, and everything in the guest space) are "manage", unless the user
+// handed a child's profile to someone else (ownership transfer, Phase 5; ScopeState.home). A child shared from another
+// family takes the role the server last confirmed (ScopeState.shared, lib/sync/scopes.ts).
 
 export type Access = "manage" | "edit" | "view";
 export type TechnicalRole = "owner" | "editor" | "viewer";
@@ -21,9 +22,9 @@ export const familyOfId = (id: string | undefined | null): string | null => (id 
 
 // `scopes` is SpaceMeta.scopes as stored (unknown shape until read here).
 export function childAccess(childId: string, scopes: unknown): Access {
-  if (familyOfId(childId) === null) return "manage";
-  const shared = (scopes as { shared?: Record<string, TechnicalRole> } | undefined)?.shared ?? {};
-  return accessOfRole(shared[childId]);
+  const known = scopes as { shared?: Record<string, TechnicalRole>; home?: Record<string, TechnicalRole> } | undefined;
+  if (familyOfId(childId) === null) return accessOfRole(known?.home?.[childId] ?? "owner");
+  return accessOfRole(known?.shared?.[childId]);
 }
 
 export const canAddAndEdit = (access: Access) => access !== "view";

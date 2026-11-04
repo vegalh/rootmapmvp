@@ -50,7 +50,8 @@ async function until(p, cond, label, tries = 60) {
 }
 async function backedUp(p, label) {
   for (let i = 0; i < 60; i++) { if ((await status(p)).allBackedUp) return; await syncNow(p); await sleep(500); }
-  throw new Error(`timed out: ${label}`);
+  const outbox = await p.eval(`import("/src/lib/data/store.ts").then(S => JSON.stringify(S.pendingOutbox().map(e => [e.key, e.rejected?.reason ?? null])))`);
+  throw new Error(`timed out: ${label}\nstatus: ${JSON.stringify(await status(p))}\noutbox: ${outbox}`);
 }
 async function rest(method, path, body) {
   const r = await fetch(`${API}${path}`, { method, headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json", Prefer: "return=representation" }, body: body && JSON.stringify(body) });
@@ -344,12 +345,81 @@ try {
       const n = await d.p.eval(`import("/src/lib/cloud/client.ts").then(async C => { const c = await C.getCloudClient(); const { data } = await c.from("record_versions").select("id").eq("family_id", ${JSON.stringify(FA)}).eq("record_id", "m-a1"); return data?.length ?? -1; })`);
       assert.ok(n >= 1, "readable by Ana and by Ben");
     }
+    // Phase 5: Ben (whose change lost) is told on My Children; Ana (whose change stayed) is not.
+    await kids(dB.p);
+    await dB.p.waitFor(`[...document.querySelectorAll(".access-notice")].some(n => n.innerText.includes("Someone else changed"))`, 15000, "Ben's kept-edit note");
+    await kids(dA.p); await sleep(800);
+    assert.ok(!(await text(dA.p)).includes("Someone else changed"), "no note for the change that stayed");
     // The Moment's page shows the kept version to Ana (who manages Kai's profile) and to Ben (whose version it is).
     for (const [d, id] of [[dA, "m-a1"], [dB, sid(FA, "m-a1")]]) {
       await d.p.eval(`location.hash = "#/moment/" + encodeURIComponent(${JSON.stringify(id)})`);
       await d.p.waitFor(`document.querySelector(".kept-versions")?.innerText.includes("Ben's words")`, 10000, "kept version shown");
       assert.ok((await d.p.eval(`document.querySelector(".journal-entry-text").innerText`)).includes("Ana's words"), "the Moment itself shows the kept-first text");
     }
+    // Who wrote it (Phase 5): Ana added and last changed m-a1, so her own page says nothing; Ben's names her.
+    await dB.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ana")`, 10000, "Ben sees who added it");
+    assert.ok(!(await dB.p.eval(`document.querySelector(".entry-authors").innerText`)).includes("Last changed"), "the same person is named once");
+    assert.ok(!(await dA.p.eval(`!!document.querySelector(".entry-authors")`)), "nothing on a Moment written and changed only by Ana");
+    // Opening the Moment cleared Ben's note.
+    await kids(dB.p); await sleep(800);
+    assert.ok(!(await text(dB.p)).includes("Someone else changed"), "the note is gone once the Moment was opened");
+    // Ana's view of Ben's Moment m-b1: he added it.
+    await dA.p.eval(`location.hash = "#/moment/m-b1"`);
+    await dA.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ben")`, 10000, "Ana sees Ben added m-b1");
+  });
+
+  await step("Ownership transfer: Ana hands Kai's profile to Ben, who accepts on My Children; Ana keeps Add & Edit (no Manage; she may leave); Ben hands it back from Manage and Ana accepts on Kai's page", async () => {
+    const confirmWith = async (p, label) => {
+      await p.waitFor(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).length`, 5000, `confirm ${label}`);
+      await p.eval(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).at(-1).click(); true`);
+    };
+    const roleOf = async (who, role) => { for (let i = 0; i < 20 && (await membership(FA, "c-kai", who)).role !== role; i++) await sleep(250); assert.equal((await membership(FA, "c-kai", who)).role, role); };
+    page = dA.p;
+    await openChild(dA.p, "c-kai");
+    await dA.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Manage button");
+    await dA.u.click("Manage", ".child-circle button");
+    await dA.p.waitFor(`[...document.querySelectorAll(".circle-manage li button")].some(b => b.textContent === "Hand Over Profile")`, 5000, "Hand Over Profile");
+    await manageRow(dA.p, "Ben", `[...li.querySelectorAll("button")].find(b => b.textContent === "Hand Over Profile").click(); return true;`);
+    await confirmWith(dA.p, "Send Request");
+    await dA.p.waitFor(`document.querySelector(".circle-transfer")?.innerText.includes("Waiting for Ben")`, 5000, "pending offer shown");
+    assert.equal((await membership(FA, "c-kai", Ana)).role, "owner", "nothing changes before acceptance");
+    await dA.u.click("Done", ".sheet-buttons button");
+
+    page = dB.p;
+    await kids(dB.p);
+    for (let i = 0; i < 20 && !(await text(dB.p)).includes("would like you to manage Kai"); i++) { await dB.p.eval(`window.dispatchEvent(new Event("focus"))`); await sleep(500); }
+    await confirmWith(dB.p, "Accept");
+    await confirmWith(dB.p, "Accept");
+    await roleOf(Ben, "owner");
+    await roleOf(Ana, "editor");
+    await until(dB.p, `meta.scopes?.shared?.[${JSON.stringify(sid(FA, "c-kai"))}] === "owner"`, "Ben's device knows he manages Kai");
+    await openChild(dB.p, sid(FA, "c-kai"));
+    await dB.p.waitFor(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`, 10000, "Ben manages");
+
+    page = dA.p;
+    await until(dA.p, `meta.scopes?.home?.["c-kai"] === "editor"`, "Ana's device knows");
+    await openChild(dA.p, "c-kai");
+    await dA.p.waitFor(`document.querySelector(".child-circle")?.innerText.includes("Add & Edit")`, 10000, "Ana's circle line");
+    const circle = await circleText(dA.p);
+    assert.ok(circle.includes("Leave the Circle"), "the previous owner may leave");
+    assert.ok(!(await dA.p.eval(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`)), "no Manage");
+
+    page = dB.p;
+    await dB.u.click("Manage", ".child-circle button");
+    await dB.p.waitFor(`[...document.querySelectorAll(".circle-manage li")].some(l => l.innerText.includes("Ana"))`, 5000, "Ana listed");
+    await manageRow(dB.p, "Ana", `[...li.querySelectorAll("button")].find(b => b.textContent === "Hand Over Profile").click(); return true;`);
+    await confirmWith(dB.p, "Send Request");
+    await dB.p.waitFor(`document.querySelector(".circle-transfer")`, 5000, "pending");
+    await dB.u.click("Done", ".sheet-buttons button");
+
+    page = dA.p;
+    for (let i = 0; i < 20 && !(await circleText(dA.p)).includes("would like you to manage Kai"); i++) { await dA.p.eval(`window.dispatchEvent(new Event("focus"))`); await sleep(500); }
+    await dA.p.eval(`[...document.querySelectorAll(".child-circle button")].find(b => b.textContent === "Accept").click(); true`);
+    await confirmWith(dA.p, "Accept");
+    await roleOf(Ana, "owner");
+    await roleOf(Ben, "editor");
+    await until(dA.p, `!meta.scopes?.home`, "Ana manages Kai again");
+    await until(dB.p, `meta.scopes?.shared?.[${JSON.stringify(sid(FA, "c-kai"))}] === "editor"`, "Ben is Add & Edit again");
   });
 
   await step("Ana makes Ben View Only in Manage; Ben's screens follow (no adding or editing), and his circle line updates in place", async () => {
@@ -485,6 +555,24 @@ try {
     await dA.p.eval(`window.dispatchEvent(new Event("focus"))`);
     await sleep(1500);
     assert.ok(!(await dA.p.eval(`!!document.querySelector(".circle-joins")`)), "dismissed on one device, gone on the other");
+  });
+  await step("Previous owner removed: Ana hands Tia to Ben, who removes Ana; Ana's device removes Tia and her Moment and keeps the rest of her family's records", async () => {
+    const rpc = (p, fn, args) => p.eval(`import("/src/lib/cloud/client.ts").then(async m => { const c = await m.getCloudClient(); const { data, error } = await c.rpc(${JSON.stringify(fn)}, ${JSON.stringify(args)}); if (error) throw new Error(error.message); return data; })`);
+    page = dA.p;
+    await write(dA.p, { children: [child("c-tia", "Tia")], entries: [entry("m-t1", "c-tia", "Tia's first day")] });
+    await backedUp(dA.p, "Tia backed up");
+    const kept = await store(dA.p, `return S.getCollection("entries").filter(e => !e.familyId && e.childId !== "c-tia").map(e => e.id).sort();`);
+    await rest("POST", "/rest/v1/child_memberships", { family_id: FA, child_id: "c-tia", user_id: Ben.id, role: "editor" });
+    const offer = await rpc(dA.p, "offer_ownership_transfer", { p_family_id: FA, p_child_id: "c-tia", p_to_user: Ben.id });
+    assert.equal(await rpc(dB.p, "accept_ownership_transfer", { p_id: offer }), "ok");
+    await until(dA.p, `meta.scopes?.home?.["c-tia"] === "editor"`, "Ana's device knows she no longer manages Tia");
+    await rpc(dB.p, "remove_member", { p_family_id: FA, p_child_id: "c-tia", p_user_id: Ana.id });
+    await until(dA.p, `!all("children").some(c => c.id === "c-tia") && !all("entries").some(e => e.id === "m-t1") && meta.scopes?.revoked?.["c-tia"]?.state === "done"`, "Tia removed from Ana's device");
+    assert.deepEqual(await store(dA.p, `return S.getCollection("entries").filter(e => !e.familyId).map(e => e.id).sort();`), kept, "every other record of Ana's family stays");
+    assert.ok(await get(dA.p, "children", "c-kai"), "Kai stays");
+    assert.ok(await serverRow("entries", FA, "m-t1"), "Tia's Moment stays on the server, for her circle");
+    await kids(dA.p);
+    await dA.p.waitFor(`document.body.innerText.includes("You no longer have access")`, 10000, "Ana is told");
   });
   await dC.p.close().catch(() => {});
   captchaServer.stop();

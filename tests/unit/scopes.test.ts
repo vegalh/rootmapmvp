@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { outboxKey, type OutboxEntry } from "../../src/lib/data/schema.ts";
+import { childAccess } from "../../src/lib/childAccess.ts";
 import {
   CONFIRM_REMOVAL_AFTER, homeLocal, initialScopeState, isScopedId, observeMemberships, planRevocation, scopeStateFor, scopedId, scopedLocal, sharedScopes, unscope,
   type Membership, type ScopeBase, type ScopeState,
@@ -50,6 +51,39 @@ test("memberships: a role change (also an ownership transfer) updates the role a
   const { state, actions } = observe(s1, ok([own, { familyId: F1, childId: "emma", role: "owner" }]));
   assert.equal(state.shared[scopedId(F1, "emma")], "owner");
   assert.deepEqual(actions, [{ kind: "clearRejections", familyId: F1 }]);
+});
+
+test("memberships: a child of the user's own family handed to someone else shows the user's new role, and is handed back", () => {
+  const handed = observe(initialScopeState(U, HOME), ok([{ ...own, role: "editor" }]));
+  assert.deepEqual(handed.state.home, { emma: "editor" });
+  assert.deepEqual(handed.state.shared, {}, "never a shared scope");
+  assert.deepEqual(handed.actions, [{ kind: "clearRejections", familyId: HOME }]);
+  assert.equal(childAccess("emma", handed.state), "edit");
+  const back = observe(handed.state, ok([own]));
+  assert.equal(back.state.home, undefined);
+  assert.equal(childAccess("emma", back.state), "manage");
+});
+
+test("memberships: once access to a handed-over child ends (left, removed, profile deleted), it is removed after answers in a row; a child the user manages never is", () => {
+  const leo: Membership = { familyId: HOME, childId: "leo", role: "owner" };
+  const handed = observe(initialScopeState(U, HOME), ok([{ ...own, role: "editor" }, leo]), ["emma", "leo"]).state;
+  const once = observe(handed, ok([leo]), ["emma", "leo"]);
+  assert.deepEqual(once.actions, [], "one answer is never enough");
+  assert.equal(childAccess("emma", once.state), "edit");
+  const twice = observe(once.state, ok([leo]), ["emma", "leo"]);
+  assert.deepEqual(twice.actions, [{ kind: "revoke", familyId: HOME, childId: "emma" }, { kind: "clearRejections", familyId: HOME }]);
+  assert.equal(twice.state.revoked.emma.state, "pending");
+  // Its only child gone: the answer has no own-family membership at all, and is still believed.
+  const alone = observe(observe(handed, ok([]), ["emma"]).state, ok([]), ["emma"]);
+  assert.ok(alone.actions.some(a => a.kind === "revoke"));
+  // A child the user manages that goes missing: nothing (no role is kept for it, so nothing to remove).
+  let s = observe(initialScopeState(U, HOME), ok([own, leo]), ["emma", "leo"]).state;
+  for (let i = 0; i < 4; i++) { const r = observe(s, ok([leo]), ["emma", "leo"]); assert.deepEqual(r.actions, []); s = r.state; }
+  assert.deepEqual(s.revoked, {});
+  // Access back (the profile restored): the user's own family is downloaded again.
+  const restored = observe(twice.state, ok([{ ...own, role: "editor" }, leo]), ["leo"]);
+  assert.equal(restored.state.revoked.emma, undefined);
+  assert.ok(restored.actions.some(a => a.kind === "fullResync" && a.familyId === HOME));
 });
 
 test("memberships: removal needs answers in a row; an unknown answer or a one-off gap removes nothing", () => {
@@ -123,7 +157,27 @@ test("removal plan: only that child of that family; the user's own family and ot
     { collection: "records", id: scopedId(F1, "r-1") },
   ]);
   assert.deepEqual(plan.archive, []);
-  assert.throws(() => planRevocation(s, state, HOME, "emma", now), /own family/);
+  assert.throws(() => planRevocation(s, state, HOME, "emma", now), /never removed/, "a child of the user's own family they manage");
+});
+
+test("removal plan: a handed-over child of the user's own family takes only its own records and photos", () => {
+  const state: ScopeState = { ...initialScopeState(U, HOME), revoked: { emma: { familyId: HOME, childId: "emma", since: now, state: "pending" } } };
+  const edit = entry("entries", "m-1", 4);
+  const s = space({
+    children: [{ id: "emma", photo: P3 }, { id: "leo" }, { id: scopedId(F1, "emma"), familyId: F1 }],
+    entries: [
+      { id: "m-1", childId: "emma", text: "offline", photos: [P1, P2] },
+      { id: "m-2", childId: "leo", photos: [P1] }, // the same Moment about leo keeps the shared photo
+      { id: scopedId(F1, "m-1"), childId: scopedId(F1, "emma"), photos: [] },
+    ],
+    records: [{ id: "r-1", childId: "emma" }, { id: "r-2", childId: "leo" }],
+    photos: [{ id: P1 }, { id: P2 }, { id: P3 }],
+  }, [edit]);
+  const plan = planRevocation(s, state, HOME, "emma", now);
+  assert.deepEqual(plan.deleteRecords, [{ collection: "children", id: "emma" }, { collection: "entries", id: "m-1" }, { collection: "records", id: "r-1" }]);
+  assert.deepEqual(plan.deletePhotos.sort(), [P2, P3].sort());
+  assert.deepEqual(plan.outboxRemove, [{ key: edit.key, seq: 4 }]);
+  assert.equal(plan.archive.length, 1, "the unsent edit is kept apart");
 });
 
 test("removal plan: a photo another remaining record shows is kept; one only the removed child shows goes", () => {

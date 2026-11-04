@@ -40,9 +40,10 @@ import { photosForChildren } from "./lib/sharedPhotos";
 import { newRecordId, scopedId } from "./lib/data/schema";
 import { canAddAndEdit, canManage, childAccess, editableChildren, familyOfId, ownFamilyChildren, sameFamilyChildren } from "./lib/childAccess";
 import { sharedSyncEnabled } from "./lib/sync/scopes";
-import ChildCircle, { CircleJoins } from "./components/ChildCircle";
+import ChildCircle, { CircleJoins, OwnershipOffers } from "./components/ChildCircle";
 import KeptVersions from "./components/KeptVersions";
-import AccessNotice, { ArchivedChangesSheet } from "./components/AccessNotice";
+import AccessNotice, { ArchivedChangesSheet, KeptEditsNotice } from "./components/AccessNotice";
+import EntryAuthors from "./components/EntryAuthors";
 import { MIGRATED_KEY, hasPendingNotes, importObservations, notesEntry } from "./lib/entries";
 import { copy, deviceLanguage, localizeActivity } from "./lib/i18n";
 import { cloudConfig, isBeta } from "./lib/cloud/config";
@@ -51,7 +52,7 @@ import { useCloudState } from "./lib/cloud/hooks";
 import type { AuthResult } from "./lib/cloud/auth";
 import { cloudState, confirmSignInCode, sendSignInCode, signInWithPasswordHere, signOutHere } from "./lib/cloud/session";
 import { spaceMatches } from "./lib/cloud/space";
-import { prepareImport, startSync } from "./lib/sync/runner";
+import { KEPT_EDITS_KEY, prepareImport, startSync } from "./lib/sync/runner";
 import { WELCOME_KEY, welcomeAtStart, type WelcomeState } from "./lib/welcome";
 import { formatRoute, parseRoute, type Route } from "./lib/routes";
 import { haptic, prefersReducedMotion, setNativeAppearance } from "./lib/native";
@@ -400,6 +401,13 @@ export default function App() {
   const music = findMusic(selectedActivity) || musicActivities[0];
   const book = books.find(b => b.id === selectedBook) || books[0];
   const entry = entries.find(e => e.id === selectedEntry);
+  // Moments where this device's change lost to a concurrent one (lib/sync/runner.ts): noted on My Children until
+  // the Moment is opened or the note dismissed. Only where sharing is on, like the kept versions themselves.
+  const [keptEdits, setKeptEdits] = useSetting<string[]>(KEPT_EDITS_KEY, []);
+  const keptEditEntries = useMemo(() => (sharedSyncEnabled ? keptEdits.flatMap(id => entries.filter(e => e.id === id)) : []), [keptEdits, entries]);
+  useEffect(() => {
+    if (screen === "entry" && entry && keptEdits.includes(entry.id)) setKeptEdits(keptEdits.filter(id => id !== entry.id));
+  }, [screen, entry, keptEdits, setKeptEdits]);
 
   const storageMessage = (failure: StorageFailure) => (failure === "full" ? t.storageFull : t.storageFailed);
   // For synchronous saves: shows the storage error and returns false when the write failed.
@@ -830,6 +838,8 @@ export default function App() {
         <ChildrenPage
           notice={<>
             {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <CircleJoins homeFamilyId={cloud.account.familyId} openChild={goChild} t={t} />}
+            {sharedSyncEnabled && cloud.status === "signed-in" && cloud.account && <OwnershipOffers notify={setToast} t={t} />}
+            <KeptEditsNotice entries={keptEditEntries} open={id => openEntry(id, "children")} dismiss={() => setKeptEdits([])} t={t} />
             <AccessNotice count={unseenRevoked.length} archived={archivedCount} review={() => setReviewingArchive(true)} dismiss={() => setAccessNoticesSeen([...accessNoticesSeen, ...unseenRevoked])} t={t} />
           </>}
           childrenData={childrenData}
@@ -1057,6 +1067,7 @@ export default function App() {
           child={childrenData.find(c => c.id === entry.childId)}
           canEdit={canAddAndEdit(accessOf(entry.childId))}
           versions={sharedSyncEnabled && homeFamily ? <KeptVersions key={entry.id} entryId={entry.id} homeFamilyId={homeFamily} lang={lang} t={t} /> : undefined}
+          authors={sharedSyncEnabled && homeFamily ? <EntryAuthors key={`authors:${entry.id}`} entryId={entry.id} updatedAt={entry.updatedAt} homeFamilyId={homeFamily} t={t} /> : undefined}
           lang={lang}
           back={() => goBack(originScreen)}
           edit={() => go("entryEdit")}

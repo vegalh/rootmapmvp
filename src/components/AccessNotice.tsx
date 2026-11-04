@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Modal } from "./ui";
 import { archivedChanges, discardArchived, type ArchivedChange } from "../lib/data/store";
-import { fmtLong } from "../lib/dates";
+import { fmt, fmtLong } from "../lib/dates";
+import type { Entry } from "../types";
 import type { Copy } from "../lib/i18n";
 
 // When a child's profile is no longer shared with this parent (removed from the circle, or the profile was deleted),
@@ -24,6 +25,27 @@ export function AccessNotice({ count, archived, review, dismiss, t }: {
         {archived > 0 && <button className="text-action" onClick={review}>{t.archivedReview}</button>}
         {count > 0 && <button className="text-action" onClick={dismiss}>{t.done}</button>}
       </div>
+    </section>
+  );
+}
+
+// Moments where a change made on this device lost to someone else's at the same time (Shared Child Profiles Phase 5;
+// lib/sync/runner.ts). Their version is shown; this parent's is kept on the Moment (components/KeptVersions.tsx).
+// View opens it, which also clears the note; Done clears them all.
+export function KeptEditsNotice({ entries, open, dismiss, t }: { entries: Entry[]; open: (id: string) => void; dismiss: () => void; t: Copy }) {
+  if (!entries.length) return null;
+  const lang = t.code === "zh" ? "zh" : "en";
+  return (
+    <section className="access-notice" role="status">
+      {entries.map(e => (
+        <div key={e.id} className="circle-join">
+          <p>{t.keptEditNote.replace("{title}", e.title?.trim() || fmt(e.date, lang))}</p>
+          <div className="access-notice-actions">
+            <button className="text-action" onClick={() => open(e.id)}>{t.keptEditView}</button>
+          </div>
+        </div>
+      ))}
+      <div className="access-notice-actions"><button className="text-action" onClick={dismiss}>{t.done}</button></div>
     </section>
   );
 }
