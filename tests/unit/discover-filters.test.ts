@@ -78,6 +78,8 @@ test("music: Art & Creativity, works with every filter, and is found by search i
   assert.equal(music.length, musicActivities.length);
   for (const m of music) {
     assert.equal(m.category, "art-creativity", m.id);
+    // Songs have no Setting or Materials: they're listed under "All" and don't fill the collections built on them.
+    if (m.id.startsWith("song-")) { assert.equal(m.settings, undefined, m.id); assert.equal(m.materialType, undefined, m.id); continue; }
     assert.ok(m.settings?.length, `${m.id}: settings`);
     assert.ok(m.materialType, `${m.id}: materials`);
   }
@@ -93,7 +95,7 @@ test("music: Art & Creativity, works with every filter, and is found by search i
 });
 
 test("music materials: only activities a parent can sing or call out are Nothing Needed", () => {
-  const byId = Object.fromEntries(musicActivities.map(m => [m.id, m.materialType]));
+  const byId = Object.fromEntries(musicActivities.filter(m => !m.song).map(m => [m.id, m.materialType]));
   assert.deepEqual(byId, {
     "music-freeze-dance": "everyday", // music has to play and stop: a phone or speaker
     "music-clap-the-beat": "none",

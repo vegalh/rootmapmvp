@@ -106,7 +106,9 @@ test("catalog: book and music data are complete", () => {
     assert.ok(bookAgeRanges(b).length, `${b.id} has an age range`);
   }
   for (const m of musicActivities) {
-    assert.ok(m.title && m.description && m.howToPlay.length && m.whatChildrenExplore.length, `${m.id} has its text`);
+    // A song's page shows its score, lyrics, how to use and source rather than a description and steps.
+    if (m.song) assert.ok(m.title && m.titleZh && m.song.lyrics && m.song.howToUse && m.song.source, `${m.id} has its text`);
+    else assert.ok(m.title && m.description && m.howToPlay.length && m.whatChildrenExplore.length, `${m.id} has its text`);
     assert.ok(m.ageRanges.length && m.duration > 0, `${m.id} has ages and a duration`);
     assert.deepEqual(musicAsActivity(m).steps, m.howToPlay);
   }

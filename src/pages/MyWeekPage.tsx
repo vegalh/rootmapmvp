@@ -4,7 +4,7 @@ import { PageHeader, Empty, FilterPill } from "../components/ui";
 import CollectionCard from "../components/CollectionCard";
 import type { Collection } from "../data/collections";
 import { collectionImages } from "../lib/collections";
-import { ACTIVITY_SETTINGS, MATERIAL_TYPES, TIME_BANDS, findActivity, matchesMaterials, matchesSetting, matchesTime } from "../lib/catalog";
+import { ACTIVITY_SETTINGS, MATERIAL_TYPES, TIME_BANDS, durationLabel, findActivity, matchesMaterials, matchesSetting, matchesTime } from "../lib/catalog";
 import { childOptionLabel, childShortName } from "../lib/children";
 import { fmt, fmtWeekday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
@@ -158,7 +158,7 @@ export function ActivityRow({ a: rawActivity, subtitle, action, t }: { a: Activi
   return (
     <div className="activity-row">
       <img src={a.image} alt="" />
-      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${categoryOptionLabel(a.category, t)}`}</small><em><Icon name="clock" size={12} />{a.minutes} {t.min} · {a.materialsLabel}</em></span>
+      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${categoryOptionLabel(a.category, t)}`}</small><em><Icon name="clock" size={12} />{durationLabel(rawActivity, t.code === "zh" ? "zh" : "en")} · {a.materialsLabel}</em></span>
       {action}
     </div>
   );

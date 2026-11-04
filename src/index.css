@@ -599,6 +599,34 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .shelf-empty .small-primary { margin-top: 14px; height: 40px; padding: 0 16px; }
 
 .music-card .activity-image { height: 116px; }
+
+/* A song's page (MusicDetailPage, SongScore): Listen button, jianpu score, lyrics and notes. */
+.song-group { margin: -6px 0 14px; }
+.song-player { grid-template-columns: 46px minmax(0, 1fr); }
+.song-player strong, .song-player small { display: block; }
+.song-player strong { color: var(--primary); font-size: 15px; }
+.song-player small { margin-top: 2px; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.song-legend { margin: 0 0 10px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.song-score { overflow-x: auto; padding: 14px 4px 18px; border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); color: var(--text); }
+.jp { display: flex; flex-wrap: wrap; align-items: center; row-gap: 22px; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 19px; line-height: 1; }
+.jp-note { position: relative; display: inline-flex; padding: 4px 0 6px; margin: 0 3px; border-radius: 4px; transition: background-color var(--dur-fast); }
+.jp-core { position: relative; display: inline-flex; align-items: baseline; padding: 0 1px 3px; }
+.jp-note.u1 .jp-core { background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1.5px no-repeat; }
+.jp-note.u2 .jp-core { background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1.5px no-repeat, linear-gradient(currentColor, currentColor) 0 calc(100% - 4px) / 100% 1.5px no-repeat; padding-bottom: 7px; }
+.jp-aug { margin-left: 1px; }
+.jp-dot { position: absolute; left: 50%; transform: translateX(-50%); font-size: 9px; line-height: 1; }
+.jp-dot.up { top: -7px; }
+.jp-dot.dn { bottom: -6px; }
+.jp-note.u1 .jp-dot.dn { bottom: -9px; }
+.jp-note.u2 .jp-dot.dn { bottom: -10px; }
+.jp-acc { font-size: 12px; align-self: flex-start; margin-right: 1px; }
+.jp-note.on { background: var(--apricot); }
+.jp-ext { margin: 0 6px; }
+.jp-bar { display: inline-block; width: 1.5px; height: 24px; margin: 0 8px; background: var(--muted); opacity: .7; }
+.jp-bar.end { width: 5px; background: linear-gradient(90deg, var(--muted) 0 1.5px, transparent 1.5px 3px, var(--text) 3px); }
+.song-lyrics { margin: 0; font-size: 16px; line-height: 1.65; white-space: pre-line; }
+.song-note { margin: 0; font-size: 15px; line-height: 1.6; }
+.song-copyright { margin: 22px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .music-play { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--primary); background: color-mix(in srgb, var(--card) 92%, transparent); box-shadow: 0 3px 10px rgba(59, 42, 26, .14); font-style: normal; }
 
 .audio-player { margin: 0 0 16px; padding: 12px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); }

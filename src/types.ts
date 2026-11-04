@@ -195,6 +195,25 @@ export type MusicActivity = {
   // Discover's Setting and Materials filters, as on Activity. Music is always in the Art & Creativity category.
   settings?: ActivitySetting[];
   materialType?: MaterialType;
+  // A song (src/data/songs.json): its page shows the jianpu score, lyrics and a Listen button instead of a recording.
+  song?: Song;
+};
+
+// One of the songs in src/data/songs.json, exactly as supplied. `tune` is a key into that file's `tunes` (jianpu
+// tokens, see lib/songs.ts); `group` "en" is an English public-domain classic (title English, subtitle Chinese),
+// "zh" RootMap's own Chinese lyrics to a public-domain melody (title Chinese, subtitle English).
+export type Song = {
+  id: number;
+  title: string;
+  subtitle: string;
+  group: string;
+  key: string;
+  meter: string;
+  tempo: number;
+  tune: string;
+  lyrics: string;
+  howToUse: string;
+  source: string;
 };
 
 export type Plan = SyncMeta & {

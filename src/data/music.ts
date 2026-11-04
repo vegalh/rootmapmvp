@@ -1,12 +1,15 @@
-import type { MusicActivity } from "../types";
+import type { MusicActivity, Song } from "../types";
+import songData from "./songs.json";
+import { songSeconds } from "../lib/songs";
 import coverFreezeDance from "../assets/music/cover-freeze-dance.svg";
 import coverClapTheBeat from "../assets/music/cover-clap-the-beat.svg";
 import coverAnimalWalks from "../assets/music/cover-animal-walks.svg";
 import coverFastAndSlow from "../assets/music/cover-fast-and-slow.svg";
 import coverEchoSong from "../assets/music/cover-echo-song.svg";
 
-// Music activities a parent and child do together, guided by a short recording. Not a music library. They're listed
-// in Discover > Activities (category Art & Creativity) and open their own page with the audio player.
+// Music activities a parent and child do together, guided by a short recording, followed by the songs (see `songs`
+// at the end). They're listed in Discover > Activities (category Art & Creativity) and open their own page: the audio
+// player for a guided activity, the score, lyrics and Listen button for a song.
 //
 // To add one, append an object with a unique, stable `id` (saved activities, My Week plans and "Mark as Tried"
 // records refer to it, so never change or reuse one, and don't reuse an id from src/data/activities.ts).
@@ -24,7 +27,7 @@ import coverEchoSong from "../assets/music/cover-echo-song.svg";
 //
 // Each activity has its own simple illustration (its own colour and motif), so the cards are easy to tell apart;
 // replace `coverImage` with an imported image (about 4:3) if you like.
-export const musicActivities: MusicActivity[] = [
+const guidedActivities: MusicActivity[] = [
   {
     id: "music-freeze-dance",
     settings: ["home", "park"],
@@ -156,3 +159,28 @@ export const musicActivities: MusicActivity[] = [
     whatChildrenExploreZh: ["倾听", "早期语言", "声音与音高", "轮流"],
   },
 ];
+
+// The songs in src/data/songs.json (copy changes there exactly as supplied; never edit lyrics, tunes or sources here).
+// Each is a music activity with id "song-<id>" (stable: saved activities and records refer to it). Its name is in
+// English and Chinese (the English classics' title is English, the Chinese songs' title Chinese), its length is the
+// melody's once through, and it suits babies (0–12 months). No Setting or Materials, so the songs are listed under
+// "All" for those filters and don't fill the collections built on them.
+function songActivity(song: Song): MusicActivity {
+  const en = song.group === "en";
+  return {
+    id: `song-${song.id}`,
+    title: en ? song.title : song.subtitle,
+    titleZh: en ? song.subtitle : song.title,
+    ageRanges: ["0–2"],
+    duration: Math.max(1, Math.ceil(songSeconds(song) / 60)),
+    description: "",
+    howToPlay: [],
+    whatChildrenExplore: [],
+    keywords: `song ${song.title} ${song.subtitle} ${song.lyrics}`,
+    keywordsZh: "儿歌",
+    song,
+  };
+}
+export const songs: MusicActivity[] = songData.songs.map(songActivity);
+
+export const musicActivities: MusicActivity[] = [...guidedActivities, ...songs];

@@ -3,6 +3,7 @@ import { musicActivities } from "../data/music";
 import defaultMusicCover from "../assets/music/cover-sage.svg";
 import type { Activity, ActivitySetting, AgeRange, Book, Child, DiscoverCategory, Lang, MaterialType, MusicActivity } from "../types";
 import { ageFromDob } from "./dates";
+import { songDurationLabel } from "./songs";
 import { categoryOptionLabel, copy, discoverCategoryLabel, topicOptionLabel, type Copy } from "./i18n";
 
 // The one activity catalog: Discover activities (src/data/activities.ts) and Music activities (src/data/music.ts).
@@ -107,6 +108,13 @@ export function ageTagLabel(a: Pick<Activity, "age" | "ageKey">, lang: Lang): st
   return lang === "zh" ? `${from}–${to}岁` : `${from}–${to} yrs`;
 }
 
+// How long an activity takes, as cards and rows show it: "10 min" / "10分钟"; a song, how long its melody plays.
+export function durationLabel(a: Pick<Activity, "id" | "minutes">, lang: Lang): string {
+  const song = findMusic(a.id)?.song;
+  if (song) return songDurationLabel(song, lang);
+  return lang === "zh" ? `${a.minutes}${copy.zh.min}` : `${a.minutes} ${copy.en.min}`;
+}
+
 // Time filter (My Week › Saved): up to 10 minutes, 11–15, over 15.
 export type TimeBand = "upTo10" | "10to15" | "over15";
 export const TIME_BANDS: TimeBand[] = ["upTo10", "10to15", "over15"];
@@ -159,7 +167,7 @@ export function musicAsActivity(m: MusicActivity): Activity {
     category: "art-creativity",
     minutes: m.duration,
     // "Optional" when a parent can just as well sing or call it out (see materialType in data/music.ts).
-    materialsLabel: m.materialType === "none" ? "Optional audio guide" : "Audio guide",
+    materialsLabel: m.song ? "Sing along" : m.materialType === "none" ? "Optional audio guide" : "Audio guide",
     image: musicCover(m),
     description: m.description,
     domains: m.whatChildrenExplore,
@@ -171,7 +179,7 @@ export function musicAsActivity(m: MusicActivity): Activity {
     zh: {
       title: m.titleZh,
       age: agesLabel(m.ageRanges, "zh"),
-      materialsLabel: m.materialType === "none" ? "可选音频引导" : "音频引导",
+      materialsLabel: m.song ? "一起唱" : m.materialType === "none" ? "可选音频引导" : "音频引导",
       description: m.descriptionZh,
       domains: m.whatChildrenExploreZh,
       steps: m.howToPlayZh,
@@ -201,13 +209,14 @@ export function spreadEvenly<T>(main: T[], extra: T[]): T[] {
 }
 
 let items: CatalogItem[] | undefined;
-// Every activity and music activity, in Discover and Add Activity order: the data files' order, with music spread
-// evenly through the activities rather than after them all.
+// Every activity and music activity, in Discover and Add Activity order: the data files' order, with the guided music
+// activities spread evenly through the activities rather than after them all, then the songs in their own order.
 export function catalogItems(): CatalogItem[] {
-  items ??= spreadEvenly<CatalogItem>(
-    activities.map(a => ({ ...a, type: "activity" as const })),
-    musicActivities.map(m => ({ ...musicAsActivity(m), type: "music" as const })),
-  );
+  const music = (list: MusicActivity[]) => list.map(m => ({ ...musicAsActivity(m), type: "music" as const }));
+  items ??= [
+    ...spreadEvenly<CatalogItem>(activities.map(a => ({ ...a, type: "activity" as const })), music(musicActivities.filter(m => !m.song))),
+    ...music(musicActivities.filter(m => m.song)),
+  ];
   return items;
 }
 

@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DISCOVER_CATEGORIES, catalogCategories, catalogItems, findActivity, searchCatalog, spreadEvenly } from "../../src/lib/catalog.ts";
+import { DISCOVER_CATEGORIES, catalogCategories, catalogItems, findActivity, searchCatalog, searchText, spreadEvenly } from "../../src/lib/catalog.ts";
 import { buildActivityRecord, recentActivityIds, recordView } from "../../src/lib/activityRecords.ts";
 import { copy } from "../../src/lib/i18n.ts";
 import { activities } from "../../src/data/activities.ts";
-import { musicActivities } from "../../src/data/music.ts";
+import { musicActivities, songs } from "../../src/data/music.ts";
 import { initialRecords } from "../../src/data/progress.ts";
 import type { LessonRecord } from "../../src/types.ts";
 
@@ -20,12 +20,15 @@ test("catalog: one list of every Discover activity and music activity, ids uncha
   for (const a of items) assert.equal(findActivity(a.id)?.id, a.id);
 });
 
-test("catalog: music is spread evenly through the activities, in a stable order", () => {
-  const items = ids(catalogItems());
-  assert.deepEqual(ids(catalogItems()), items, "the same order every time");
+test("catalog: music is spread evenly through the activities, in a stable order, then the songs", () => {
+  const all = ids(catalogItems());
+  assert.deepEqual(ids(catalogItems()), all, "the same order every time");
+  // The songs come last, in their own order, so the activities and guided music keep their places.
+  assert.deepEqual(all.slice(all.length - songs.length), ids(songs));
+  const items = all.slice(0, all.length - songs.length);
   // Each list keeps its own order.
   assert.deepEqual(items.filter(id => !id.startsWith("music-")), ids(activities));
-  assert.deepEqual(items.filter(id => id.startsWith("music-")), ids(musicActivities));
+  assert.deepEqual(items.filter(id => id.startsWith("music-")), ids(musicActivities.filter(m => !m.song)));
   // Not all at the end, and no two music activities next to each other.
   const at = items.map((id, i) => (id.startsWith("music-") ? i : -1)).filter(i => i >= 0);
   assert.ok(at[0] < items.length / 2 && at[at.length - 1] < items.length - 1, JSON.stringify(at));
@@ -49,7 +52,9 @@ test("search: English title, partial and case-insensitive", () => {
   for (const id of ["water-pouring", "pouring-to-cups", "pouring-stars"]) {
     if (findActivity(id)) assert.ok(found.includes(id), id);
   }
-  assert.ok(found.every(id => /pour/i.test(findActivity(id)!.title) || findActivity(id)!.keywords.includes("pour")));
+  // Everything found says "pour" somewhere it is searched (a song's lyrics too: "Pour écrire un mot").
+  assert.ok(found.every(id => searchText(findActivity(id)!).includes("pour")));
+  assert.ok(found.every(id => /pour/i.test(findActivity(id)!.title) || findActivity(id)!.keywords.includes("pour") || id.startsWith("song-")));
 });
 
 test("search: Chinese title, whatever the interface language", () => {

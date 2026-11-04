@@ -1,11 +1,15 @@
 import { Icon } from "../components/Icon";
 import AudioPlayer from "../components/AudioPlayer";
+import SongScore from "../components/SongScore";
 import { localizeMusic, musicCover } from "../lib/catalog";
+import { songDurationLabel, songNotes } from "../lib/songs";
 import type { Copy } from "../lib/i18n";
 import type { MusicActivity } from "../types";
 
-// A music activity: the guide recording, a short introduction, how to play and what children explore. Saving,
-// Add to My Week and Mark as Tried use the same sheets and records as Discover activities.
+// A music activity: the guide recording, a short introduction, how to play and what children explore. A song shows
+// its Listen button, jianpu score, lyrics, how to use it and its source instead (as supplied: the lyrics, notes and
+// sources are in their own language whatever the interface language). Saving, Add to My Week and Mark as Tried use
+// the same sheets and records as Discover activities.
 export default function MusicDetailPage({ music, saved, toggleSaved, back, openPlan, openTried, t }: {
   music: MusicActivity;
   saved: boolean;
@@ -16,6 +20,9 @@ export default function MusicDetailPage({ music, saved, toggleSaved, back, openP
   t: Copy;
 }) {
   const m = localizeMusic(music, t);
+  const song = music.song;
+  const lang = t.code === "zh" ? "zh" : "en";
+  const notes = song && songNotes(song, lang);
   return (
     <main className="detail-page music-detail">
       <div className="detail-actions">
@@ -27,13 +34,29 @@ export default function MusicDetailPage({ music, saved, toggleSaved, back, openP
       <img className="detail-hero" src={musicCover(music)} alt="" />
       <div className="detail-content">
         <h1>{m.title}</h1>
-        <p className="meta">{m.ages}<b>·</b>{t.music}<b>·</b>{music.duration} {t.minutesWord}</p>
-        <AudioPlayer key={music.id} src={music.audioSrc} t={t} />
-        <p className="description">{m.description}</p>
-        <h2>{t.howToPlay}</h2>
-        <ol>{m.howToPlay.map(s => <li key={s}>{s}</li>)}</ol>
-        <h2>{t.whatChildrenExplore}</h2>
-        <div className="explore-tags">{m.whatChildrenExplore.map(x => <span key={x}>{x}</span>)}</div>
+        <p className="meta">{m.ages}<b>·</b>{t.music}<b>·</b>{song ? songDurationLabel(song, lang) : `${music.duration} ${t.minutesWord}`}</p>
+        {song ? (
+          <>
+            <div className="explore-tags song-group"><span>{song.group === "zh" ? t.songGroupZh : t.songGroupEn}</span></div>
+            <SongScore key={music.id} song={song} t={t} />
+            <h2>{t.songLyrics}</h2>
+            <p className="song-lyrics" lang={song.group}>{song.lyrics}</p>
+            <h2>{t.songHowToUse}</h2>
+            <p className="song-note" lang={notes!.lang}>{notes!.howToUse}</p>
+            <h2>{t.songSource}</h2>
+            <p className="song-note" lang={notes!.lang}>{notes!.source}</p>
+            <p className="song-copyright">{t.songCopyright}</p>
+          </>
+        ) : (
+          <>
+            <AudioPlayer key={music.id} src={music.audioSrc} t={t} />
+            <p className="description">{m.description}</p>
+            <h2>{t.howToPlay}</h2>
+            <ol>{m.howToPlay.map(s => <li key={s}>{s}</li>)}</ol>
+            <h2>{t.whatChildrenExplore}</h2>
+            <div className="explore-tags">{m.whatChildrenExplore.map(x => <span key={x}>{x}</span>)}</div>
+          </>
+        )}
       </div>
       <div className="sticky-action two">
         <button className="secondary" onClick={openTried}><Icon name="check" size={19} />{t.markAsTried}</button>

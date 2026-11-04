@@ -3,7 +3,7 @@ import { Icon } from "../components/Icon";
 import { PageHeader, FilterPill, Empty } from "../components/ui";
 import BooksBrowser from "../components/BooksBrowser";
 import CollectionCard from "../components/CollectionCard";
-import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, filterDiscoverActivities, findMusic, suitableFirst } from "../lib/catalog";
+import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, durationLabel, filterDiscoverActivities, findMusic, suitableFirst } from "../lib/catalog";
 import { childShortName } from "../lib/children";
 import { collectionImages, shownCollections } from "../lib/collections";
 import type { Activity, Child } from "../types";
@@ -134,17 +134,17 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
   const builds = buildsDomains(rawActivity, lang);
   const materials = a.materialType === "none" ? t.factNothingNeeded : a.materialType === "everyday" ? t.factAtHome : a.materialsLabel;
   return (
-    <article className={`activity-card ${music ? "music-card" : ""}`}>
+    <article className={`activity-card ${music ? "music-card" : ""} ${music?.song ? "song-card" : ""}`}>
       <button className="activity-image" onClick={() => open(a.id)}>
         <img src={a.image} alt="" /><span>{category}</span>
-        {music && <i className="music-play"><Icon name={music.audioSrc ? "play" : "music"} size={16} filled={!!music.audioSrc} /></i>}
+        {music && <i className="music-play"><Icon name={music.audioSrc || music.song ? "play" : "music"} size={16} filled={!!(music.audioSrc || music.song)} /></i>}
       </button>
       <div>
         <button className="activity-name" onClick={() => open(a.id)}>{a.title}</button>
         <button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(a.id)} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", a.title)}><Icon name="heart" size={18} filled={saved} /></button>
         {builds.length > 0 && <p className="activity-builds">{t.buildsLabel}{builds.join(" · ")}</p>}
         <ul className="activity-facts">
-          <li><Icon name="clock" size={12} />{lang === "zh" ? `${a.minutes}${t.min}` : `${a.minutes} ${t.min}`}</li>
+          <li><Icon name="clock" size={12} />{durationLabel(rawActivity, lang)}</li>
           <li>{ageTagLabel(rawActivity, lang)}</li>
           <li><Icon name="layers" size={12} />{materials}</li>
         </ul>

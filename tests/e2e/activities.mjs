@@ -110,7 +110,8 @@ await step("Category and search filter together; music is in Art & Creativity", 
   assert.ok(art.length > 0 && art.every(r => r.meta.startsWith("Art & Creativity")));
   await search("music");
   const music = await rows();
-  assert.ok(music.length > 0 && music.length < art.length && music.every(r => r.meta.startsWith("Art & Creativity")), "music among the art activities");
+  // Both lists can fill a page ("Show more"), so compare what's in them rather than how long they are.
+  assert.ok(music.length > 0 && art.some(r => !music.some(m => m.title === r.title)) && music.every(r => r.meta.startsWith("Art & Creativity")), "music among the art activities");
   await noOverflow("picker filtered");
 });
 
