@@ -69,17 +69,26 @@ export function songNotes(song: Song, lang: Lang): { howToUse: string; source: s
 
 const midi = (n: ScoreNote) => MIDDLE_C + SEMI[n.deg] + 12 * n.hi - 12 * n.lo + (n.acc === "#" ? 1 : n.acc === "b" ? -1 : 0);
 
-// A soft triangle tone with a quiet sine overtone, short attack and decay: a gentle music box.
-function tone(ctx: AudioContext, note: number, t: number, d: number) {
+// A soft piano-like tone: a fundamental with quickly fading overtones (a PeriodicWave), struck with a short attack and
+// left to decay as a piano string does, through a low-pass filter that mellows as the note rings. The note is let go
+// with a short release when its time is up, so repeated notes stay distinct.
+const PIANO_HARMONICS = [0, 1, 0.42, 0.18, 0.1, 0.05, 0.025];
+function tone(ctx: AudioContext, out: AudioNode, wave: PeriodicWave, note: number, t: number, d: number) {
   const f = 440 * Math.pow(2, (note - 69) / 12);
-  const o = ctx.createOscillator(), g = ctx.createGain(), o2 = ctx.createOscillator(), g2 = ctx.createGain();
-  o.type = "triangle"; o.frequency.value = f; o2.type = "sine"; o2.frequency.value = f * 2;
-  const end = t + Math.max(d * 0.92, 0.08);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.28, t + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.14, t + Math.min(0.25, d * 0.5)); g.gain.exponentialRampToValueAtTime(0.0001, end);
-  g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.04, t + 0.02); g2.gain.exponentialRampToValueAtTime(0.0001, end);
-  o.connect(g).connect(ctx.destination); o2.connect(g2).connect(ctx.destination);
-  o.start(t); o2.start(t); o.stop(end + 0.02); o2.stop(end + 0.02);
+  const o = ctx.createOscillator(), filter = ctx.createBiquadFilter(), g = ctx.createGain();
+  o.setPeriodicWave(wave); o.frequency.value = f;
+  filter.type = "lowpass"; filter.Q.value = 0.5;
+  filter.frequency.setValueAtTime(Math.min(f * 6, 6000), t);
+  filter.frequency.setTargetAtTime(Math.min(f * 2, 2500), t, 0.25);
+  // Higher notes fade sooner, as on a piano.
+  const decay = Math.max(0.35, 1.1 - (note - 60) * 0.025);
+  const release = t + Math.max(d * 0.95, 0.12);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.5, t + 0.006);
+  g.gain.setTargetAtTime(0, t + 0.006, decay);
+  g.gain.setTargetAtTime(0, release, 0.06);
+  o.connect(filter).connect(g).connect(out);
+  o.start(t); o.stop(release + 0.4);
 }
 
 // Only one song plays at a time: starting one stops whichever was playing.
@@ -94,6 +103,12 @@ export function playSong(song: Song, onNote: (k: number) => void): boolean {
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return false;
   const ctx = new AC();
+  // Every note goes through one quiet master volume and a gentle compressor, so overlapping notes never get harsh.
+  const out = ctx.createGain(), comp = ctx.createDynamicsCompressor();
+  out.gain.value = 0.35;
+  comp.threshold.value = -18; comp.ratio.value = 3;
+  out.connect(comp).connect(ctx.destination);
+  const wave = ctx.createPeriodicWave(new Float32Array(PIANO_HARMONICS.length), new Float32Array(PIANO_HARMONICS));
   const timers: ReturnType<typeof setTimeout>[] = [];
   const stop = () => {
     timers.forEach(clearTimeout);
@@ -107,7 +122,7 @@ export function playSong(song: Song, onNote: (k: number) => void): boolean {
   for (const e of songScore(song)) {
     if (e.type !== "note") continue;
     const d = e.dur * sec;
-    if (e.deg > 0) tone(ctx, midi(e), t, d);
+    if (e.deg > 0) tone(ctx, out, wave, midi(e), t, d);
     const index = k++;
     timers.push(setTimeout(() => onNote(index), (t - t0) * 1000 + 100));
     t += d;
