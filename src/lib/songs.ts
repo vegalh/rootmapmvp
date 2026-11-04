@@ -1,5 +1,5 @@
 import songData from "../data/songs.json";
-import { songNotesEn } from "../data/songNotes";
+import { songNotesEn, songSourcesZh } from "../data/songNotes";
 import type { Lang, Song } from "../types";
 
 // Jianpu (numbered notation) for the songs in src/data/songs.json, and the Listen tone. Tokens are separated by
@@ -56,14 +56,15 @@ export function songDurationLabel(song: Song, lang: Lang): string {
   return m ? `${m} min${s ? ` ${s} sec` : ""}` : `${s} sec`;
 }
 
-// A song's how-to-use note and source in the interface language (Chinese as supplied, English from data/songNotes.ts).
+// A song's how-to-use note and source in the interface language (Chinese as supplied unless data/songNotes.ts has a
+// parent-facing source line, English from data/songNotes.ts).
 // The Chinese note names activities by number ("配合 #9 摇摇歌"), from a list that isn't in RootMap; only the name is
 // shown ("配合“摇摇歌”"), never the number or a link.
 export function songNotes(song: Song, lang: Lang): { howToUse: string; source: string; lang: Lang } {
   const en = songNotesEn[song.id];
   if (lang === "en" && en) return { ...en, lang: "en" };
   const howToUse = song.howToUse.replace(/#\d+\s*([^、。，；\s]+)/g, "“$1”").replace(/配合\s+“/g, "配合“");
-  return { howToUse, source: song.source, lang: "zh" };
+  return { howToUse, source: songSourcesZh[song.id] ?? song.source, lang: "zh" };
 }
 
 const midi = (n: ScoreNote) => MIDDLE_C + SEMI[n.deg] + 12 * n.hi - 12 * n.lo + (n.acc === "#" ? 1 : n.acc === "b" ? -1 : 0);

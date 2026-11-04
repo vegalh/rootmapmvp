@@ -6,7 +6,7 @@ import { songs } from "../../src/data/music.ts";
 import { collections } from "../../src/data/collections.ts";
 import { catalogItems, filterDiscoverActivities, DEFAULT_DISCOVER_FILTERS, findActivity, isMusicId } from "../../src/lib/catalog.ts";
 import { parseJianpu, songDurationLabel, songNotes, songScore, songSeconds } from "../../src/lib/songs.ts";
-import { songNotesEn, songsForCopyrightReview } from "../../src/data/songNotes.ts";
+import { songNotesEn, songSourcesZh, songsForCopyrightReview } from "../../src/data/songNotes.ts";
 import { durationLabel } from "../../src/lib/catalog.ts";
 
 test("songs: all 50, in id order, each a music activity with a stable id", () => {
@@ -73,7 +73,7 @@ test("songs: how to use and source in both languages, with no numbered activity 
   assert.deepEqual(Object.keys(songNotesEn).map(Number), songData.songs.map(s => s.id), "English for every song");
   for (const m of songs) {
     const zh = songNotes(m.song!, "zh"), en = songNotes(m.song!, "en");
-    assert.equal(zh.source, m.song!.source, `${m.id}: Chinese source as supplied`);
+    assert.equal(zh.source, songSourcesZh[m.song!.id] ?? m.song!.source, `${m.id}: Chinese source as supplied unless reworded for parents`);
     assert.equal(zh.howToUse, m.song!.howToUse.includes("#") ? zh.howToUse : m.song!.howToUse, `${m.id}: unchanged unless it names an activity by number`);
     assert.deepEqual([en.lang, zh.lang], ["en", "zh"]);
     for (const text of [zh.howToUse, en.howToUse, en.source]) assert.ok(text && !/#\d/.test(text), `${m.id}: ${text}`);
