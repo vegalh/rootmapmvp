@@ -103,6 +103,8 @@ export function stepper(getPage) {
   async function step(name, fn, expected) {
     const page = getPage();
     const errorsBefore = page.errors.length;
+    const pages = () => [...new Set([page, getPage()])];
+    const before = new Map(pages().map(p => [p, [p.failures?.length ?? 0, p.warnings.length]]));
     try {
       await fn();
       const newErrors = page.errors.slice(errorsBefore).filter(e => !(expected && expected.test(e)));
@@ -112,6 +114,12 @@ export function stepper(getPage) {
     } catch (e) {
       results.push(["FAIL", name, e.message]);
       console.log(`FAIL  ${name}\n      ${e.message.split("\n").join("\n      ")}`);
+      // What the server answered and what the app's sync reported during this step (diagnostics only).
+      for (const p of pages()) {
+        const [f, w] = before.get(p) ?? [0, 0];
+        for (const x of (p.failures ?? []).slice(f).slice(0, 10)) console.log(`      response: ${x}`);
+        for (const x of p.warnings.slice(w).filter(x => /RootMap sync/.test(x)).slice(0, 5)) console.log(`      warning: ${x.slice(0, 300)}`);
+      }
     }
   }
   const finish = () => {

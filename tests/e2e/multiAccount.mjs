@@ -50,7 +50,8 @@ async function until(p, cond, label, tries = 60) {
 }
 async function backedUp(p, label) {
   for (let i = 0; i < 60; i++) { if ((await status(p)).allBackedUp) return; await syncNow(p); await sleep(500); }
-  throw new Error(`timed out: ${label}`);
+  const outbox = await p.eval(`import("/src/lib/data/store.ts").then(S => JSON.stringify(S.pendingOutbox().map(e => [e.key, e.rejected?.reason ?? null])))`);
+  throw new Error(`timed out: ${label}\nstatus: ${JSON.stringify(await status(p))}\noutbox: ${outbox}`);
 }
 async function rest(method, path, body) {
   const r = await fetch(`${API}${path}`, { method, headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json", Prefer: "return=representation" }, body: body && JSON.stringify(body) });

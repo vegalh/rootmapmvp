@@ -38,6 +38,9 @@ export class Page {
   constructor(ws) {
     this.ws = ws; this.id = 0; this.pending = new Map(); this.handlers = new Set();
     this.errors = []; this.warnings = []; this.dialogs = [];
+    // Failed API responses with their bodies (Postgres code and message), printed when a step fails: Chrome's own
+    // log line says only "409 (Conflict)". Needs Network.enable (cloudkit.mjs).
+    this.failures = []; const failing = new Map();
     ws.onmessage = e => {
       const m = JSON.parse(e.data);
       if (m.id) {
@@ -47,6 +50,14 @@ export class Page {
         return;
       }
       for (const h of this.handlers) h(m);
+      if (m.method === "Network.responseReceived" && m.params.response.status >= 400 && /\/(rest|functions|storage)\/v1\//.test(m.params.response.url)) failing.set(m.params.requestId, m.params.response);
+      if (m.method === "Network.loadingFinished" && failing.has(m.params.requestId)) {
+        const r = failing.get(m.params.requestId);
+        failing.delete(m.params.requestId);
+        this.send("Network.getResponseBody", { requestId: m.params.requestId })
+          .then(b => b.body, () => "(no body)")
+          .then(body => this.failures.push(`${new Date().toISOString()} ${r.status} ${r.url}: ${body.slice(0, 300)}`));
+      }
       if (m.method === "Runtime.consoleAPICalled") {
         const text = m.params.args.map(a => a.value ?? a.description ?? "").join(" ");
         if (m.params.type === "error") this.errors.push(`console.error: ${text}`);
