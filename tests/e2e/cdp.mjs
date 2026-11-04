@@ -133,7 +133,9 @@ export class Page {
     return Buffer.from(data, "base64");
   }
   async close() {
-    try { await this.send("Browser.close"); } catch { /* closing */ }
+    // Not awaited: Chrome may close the socket before it answers, and that answer would then never come. Its exit is
+    // what counts.
+    this.send("Browser.close").catch(() => { /* closing */ });
     await new Promise(r => { if (this.proc.exitCode !== null) r(); else this.proc.once("exit", r); });
   }
 }

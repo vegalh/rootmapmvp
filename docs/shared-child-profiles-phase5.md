@@ -174,6 +174,11 @@ UTC, CPU throttled 6×), and not in CI after test-only diagnostics were added (`
 server's error responses, the app's sync warnings and the outbox), where every check passed. Treated as a possible
 intermittent issue. If it happens again, those lines under the first FAIL show the cause.
 
+The next run (41912438454, at `8af34e8`, a docs-only commit) failed in the cloud-off suites: `activities.mjs` passed
+10/10, then Node exited on an unsettled top-level await at `await page.close()`. The test kit's `close()`
+(`tests/e2e/cdp.mjs`) awaited Chrome's answer to `Browser.close`, and Chrome can close the socket before answering;
+it now waits only for Chrome to exit. Not an app issue. Every suite calls this `close()`.
+
 ### Results: the first part of Phase 5 (this Mac, local stack only, 2026-11-03)
 
 | Command | Result |
