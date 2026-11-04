@@ -175,8 +175,7 @@ export function ChildCircle({ child, homeFamilyId, access, afterLeave, notify, l
                   {RELATIONSHIPS.map(r => <option value={r} key={r}>{relationshipLabel(r, t)}</option>)}
                 </select>
               </Field>
-              {/* The child's own family stays in its circle (after handing its profile to someone else). */}
-              {scope && <button className="text-action danger" onClick={leave}>{t.circleLeave}</button>}
+              <button className="text-action danger" onClick={leave}>{t.circleLeave}</button>
             </>
           )}
         </>

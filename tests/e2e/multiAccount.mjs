@@ -367,7 +367,7 @@ try {
     await dA.p.waitFor(`document.querySelector(".entry-authors")?.innerText.includes("Added by Ben")`, 10000, "Ana sees Ben added m-b1");
   });
 
-  await step("Ownership transfer: Ana hands Kai's profile to Ben, who accepts on My Children; Ana keeps Add & Edit (no Manage, no Leave); Ben hands it back from Manage and Ana accepts on Kai's page", async () => {
+  await step("Ownership transfer: Ana hands Kai's profile to Ben, who accepts on My Children; Ana keeps Add & Edit (no Manage; she may leave); Ben hands it back from Manage and Ana accepts on Kai's page", async () => {
     const confirmWith = async (p, label) => {
       await p.waitFor(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).length`, 5000, `confirm ${label}`);
       await p.eval(`[...document.querySelectorAll("button")].filter(b => b.textContent === ${JSON.stringify(label)}).at(-1).click(); true`);
@@ -400,7 +400,7 @@ try {
     await openChild(dA.p, "c-kai");
     await dA.p.waitFor(`document.querySelector(".child-circle")?.innerText.includes("Add & Edit")`, 10000, "Ana's circle line");
     const circle = await circleText(dA.p);
-    assert.ok(!circle.includes("Leave the Circle"), "the child's own family stays");
+    assert.ok(circle.includes("Leave the Circle"), "the previous owner may leave");
     assert.ok(!(await dA.p.eval(`[...document.querySelectorAll(".child-circle button")].some(b => b.textContent === "Manage")`)), "no Manage");
 
     page = dB.p;
@@ -554,6 +554,24 @@ try {
     await dA.p.eval(`window.dispatchEvent(new Event("focus"))`);
     await sleep(1500);
     assert.ok(!(await dA.p.eval(`!!document.querySelector(".circle-joins")`)), "dismissed on one device, gone on the other");
+  });
+  await step("Previous owner removed: Ana hands Tia to Ben, who removes Ana; Ana's device removes Tia and her Moment and keeps the rest of her family's records", async () => {
+    const rpc = (p, fn, args) => p.eval(`import("/src/lib/cloud/client.ts").then(async m => { const c = await m.getCloudClient(); const { data, error } = await c.rpc(${JSON.stringify(fn)}, ${JSON.stringify(args)}); if (error) throw new Error(error.message); return data; })`);
+    page = dA.p;
+    await write(dA.p, { children: [child("c-tia", "Tia")], entries: [entry("m-t1", "c-tia", "Tia's first day")] });
+    await backedUp(dA.p, "Tia backed up");
+    const kept = await store(dA.p, `return S.getCollection("entries").filter(e => !e.familyId && e.childId !== "c-tia").map(e => e.id).sort();`);
+    await rest("POST", "/rest/v1/child_memberships", { family_id: FA, child_id: "c-tia", user_id: Ben.id, role: "editor" });
+    const offer = await rpc(dA.p, "offer_ownership_transfer", { p_family_id: FA, p_child_id: "c-tia", p_to_user: Ben.id });
+    assert.equal(await rpc(dB.p, "accept_ownership_transfer", { p_id: offer }), "ok");
+    await until(dA.p, `meta.scopes?.home?.["c-tia"] === "editor"`, "Ana's device knows she no longer manages Tia");
+    await rpc(dB.p, "remove_member", { p_family_id: FA, p_child_id: "c-tia", p_user_id: Ana.id });
+    await until(dA.p, `!all("children").some(c => c.id === "c-tia") && !all("entries").some(e => e.id === "m-t1") && meta.scopes?.revoked?.["c-tia"]?.state === "done"`, "Tia removed from Ana's device");
+    assert.deepEqual(await store(dA.p, `return S.getCollection("entries").filter(e => !e.familyId).map(e => e.id).sort();`), kept, "every other record of Ana's family stays");
+    assert.ok(await get(dA.p, "children", "c-kai"), "Kai stays");
+    assert.ok(await serverRow("entries", FA, "m-t1"), "Tia's Moment stays on the server, for her circle");
+    await kids(dA.p);
+    await dA.p.waitFor(`document.body.innerText.includes("You no longer have access")`, 10000, "Ana is told");
   });
   await dC.p.close().catch(() => {});
   captchaServer.stop();

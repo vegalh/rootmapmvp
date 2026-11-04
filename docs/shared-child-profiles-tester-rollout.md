@@ -79,9 +79,10 @@ role change.
 | 5 | B: add a Moment | A sees it within a minute; its page says "Added by B" |
 | 6 | A: Manage › change B to View Only | B: no Add or Edit; "What you can do: View Only" |
 | 7 | A: Manage › change B back to Add & Edit › **Hand Over Profile** next to B › Send Request | A: "Waiting for B to accept"; A still manages |
-| 8 | B: My Children › Accept › Accept | B: Manage on the child's page. A: "What you can do: Add & Edit"; no Edit Profile, Delete, Manage or Leave |
+| 8 | B: My Children › Accept › Accept | B: Manage on the child's page. A: "What you can do: Add & Edit"; no Edit Profile, Delete or Manage |
 | 9 | B: Manage › Hand Over Profile next to A; A accepts on the child's page | A manages again |
 | 10 | A: Manage › Remove from Circle (B) | B: the child disappears within a minute, "You no longer have access…" |
+| 11 | A: add a second child, invite B, hand it to B (steps 7–8); B: Manage › Remove from Circle (A) | A: that child disappears within a minute, "You no longer have access…"; A's other children stay |
 
 The same flow runs automatically in CI on every PR (`tests/e2e/multiAccount.mjs`, against a local stack), so this
 step only confirms the real website and project.

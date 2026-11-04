@@ -91,9 +91,30 @@ path into `child_memberships`.
 | No races | every change locks the child's row first (the same lock as every membership change), then the offer |
 | No direct access | the table has RLS on, no policy and no grant for clients; listing is `ownership_transfers()`, the caller's own live offers only, with names and no email |
 
-The child's own family stays in its circle. A child's records live in the family that created it, and that family's
-devices sync it as their own. So after a transfer, `remove_member` and `leave_circle` refuse to remove a parent of
-that family (`42501`). The new Owner can still make them View Only.
+After a transfer the previous Owner is an ordinary Add & Edit member. They can leave, and the new Owner can make
+them View Only or remove them (`leave_circle`, `set_member_role`, `remove_member`, unchanged since Phase 4). A
+teacher can create a profile, hand it to a parent and leave completely. The child's rows stay in the family that
+created it, but every policy reaches them by child role (Phase 1b). Once the membership is gone, that family reads
+and writes nothing of the child, not even Moments it wrote itself. Its other children are untouched. The same holds
+while the new Owner has the profile deleted: non-owners' memberships are hidden (Phase 3).
+
+**Removing the previous Owner's copy (device).** The existing removal path, unchanged except for which children it
+may take (`lib/sync/scopes.ts`):
+
+- The device records the user's role only for own-family children they no longer manage (`ScopeState.home`). Only
+  those can ever be removed. A child the user manages is never a candidate, whatever an answer says.
+- Missing from two successful membership answers in a row (they left, were removed, or the profile was deleted):
+  removal is decided and the child is hidden at once. Then, in one transaction, the child, its Moments and activity
+  records, their sync state and the photos only they show are removed. Unsent changes go to the archive first, and
+  "You no longer have access…" is shown. Offline or failed answers change nothing.
+- Records of other children, of other families, and family-scoped data (My Week, goals, saved items) are never
+  touched. A Moment about two children keeps the other child's copy and its photo.
+- If access comes back (the profile restored, or invited again), the user's own family is downloaded again from the
+  start, so the removed records return.
+
+Remaining gap: a device that never synced between the transfer and the removal doesn't know it lost Manage, so it
+keeps its copy (the server refuses every change from it). Removing own-family children without that knowledge would
+risk the user's own data, so it isn't done.
 
 App:
 
@@ -102,8 +123,8 @@ App:
 - Recipient: "Ana would like you to manage Kai's profile." with **Accept** / **Decline**, on My Children and on the
   child's page. Accept asks once more, explaining what changes.
 - Previous Owner: the device keeps the user's role for their own family's children (`ScopeState.home`,
-  `lib/sync/scopes.ts`). `childAccess` shows such a child as Add & Edit: no Edit Profile, no Delete, no Manage, no
-  Leave. The child stays in the user's own family on the device; nothing is downloaded again or removed.
+  `lib/sync/scopes.ts`). `childAccess` shows such a child as Add & Edit: no Edit Profile, no Delete, no Manage. They
+  can Leave the Circle.
 - Chinese: 移交档案管理 / 等待{name}接受 / 接受 · 婉拒.
 
 ## 3. Permission model (re-checked)
@@ -121,9 +142,10 @@ App:
 | A client claims or rewrites who added a Moment | `tests/db/entryAuthors.test.ts` (new, 4 tests): insert and update refused, trigger sets and keeps it |
 | Names leak to outsiders, or ids/emails to members | `entryAuthors.test.ts`: outsider refused like a missing Moment; no id or email in answers; a member who left isn't named |
 | A conflict isn't reported, or a non-Moment is | `tests/db/sync.test.ts`: two existing conflict tests now also check `keptEdits` |
-| Ownership transfer: who may offer, accept, cancel, decline; one Owner; duplicates; expired and stale offers; new roles enforced; the home family stays | `tests/db/ownershipTransfer.test.ts` (new, 13 tests) |
-| The previous Owner's screens follow the transfer | `tests/unit/scopes.test.ts` (+1): `ScopeState.home`, `childAccess` "edit", back to "manage" when handed back |
-| Transfer across two accounts in the browser | `tests/e2e/multiAccount.mjs` (+1 step): Ana offers from Manage, Ben accepts on My Children, Ana's page drops Manage and Leave, Ben hands it back, Ana accepts on Kai's page |
+| Ownership transfer: who may offer, accept, cancel, decline; one Owner; duplicates; expired and stale offers; new roles enforced; the previous Owner leaves or is removed and then reads nothing of the child (also while it is deleted), other children untouched | `tests/db/ownershipTransfer.test.ts` (new, 15 tests) |
+| The previous Owner's screens follow the transfer | `tests/unit/scopes.test.ts`: `ScopeState.home`, `childAccess` "edit", back to "manage" when handed back |
+| The previous Owner's device removes the wrong data, or too early | `tests/unit/scopes.test.ts` (+3): two answers needed; a managed child is never removed; only that child's records and photos (a shared photo stays); unsent edits archived; restored access downloads again |
+| Transfer across two accounts in the browser | `tests/e2e/multiAccount.mjs` (+1 step): Ana offers from Manage, Ben accepts on My Children, Ana's page drops Manage and Leave, Ben hands it back, Ana accepts on Kai's page. A second step: Ana hands Tia to Ben, Ben removes Ana, and Ana's device removes Tia and her Moment and keeps every other record |
 | The whole flow across two accounts | `tests/e2e/multiAccount.mjs`, concurrent-edit step: Ben (whose text lost) gets the note, Ana doesn't; opening the Moment clears it; "Added by Ana" on Ben's view, nothing on Ana's own Moment, "Added by Ben" on Ana's view of his |
 
 No new test infrastructure. The link fallback isn't automated (headless Chrome grants clipboard access). It needs
@@ -136,10 +158,11 @@ Targeted runs only. CI runs the full suites on the PR.
 | Command | Result |
 |---|---|
 | `npm run typecheck` | clean |
-| `npm test` | **214 / 214** (+1) |
-| `tests/db/ownershipTransfer.test.ts` | **13 / 13** (new) |
+| `npm test` | **216 / 216** (+3) |
+| `tests/db/ownershipTransfer.test.ts` | **15 / 15** (new) |
+| `tests/db/multiFamilySync.test.ts` (removal code changed) | **11 / 11** |
 | `invitations`, `circleJoins`, `entryAuthors`, `childMemberships` (`remove_member` / `leave_circle` changed) | **54 / 54** |
-| `tests/e2e/multiAccount.mjs` | **18 / 18** (with the new transfer step) |
+| `tests/e2e/multiAccount.mjs` | **19 / 19** (with the two new transfer steps) |
 | `npm run build` | builds (the existing chunk-size warning only) |
 
 `tests/ops/oldSchema.mjs` now also lists the transfer table and functions as sharing objects.
@@ -173,9 +196,7 @@ pre-sharing migrations. CI runs it.
 
 ## 5. What remains
 
-- **After a transfer, if the new Owner deletes the profile**, the previous Owner's device keeps its last copy of the
-  child (as Add & Edit; the server refuses every change). The server is correct; only the stale copy on that device
-  stays. Rare for testers. Deleting it locally can come later.
+- **A device offline from before a transfer until after the previous Owner's removal** keeps its copy (2.4).
 - **Authorship on lists and activity records**: not planned. Attribution stays on the Moment page only (2.1).
 - **Activity records**: no kept-edit note. Moments only, as in Phase 4's kept versions.
 - **Restoring a kept version with one tap.** Today the kept text can be read and copied.

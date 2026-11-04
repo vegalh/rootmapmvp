@@ -185,7 +185,9 @@ export type ScopeState = {
   // Shared children (scopedId(familyId, childId)) and the user's role for each, as last confirmed.
   shared: Record<string, Role>;
   // The user's own family's children (plain ids) whose profile someone else now manages (an ownership transfer),
-  // and the user's role for each. A child of the user's own family not listed here is theirs to manage.
+  // and the user's role for each. A child of the user's own family not listed here is theirs to manage, and is never
+  // removed from this device. One listed here is removed like a shared child once the user's access ends (they left
+  // or were removed, or its new owner deleted the profile); `absent` and `revoked` then use its plain id.
   home?: Record<string, Role>;
   // Shared children missing from the last successful answers, and how many in a row.
   absent: Record<string, number>;
@@ -215,17 +217,20 @@ export function scopeStateFor(stored: unknown, userId: string, homeFamilyId: str
 //   older than its cursor were never sent for this child
 // - role changed (including an ownership transfer): updated; refused changes for that family may be sent again
 // - shared child missing: counted; removed (and its data with it) after CONFIRM_REMOVAL_AFTER answers in a row
-// - the user's own family's children are never removed here; only the user's role for them is kept (`home`), for
-//   the rare child whose profile was handed to someone else
+// - the user's own family's children: the user's role is kept (`home`) for a child whose profile was handed to
+//   someone else. Only such a child can be removed (after the same answers in a row), and only its own data; a child
+//   the user still manages never is. If access comes back, the user's own family is downloaded again from the start
 export function observeMemberships(state: ScopeState, answer: MembershipFetch, opts: { userId: string; now: string; homeChildren?: string[] }): { state: ScopeState; actions: ScopeAction[] } {
   if (state.userId !== opts.userId) throw new Error("scope state belongs to another account");
   if (!answer.ok) return { state, actions: [] };
   const homeFamily = state.homeFamilyId;
-  if (opts.homeChildren?.length && !answer.memberships.some(m => m.familyId === homeFamily)) return { state, actions: [] };
+  // The user's own children they still manage: an answer leaving all of them out can't be right.
+  const managed = (opts.homeChildren ?? []).filter(id => !(id in (state.home ?? {})));
+  if (managed.length && !answer.memberships.some(m => m.familyId === homeFamily)) return { state, actions: [] };
 
   const next: ScopeState = { ...state, shared: { ...state.shared }, absent: { ...state.absent }, revoked: { ...state.revoked } };
-  // A child of the user's own family missing from the answer (its new owner deleted the profile) keeps its last role.
-  const home: Record<string, Role> = Object.fromEntries(Object.entries(state.home ?? {}).filter(([id]) => !answer.memberships.some(m => m.familyId === homeFamily && m.childId === id)));
+  const home: Record<string, Role> = {};
+  const homeSeen = new Set<string>();
   const actions: ScopeAction[] = [];
   const add = (a: ScopeAction) => {
     if (!actions.some(x => JSON.stringify(x) === JSON.stringify(a))) actions.push(a);
@@ -233,7 +238,13 @@ export function observeMemberships(state: ScopeState, answer: MembershipFetch, o
   const seen = new Set<string>();
   for (const m of answer.memberships) {
     if (m.familyId === homeFamily) {
+      homeSeen.add(m.childId);
       if (m.role !== "owner") home[m.childId] = m.role;
+      delete next.absent[m.childId];
+      if (m.childId in next.revoked) {
+        delete next.revoked[m.childId]; // access came back: its removed data comes back with the download
+        add({ kind: "fullResync", familyId: homeFamily });
+      }
       continue;
     }
     const key = scopedId(m.familyId, m.childId);
@@ -247,6 +258,14 @@ export function observeMemberships(state: ScopeState, answer: MembershipFetch, o
       next.shared[key] = m.role;
       add({ kind: "clearRejections", familyId: m.familyId });
     }
+  }
+  for (const [childId, role] of Object.entries(state.home ?? {})) {
+    if (homeSeen.has(childId)) continue;
+    const count = (next.absent[childId] ?? 0) + 1;
+    if (count < CONFIRM_REMOVAL_AFTER) { next.absent[childId] = count; home[childId] = role; continue; }
+    delete next.absent[childId];
+    next.revoked[childId] = { familyId: homeFamily, childId, since: opts.now, state: "pending" };
+    add({ kind: "revoke", familyId: homeFamily, childId });
   }
   if (JSON.stringify(home) !== JSON.stringify(state.home ?? {})) {
     if (Object.keys(home).length) next.home = home;
@@ -305,14 +324,17 @@ const photosOf = (r: Record<string, unknown>) => [
   ...(typeof r.photo === "string" ? [r.photo] : []),
 ];
 
-// What removing one shared child's data takes. Pure. Refuses the user's own family.
+// What removing one shared child's data takes. Pure. For the user's own family, only a child whose profile was handed
+// to someone else (observeMemberships); its records have plain ids, and nothing of another child is touched.
 //
 // Removed: the child, its Moments and activity records (only those of that family), their sync state, and the photos
 // they show that no remaining record on this device shows (a Moment about two children keeps its photo while the other
 // child is still shared). Unsent changes are not lost: each is copied to the archive, with its outbox entry, first.
 export function planRevocation(local: Pick<CleanupLocal, "all" | "outbox">, state: ScopeState, familyId: string, childId: string, now: string): CleanupBatch {
-  if (familyId === state.homeFamilyId) throw new Error("the user's own family is never removed");
-  const child = scopedId(familyId, childId);
+  const home = familyId === state.homeFamilyId;
+  if (home && !(childId in state.revoked)) throw new Error("a child the user manages is never removed");
+  const child = home ? childId : scopedId(familyId, childId);
+  const inFamily = (id: unknown) => (unscope(String(id))?.familyId ?? state.homeFamilyId) === familyId;
   const batch: CleanupBatch = { deleteRecords: [], deletePhotos: [], deleteSyncRecords: [], outboxRemove: [], archive: [] };
   const outbox = new Map(local.outbox().map(e => [e.key, e]));
   const removed = new Set<string>();
@@ -323,7 +345,7 @@ export function planRevocation(local: Pick<CleanupLocal, "all" | "outbox">, stat
   for (const collection of ["children", "entries", "records"] as const) {
     for (const r of local.all(collection)) {
       const id = String(r.id);
-      if (unscope(id)?.familyId !== familyId || (collection === "children" ? id !== child : r.childId !== child)) continue;
+      if (!inFamily(id) || (collection === "children" ? id !== child : r.childId !== child)) continue;
       const key = outboxKey(collection, id);
       removed.add(key);
       batch.deleteRecords.push({ collection, id });
@@ -337,9 +359,10 @@ export function planRevocation(local: Pick<CleanupLocal, "all" | "outbox">, stat
   }
   // Versions kept for those records and not yet sent.
   for (const e of outbox.values()) {
-    if (e.collection !== "versions" || unscope(e.id)?.familyId !== familyId) continue;
+    if (e.collection !== "versions" || !inFamily(e.id)) continue;
     const tableCollection = e.payload?.table === "activity_records" ? "records" : e.payload?.table;
-    if (!removed.has(outboxKey(tableCollection as CleanupCollection, scopedId(familyId, e.payload?.recordId ?? "")))) continue;
+    const recordId = e.payload?.recordId ?? "";
+    if (!removed.has(outboxKey(tableCollection as CleanupCollection, home ? recordId : scopedId(familyId, recordId)))) continue;
     keep("versions", {}, e);
     batch.outboxRemove.push({ key: e.key, seq: e.seq });
   }
@@ -354,7 +377,7 @@ export function planRevocation(local: Pick<CleanupLocal, "all" | "outbox">, stat
   }
   for (const p of local.all("photos")) {
     const id = String(p.id);
-    if (p.familyId !== familyId || !candidates.has(id) || remaining.has(id)) continue;
+    if ((p.familyId ?? state.homeFamilyId) !== familyId || !candidates.has(id) || remaining.has(id)) continue;
     batch.deletePhotos.push(id);
     batch.deleteSyncRecords.push(outboxKey("photos", id));
     const entry = outbox.get(outboxKey("photos", id));
@@ -413,14 +436,16 @@ export async function syncScopes(
   // No state of this account yet (or another account's, which is never used): no shared family's cursor is trusted.
   const scopeCursors = stored === base.meta().scopes ? { ...base.meta().scopeCursors } : {};
   const marks: NonNullable<SyncBatch["outboxMark"]> = [];
+  let homeCursors: Record<string, number> | undefined;
   for (const a of observed.actions) {
-    if (a.kind === "fullResync") scopeCursors[a.familyId] = {};
+    if (a.kind === "fullResync" && a.familyId === opts.homeFamilyId) homeCursors = {};
+    else if (a.kind === "fullResync") scopeCursors[a.familyId] = {};
     if (a.kind === "dropScope") delete scopeCursors[a.familyId];
     if (a.kind === "clearRejections") {
       for (const e of base.outbox()) if (e.rejected && (entryFamily(base, e) ?? opts.homeFamilyId) === a.familyId) marks.push({ key: e.key, seq: e.seq, rejected: null });
     }
   }
-  if (observed.actions.length || JSON.stringify(state) !== JSON.stringify(base.meta().scopes)) await base.commit({ meta: { scopeCursors, scopes: state }, outboxMark: marks });
+  if (observed.actions.length || JSON.stringify(state) !== JSON.stringify(base.meta().scopes)) await base.commit({ meta: { scopeCursors, scopes: state, ...(homeCursors ? { cursors: homeCursors } : {}) }, outboxMark: marks });
   if (base.commitCleanup && base.all && Object.values(state.revoked).some(r => r.state === "pending")) {
     state = await runRevocations(base as ScopeBase & CleanupLocal, state, now);
   }

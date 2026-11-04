@@ -17,10 +17,10 @@
 -- 3. Concurrency. Every function that changes an offer locks the child's row first (the same lock `t00_lock_child`
 --    takes for any membership change), then the offer. Two acceptances, an acceptance racing a cancellation, or a
 --    racing role change or removal therefore run one after the other, and the second sees what the first committed.
--- 4. The child's own family stays in its circle. A child's records live in the family that created it, and that
---    family's devices sync it as their own (lib/sync/scopes.ts). After a transfer, the parent of that family is an Add
---    & Edit member like any other, except that `remove_member` and `leave_circle` no longer remove them: their device
---    would otherwise keep the child it can no longer read.
+-- 4. After a transfer the previous Owner is an Add & Edit member like any other: they can leave, and the new Owner can
+--    change their access or remove them (`set_member_role`, `remove_member`, `leave_circle`, unchanged). The child's
+--    rows stay in the family that created it, but every policy reaches them by child role (Phase 1b), so that family
+--    keeps nothing of the child once its membership is gone. Its devices then remove their copy (lib/sync/scopes.ts).
 
 create table public.child_ownership_transfers (
   id uuid primary key default gen_random_uuid(),
@@ -195,47 +195,6 @@ language sql stable security definer set search_path = '' as $$
   left join public.profiles pt on pt.user_id = t.to_user
   where (select auth.uid()) in (t.from_user, t.to_user) and private.transfer_is_live(t)
   order by t.created_at, t.id;
-$$;
-
--- ---- The child's own family stays in its circle (see 4. above) -------------------------------------------------
-
-create or replace function public.remove_member(p_family_id uuid, p_child_id text, p_user_id uuid)
-returns void
-language plpgsql security definer set search_path = '' as $$
-begin
-  if auth.uid() is null or not private.is_child_owner(p_family_id, p_child_id) then
-    raise exception 'not allowed to manage this circle' using errcode = '42501';
-  end if;
-  if p_user_id = auth.uid() then
-    raise exception 'the owner cannot remove themselves' using errcode = '42501';
-  end if;
-  if exists (select 1 from public.family_members fm where fm.family_id = p_family_id and fm.user_id = p_user_id) then
-    raise exception 'the child''s own family stays in its circle' using errcode = '42501';
-  end if;
-  delete from public.child_memberships
-   where family_id = p_family_id and child_id = p_child_id and user_id = p_user_id and role <> 'owner';
-  if not found then
-    raise exception 'not in this child''s circle' using errcode = '42501';
-  end if;
-end;
-$$;
-
-create or replace function public.leave_circle(p_family_id uuid, p_child_id text)
-returns void
-language plpgsql security definer set search_path = '' as $$
-begin
-  if auth.uid() is null then
-    raise exception 'sign in required' using errcode = '42501';
-  end if;
-  if private.is_family_member(p_family_id) then
-    raise exception 'the child''s own family stays in its circle' using errcode = '42501';
-  end if;
-  delete from public.child_memberships
-   where family_id = p_family_id and child_id = p_child_id and user_id = auth.uid() and role <> 'owner';
-  if not found then
-    raise exception 'not in this child''s circle, or you manage it' using errcode = '42501';
-  end if;
-end;
 $$;
 
 -- ---- Grants ----------------------------------------------------------------------------------------------------
