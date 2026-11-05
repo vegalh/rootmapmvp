@@ -64,7 +64,7 @@ export const copy = {
     forYourChildren: "For your children:", saveActivityLabel: "Save {title}", unsaveActivityLabel: "Remove {title} from Saved",
     noNotificationsTitle: "No notifications", notificationsComingSoonTitle: "Reminders are coming", notificationsComingSoon: "RootMap doesn't send reminders or notifications yet. When it does, you'll choose which ones you'd like here.", comingSoon: "Coming soon", addYourName: "Add your name", privacyTextAccount: "When you're signed in, they're also backed up to your RootMap account.",
     linkCopied: "Link copied.", shareFailed: "Couldn't share this page. You can copy the address from your browser.", shareLabel: "Share {title}",
-    safetyTitle: "Safety",
+    safetyTitle: "Safety", preparationTitle: "Before You Begin", extensionsTitle: "Extensions", aimsTitle: "Aims", directAimLabel: "Direct aim", indirectAimLabel: "Indirect aim", ageMonthsShort: "mo",
     welcomeFamilyTitle: "Welcome to RootMap", welcomeFamilyText: "Add your child to keep their little moments, try activities that suit their age, and look back on how they grow.",
     noChildrenYet: "No children yet. Tap Add Child above to add your first child.",
     wishlistSubtitle: "Books you'd love to read together", addToWishlist: "Add to Wishlist", removedFromWishlist: "Removed from Wishlist", removeFromWishlistLabel: "Remove {title} from Wishlist",
@@ -148,7 +148,7 @@ export const copy = {
     forYourChildren: "适合孩子：", saveActivityLabel: "收藏“{title}”", unsaveActivityLabel: "取消收藏“{title}”",
     noNotificationsTitle: "暂无通知", notificationsComingSoonTitle: "提醒功能即将推出", notificationsComingSoon: "RootMap 目前还不会发送提醒或通知。功能上线后，您可以在这里选择想要接收的内容。", comingSoon: "即将推出", addYourName: "添加您的名字", privacyTextAccount: "登录后，这些内容还会备份到您的 RootMap 账户。",
     linkCopied: "链接已复制。", shareFailed: "无法分享此页面，您可以从浏览器地址栏复制链接。", shareLabel: "分享“{title}”",
-    safetyTitle: "安全提示",
+    safetyTitle: "安全提示", preparationTitle: "提前准备", extensionsTitle: "延伸玩法", aimsTitle: "活动目的", directAimLabel: "直接目的", indirectAimLabel: "间接目的", ageMonthsShort: "个月",
     welcomeFamilyTitle: "欢迎来到 RootMap", welcomeFamilyText: "添加您的孩子，记录成长中的点滴，尝试适合孩子年龄的活动，回顾孩子的成长。",
     noChildrenYet: "还没有添加孩子。点击上方的“添加孩子”，添加您的第一个孩子。",
     wishlistSubtitle: "想和孩子一起读的书", addToWishlist: "加入心愿书单", removedFromWishlist: "已从心愿书单移除", removeFromWishlistLabel: "将“{title}”移出心愿书单",
@@ -344,7 +344,8 @@ export function noteText(notes: string | undefined, notesZh: string | undefined,
 
 type ActivityLike = {
   title: string; age: string; materialsLabel: string; description: string; domains: string[]; materials: string[]; steps: string[]; safety?: string;
-  zh?: { title?: string; age?: string; materialsLabel?: string; description?: string; domains?: string[]; materials?: string[]; steps?: string[]; safety?: string };
+  preparation?: string; extensions?: string[]; directAim?: string; indirectAim?: string;
+  zh?: { title?: string; age?: string; materialsLabel?: string; description?: string; domains?: string[]; materials?: string[]; steps?: string[]; safety?: string; preparation?: string; extensions?: string[]; directAim?: string; indirectAim?: string };
 };
 
 // Returns a copy of the activity with display fields swapped to their Chinese translations when available.
@@ -360,5 +361,9 @@ export function localizeActivity<A extends ActivityLike>(a: A, t: Copy): A {
     materials: a.zh.materials || a.materials,
     steps: a.zh.steps || a.steps,
     safety: a.zh.safety || a.safety,
+    preparation: a.zh.preparation || a.preparation,
+    extensions: a.zh.extensions?.length ? a.zh.extensions : a.extensions,
+    directAim: a.zh.directAim || a.directAim,
+    indirectAim: a.zh.indirectAim || a.indirectAim,
   };
 }

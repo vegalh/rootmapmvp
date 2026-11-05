@@ -95,10 +95,9 @@ test("age filters: overlapping ranges, and only filters that have activities", (
   const offered = ageOptionsFor(activities.map(activityAgeRanges));
   for (const range of offered.slice(1)) assert.ok(activities.some(a => activityAgeRanges(a).includes(range as never)), range);
   assert.ok(!offered.includes("6+"), "no activity for 6+, so no 6+ filter");
-  assert.ok(!offered.includes("0–2"), "no activity for 0–2 yet, so no 0–2 filter");
-  // The songs suit every age (0–6), so Discover offers 0–2 (it has nothing else for 0–2 yet).
-  assert.ok(ageOptionsFor(catalogItems().map(activityAgeRanges)).includes("0–2"), "the songs");
-  assert.ok(catalogItems().filter(a => activityAgeRanges(a).includes("0–2")).every(a => a.id.startsWith("song-")), "only the songs");
+  // The 0–12 month activities and the songs (0–6) are listed under 0–2.
+  assert.ok(offered.includes("0–2"), "the 0–12 month activities");
+  assert.ok(catalogItems().filter(a => activityAgeRanges(a).includes("0–2")).every(a => a.id.startsWith("song-") || /months$/.test(a.age)), "only the songs and the 0–12 month activities");
   assert.equal(ageRangeForYears(0.5), "0–2");
   assert.equal(ageRangeForYears(1.5), "0–2");
   assert.equal(ageRangeForYears(2.5), "2–3");
@@ -107,9 +106,16 @@ test("age filters: overlapping ranges, and only filters that have activities", (
   assert.equal(ageRangeForYears(6), "6+");
 });
 
-test("age filters: every activity's age is made of whole filters (2–3, 3–6, 6+)", () => {
+test("age filters: every activity's age is made of whole filters (2–3, 3–6, 6+), or is in months (0–2)", () => {
   const edges = /^([236])–([36]) years$|^([236])\+ years$/;
   for (const a of activities) {
+    if (/ months$/.test(a.age)) {
+      assert.match(a.age, /^\d{1,2}–\d{1,2} months$/, a.id);
+      assert.equal(a.zh?.age, a.age.replace(/ months$/, "个月"), `${a.id}: zh age`);
+      assert.deepEqual(activityAgeRanges(a), ["0–2"], `${a.id}: listed under 0–2`);
+      assert.equal(a.ageKey, "0–2", a.id);
+      continue;
+    }
     const m = a.age.match(edges);
     assert.ok(m, `${a.id}: "${a.age}"`);
     assert.equal(a.zh?.age, a.age.replace(/ years$/, "").replace(/^(\d)\+$/, "$1岁+").replace(/^(\d–\d)$/, "$1岁"), `${a.id}: zh age`);

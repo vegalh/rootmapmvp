@@ -200,7 +200,7 @@ await step("Custom activity: name and learning area, stored as typed and never a
   assert.equal(r.activityId, undefined);
   assert.ok((await history()).some(h => h.startsWith("Climbing at the playground Sensory & Movement")));
   await nav(NAV.discover);
-  await page.eval(`__t.type(".discover-search input", "Climbing")`); await sleep(150);
+  await page.eval(`__t.type(".discover-search input", "Climbing at the playground")`); await sleep(150);
   assert.equal(await page.eval(`document.querySelectorAll(".activity-card").length`), 0, "not in Discover");
   await page.eval(`__t.type(".discover-search input", "")`); await sleep(150);
   // Discover's Category filter offers exactly what Add Activity's chips do.

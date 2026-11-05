@@ -9,7 +9,7 @@ import { childShortName } from "../lib/children";
 import { trackClick, useImpression } from "../lib/analytics/tracker";
 import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../lib/i18n";
 import { activities } from "../data/activities";
-import { activityAgeRanges, ageRangeForYears, findActivity } from "../lib/catalog";
+import { activityAgeRanges, ageRangeForYears, durationLabel, findActivity, suitsAge } from "../lib/catalog";
 import { dayHash, pickForDay, pickMemory, recapEntries, recapWeekForToday, weekEntries, weekHighlights, weekRange, weekStart, type Memory } from "../lib/memories";
 import { todaysPlans } from "../lib/plans";
 import { thoughts } from "../data/thoughts";
@@ -56,8 +56,12 @@ export function TodayPage({ entries, records, childrenData, plans, completePlan,
   const withAge = childrenData.filter(c => c.dob);
   const [chosen, setChosen] = useState<string>();
   const forChild = withAge.find(c => c.id === chosen) ?? pickForDay(withAge, today, "for-child");
-  const range = forChild && ageRangeForYears(ageFromDob(forChild.dob).totalYears);
-  const suited = range ? activities.filter(a => activityAgeRanges(a).includes(range)) : [];
+  const years = forChild && ageFromDob(forChild.dob).totalYears;
+  const range = years !== undefined && ageRangeForYears(years);
+  // Activities made for the child's own age first (a 4-month-old gets a 3–6 month activity, not a 9–12 month one),
+  // then any in the child's age filter.
+  const ownAge = years !== undefined ? activities.filter(a => suitsAge(a, years)) : [];
+  const suited = ownAge.length ? ownAge : range ? activities.filter(a => activityAgeRanges(a).includes(range)) : [];
   const pool = suited.length ? suited : activities;
   const featured = localizeActivity(pool[dayHash(today, `activity:${forChild?.id ?? ""}`) % pool.length], t);
 
@@ -122,7 +126,7 @@ export function TodayPage({ entries, records, childrenData, plans, completePlan,
               {forChild && suited.length > 0 && (
                 <span className="today-feature-child">{t.todayForChild.replace("{name}", forChild.first).replace("{age}", childAge(forChild, t))}</span>
               )}
-              <span className="today-feature-meta"><span>{featured.age}</span><span><Icon name="clock" size={14} />{featured.minutes} {t.min}</span></span>
+              <span className="today-feature-meta"><span>{featured.age}</span><span><Icon name="clock" size={14} />{durationLabel(featured, lang)}</span></span>
               <p>{featured.description}</p>
               <span className="today-link">{t.exploreActivity}<Icon name="chevron" size={16} /></span>
             </span>

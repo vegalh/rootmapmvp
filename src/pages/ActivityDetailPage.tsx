@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import type { Activity } from "../types";
 import { categoryOptionLabel, localizeActivity, type Copy } from "../lib/i18n";
+import { durationLabel } from "../lib/catalog";
 
 export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, back, openPlan, openTried, notify, t }: {
   activity: Activity;
@@ -40,7 +41,7 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
       <img className="detail-hero" src={a.image} alt="" />
       <div className="detail-content">
         <h1>{a.title}</h1>
-        <p className="meta">{a.age}<b>·</b>{categoryOptionLabel(a.category, t)}<b>·</b>{a.minutes} {t.minutesWord}</p>
+        <p className="meta">{a.age}<b>·</b>{categoryOptionLabel(a.category, t)}<b>·</b>{durationLabel(rawActivity, t.code === "zh" ? "zh" : "en")}</p>
         <p className="description">{a.description}</p>
         <div className="domain-row">
           {a.domains.map((d, i) => (
@@ -57,14 +58,29 @@ export function ActivityDetailPage({ activity: rawActivity, saved, toggleSaved, 
             ))}
           </div>
         </>}
+        {a.preparation && <>
+          <h2>{t.preparationTitle}</h2>
+          <p className="detail-text">{a.preparation}</p>
+        </>}
         <h2>{t.how}</h2>
-        <ol>{a.steps.map(s => <li key={s}>{s}</li>)}</ol>
+        <ol>{a.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+        {a.extensions && a.extensions.length > 0 && <>
+          <h2>{t.extensionsTitle}</h2>
+          <ul className="detail-list">{a.extensions.map(x => <li key={x}>{x}</li>)}</ul>
+        </>}
         {a.safety && (
           <aside className="safety-note" aria-label={t.safetyTitle}>
             <Icon name="shield" size={20} />
             <div><strong>{t.safetyTitle}</strong><p>{a.safety}</p></div>
           </aside>
         )}
+        {(a.directAim || a.indirectAim) && <>
+          <h2>{t.aimsTitle}</h2>
+          <dl className="detail-aims">
+            {a.directAim && <><dt>{t.directAimLabel}</dt><dd>{a.directAim}</dd></>}
+            {a.indirectAim && <><dt>{t.indirectAimLabel}</dt><dd>{a.indirectAim}</dd></>}
+          </dl>
+        </>}
       </div>
       <div className="sticky-action two">
         <button className="secondary" onClick={openTried}><Icon name="check" size={19} />{t.markAsTried}</button>

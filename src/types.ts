@@ -125,6 +125,16 @@ export type Activity = {
   // What it needs (Discover's Materials filter): "none" = nothing to bring, buy or prepare; "everyday" = common
   // household objects or things found where you are. Absent when it needs specialized or prepared materials.
   materialType?: MaterialType;
+  // A typical session given as a range ("2–5 min"): the shortest, with `minutes` the longest. Absent = `minutes` alone.
+  minMinutes?: number;
+  // Optional Montessori presentation details (the 0–12 month activities, data/infantActivities.ts): what to set up
+  // beforehand, more of the same action once the child has it, and the aims.
+  preparation?: string;
+  extensions?: string[];
+  directAim?: string;
+  indirectAim?: string;
+  // A description of the photo this activity should have, for taking or sourcing it. Never shown in the app.
+  picturePrompt?: string;
   // Chinese translations of the display fields above; English fields remain the stored source of truth. Search
   // (lib/catalog.ts) matches both languages.
   zh?: {
@@ -138,6 +148,10 @@ export type Activity = {
     materials?: string[];
     steps?: string[];
     safety?: string;
+    preparation?: string;
+    extensions?: string[];
+    directAim?: string;
+    indirectAim?: string;
   };
 };
 

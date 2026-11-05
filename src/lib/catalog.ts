@@ -49,14 +49,25 @@ export function bookAgeRanges(b: Book): AgeRange[] {
   return spanAgeRanges(b.readingAge.from, b.readingAge.plus ? Infinity : b.readingAge.to);
 }
 
-// The ages an activity suits, from its age text ("1–3 years", "4+ years"); its `ageKey` when the text has no span.
+// The ages an activity suits, in years, from its age text ("1–3 years", "4+ years", "0–3 months" = 0–0.25); its
+// `ageKey` when the text has no span.
 export function activityAgeSpan(a: Pick<Activity, "age" | "ageKey">): [number, number] {
   const span = a.age.match(/(\d+)\s*[–-]\s*(\d+)/);
+  if (span && isMonths(a)) return [Number(span[1]) / 12, Number(span[2]) / 12];
   if (span) return [Number(span[1]), Number(span[2])];
   const plus = a.age.match(/(\d+)\s*\+/) || a.ageKey.match(/(\d+)\s*\+/);
   if (plus) return [Number(plus[1]), Infinity];
   const key = a.ageKey.match(/(\d+)\s*[–-]\s*(\d+)/);
   return key ? [Number(key[1]), Number(key[2])] : [0, Infinity];
+}
+
+// An age given in months ("0–3 months"): the 0–12 month activities.
+const isMonths = (a: Pick<Activity, "age">) => /\bmonths?\b/.test(a.age);
+
+// Whether a child of `years` is within the activity's own age span (Today suggests these first).
+export function suitsAge(a: Pick<Activity, "age" | "ageKey">, years: number): boolean {
+  const [from, to] = activityAgeSpan(a);
+  return years >= from && years < to;
 }
 
 // Age filters an activity is listed under (overlapping, see spanAgeRanges).
@@ -101,18 +112,22 @@ export function buildsDomains(a: Pick<Activity, "domains" | "zh">, lang: Lang): 
     .map(x => x.label);
 }
 
-// The card's age tag: "2–4 yrs" / "2–4岁", "4+ yrs" / "4岁+".
+// The card's age tag: "2–4 yrs" / "2–4岁", "4+ yrs" / "4岁+"; "0–3 mo" / "0–3个月".
 export function ageTagLabel(a: Pick<Activity, "age" | "ageKey">, lang: Lang): string {
+  const months = isMonths(a) && a.age.match(/(\d+)\s*[–-]\s*(\d+)/);
+  if (months) return `${months[1]}–${months[2]}${lang === "zh" ? copy.zh.ageMonthsShort : ` ${copy.en.ageMonthsShort}`}`;
   const [from, to] = activityAgeSpan(a);
   if (to === Infinity) return lang === "zh" ? `${from}岁+` : `${from}+ yrs`;
   return lang === "zh" ? `${from}–${to}岁` : `${from}–${to} yrs`;
 }
 
-// How long an activity takes, as cards and rows show it: "10 min" / "10分钟"; a song, how long its melody plays.
-export function durationLabel(a: Pick<Activity, "id" | "minutes">, lang: Lang): string {
+// How long an activity takes, as cards and rows show it: "10 min" / "10分钟", "2–5 min" / "2–5分钟"; a song, how
+// long its melody plays.
+export function durationLabel(a: Pick<Activity, "id" | "minutes" | "minMinutes">, lang: Lang): string {
   const song = findMusic(a.id)?.song;
   if (song) return songDurationLabel(song, lang);
-  return lang === "zh" ? `${a.minutes}${copy.zh.min}` : `${a.minutes} ${copy.en.min}`;
+  const n = a.minMinutes && a.minMinutes < a.minutes ? `${a.minMinutes}–${a.minutes}` : `${a.minutes}`;
+  return lang === "zh" ? `${n}${copy.zh.min}` : `${n} ${copy.en.min}`;
 }
 
 // Time filter (My Week › Saved): up to 10 minutes, 11–15, over 15.

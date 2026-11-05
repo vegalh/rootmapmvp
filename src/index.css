@@ -190,6 +190,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .material-list { display: flex; flex-direction: column; gap: 8px; }.material-list button { border: 0; background: transparent; padding: 0; text-align: left; display: flex; align-items: center; gap: 9px; font-size: 15px; }
 .material-list i { width: 17px; height: 17px; border: 1px solid var(--silver); border-radius: 5px; display: grid; place-items: center; color: white; font-style: normal; }.material-list .checked i { background: var(--primary); border-color: var(--primary); }
 .detail-content ol { list-style: none; padding: 0; counter-reset: steps; }.detail-content li { counter-increment: steps; font-size: 15px; line-height: 1.5; padding: 0 0 9px 31px; position: relative; }.detail-content li:before { content: counter(steps); position: absolute; left: 0; width: 21px; height: 21px; border-radius: 50%; background: var(--lavender); color: var(--primary); display: grid; place-items: center; font-size: 15px; font-weight: 700; }
+/* Before You Begin, Extensions and Aims (activities that have them). Extensions are a plain list, not numbered steps. */
+.detail-text { margin: 0; font-size: 15px; line-height: 1.55; }
+.detail-content ul.detail-list { list-style: none; margin: 0; padding: 0; }
+.detail-content .detail-list li { counter-increment: none; padding-left: 22px; }
+.detail-content .detail-list li:before { content: ""; top: .62em; left: 7px; width: 7px; height: 7px; background: var(--primary); opacity: .55; }
+.detail-aims { margin: 0; }
+.detail-aims dt { font-size: 14px; font-weight: 700; color: var(--primary); }
+.detail-aims dd { margin: 2px 0 12px; font-size: 15px; line-height: 1.5; }
 .sticky-action { position: fixed; z-index: 25; bottom: 0; left: 0; right: 0; padding: 12px 20px max(12px,env(safe-area-inset-bottom)); background: color-mix(in srgb,var(--card) 96%,transparent); border-top: 1px solid var(--border); backdrop-filter: blur(12px); -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; }
 .sticky-action button { width: 100%; height: 50px; border: 0; border-radius: 15px; color: white; background: var(--primary); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .sticky-action.two { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }.sticky-action.two button { padding: 0 8px; font-size: 15px; gap: 6px; }.sticky-action button.secondary { color: var(--primary); background: var(--card); border: 1.5px solid var(--primary); }

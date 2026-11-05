@@ -1,4 +1,5 @@
 import type { Activity } from "../types";
+import { infantActivities } from "./infantActivities";
 import mopping from "../assets/activities/mopping.jpg";
 import washingTable from "../assets/activities/washing-table.jpg";
 import wateringPlant from "../assets/activities/watering-plant.jpg";
@@ -82,8 +83,8 @@ import familyPhotoStories from "../assets/activities/family-photo-stories.jpg";
 
 // To add a new lesson/activity, append an object here with a unique `id`.
 // `area` groups it under a Discover category. `age` ("2–6 years") is the span it suits, made of whole age filters
-// (2–3, 3–6, 6+; no activities for 0–2 yet): it starts and ends on 2, 3 or 6, or ends in "+". `ageKey` (its first filter)
-// is kept for older code.
+// (2–3, 3–6, 6+): it starts and ends on 2, 3 or 6, or ends in "+". The 0–12 month activities (age in months, listed
+// under 0–2) are in infantActivities.ts and come last. `ageKey` (its first filter) is kept for older code.
 export const activities: Activity[] = [
   {
     id: "mopping",
@@ -2468,6 +2469,7 @@ export const activities: Activity[] = [
       keywords: "家庭照片 讲故事 聊天 回忆 旅行 语言",
     },
   },
+  ...infantActivities,
 ];
 
 // Categories shown as icon tiles on the Discover page; order here controls display order.
