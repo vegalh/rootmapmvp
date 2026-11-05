@@ -8,6 +8,7 @@ import { newRecordId } from "../lib/data/schema";
 import type { Activity, Child, Lang, ModalKind, Plan, Screen } from "../types";
 import { categoryOptionLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 import { childShortName, defaultChildId, isActiveChild } from "../lib/children";
+import { plannedNote } from "../lib/plans";
 
 type OverlayProps = Parameters<typeof ModalSheets>[0];
 
@@ -115,7 +116,7 @@ function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren
   };
 
   if (modal === "tried") {
-    return <TriedSheet activity={selectedActivity} childrenData={writableChildren} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
+    return <TriedSheet activity={selectedActivity} plans={plans} childrenData={writableChildren} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
   }
 
   if (modal === "quick") {
@@ -215,8 +216,10 @@ function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren
 
 // "Mark as Tried": a few-second record that one or more children tried this activity (siblings often try it
 // together). Mounted fresh on every open.
-function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemory, close, t }: {
+function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, addMemory, close, t }: {
   activity: Activity;
+  // My Week: an open plan for this activity on the chosen date for a chosen child starts Notes with its note.
+  plans: Plan[];
   // The child the parent was last looking at; preselected only while still in the list (and the only child is
   // always preselected). With several children and none preferred, nobody is.
   preferredChild: string;
@@ -234,7 +237,10 @@ function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemo
   // In family order, never a removed child.
   const validChosen = childrenData.filter(c => chosen.includes(c.id) && isActiveChild(childrenData, c.id)).map(c => c.id);
   const [date, setDate] = useState(localIsoToday());
-  const [notes, setNotes] = useState("");
+  // Until the parent types, Notes follows the matching plan's note (lib/plans.ts), so choosing another child or date
+  // updates it; once typed in, it's the parent's.
+  const [typedNotes, setTypedNotes] = useState<string>();
+  const notes = typedNotes ?? plannedNote(plans, activity.id, validChosen, date);
   const [error, setError] = useState("");
   const [savedFor, setSavedFor] = useState<{ childIds: string[]; date: string; notes: string }>();
   // Guards against a double tap storing the same attempt twice before the sheet re-renders.
@@ -290,7 +296,7 @@ function TriedSheet({ activity, childrenData, preferredChild, saveTried, addMemo
             <div className="skill-tags activity-skills">{a.domains.map(x => <span key={x}>{x}</span>)}</div>
           </fieldset>
         ) : null}
-        <Field label={`${t.notesLabel}${t.optionalSuffix}`}><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.addNotePlaceholder} rows={2} /></Field>
+        <Field label={`${t.notesLabel}${t.optionalSuffix}`}><textarea value={notes} onChange={e => setTypedNotes(e.target.value)} placeholder={t.addNotePlaceholder} rows={2} /></Field>
       </div>
       {error && <p className="journal-status error" role="alert">{error}</p>}
       <div className="sheet-buttons">

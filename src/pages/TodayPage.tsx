@@ -11,8 +11,9 @@ import { categoryOptionLabel, childAge, localizeActivity, type Copy } from "../l
 import { activities } from "../data/activities";
 import { activityAgeRanges, ageRangeForYears, findActivity } from "../lib/catalog";
 import { dayHash, pickForDay, pickMemory, recapEntries, recapWeekForToday, weekEntries, weekHighlights, weekRange, weekStart, type Memory } from "../lib/memories";
+import { todaysPlans } from "../lib/plans";
 import { thoughts } from "../data/thoughts";
-import type { Child, Entry, Lang, LessonRecord } from "../types";
+import type { Child, Entry, Lang, LessonRecord, Plan } from "../types";
 
 // "last month" / "上个月", "3 weeks ago" / "3周前". Looking Back only shows memories at least a week old.
 function relativeDay(date: string, today: string, lang: Lang) {
@@ -25,12 +26,16 @@ function relativeDay(date: string, today: string, lang: Lang) {
 
 const canShowPhoto = (p: string) => !!photoUrl(p);
 
-// The home screen: an activity idea for one of the children, a memory from at least a week ago, the week's
-// Moments to revisit, and a short reflection. All read-only.
-export function TodayPage({ entries, records, childrenData, lang, openActivity, openEntry, openRecord, openRecap, openDiscover, openAddChild, showSignIn, openSignIn, t }: {
+// The home screen: today's plan (My Week's plans for today, still to do), an activity idea for one of the children, a
+// memory from at least a week ago, the week's Moments to revisit, and a short reflection. Only the plans can be acted
+// on (Mark as Tried); everything else is read-only.
+export function TodayPage({ entries, records, childrenData, plans, completePlan, lang, openActivity, openEntry, openRecord, openRecap, openDiscover, openAddChild, showSignIn, openSignIn, t }: {
   entries: Entry[];
   records: LessonRecord[];
   childrenData: Child[];
+  plans: Plan[];
+  // My Week's completion: the plan is marked done and each of its children gets the activity in their history.
+  completePlan: (plan: Plan) => void;
   lang: Lang;
   openActivity: (id: string) => void;
   openEntry: (id: string) => void;
@@ -61,6 +66,8 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
   const recapWeek = recapWeekForToday(recapEntries(entries, childIds), today);
   const thought = thoughts[dayHash(today, "thought") % thoughts.length];
   const childOf = (id: string) => childrenData.find(c => c.id === id);
+  // Once the parent picks a child above Today's Inspiration, only that child's plans.
+  const planned = todaysPlans(plans, today, chosen && withAge.some(c => c.id === chosen) ? chosen : undefined);
   useImpression("today.lookingBack", !!memory);
   const dateLine = new Date(`${today}T12:00:00`).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -80,6 +87,15 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
             <h2 id="today-welcome">{t.welcomeFamilyTitle}</h2>
             <p>{t.welcomeFamilyText}</p>
             <button className="wide-primary" onClick={openAddChild}><Icon name="plus" size={18} />{t.addFirstChild}</button>
+          </section>
+        )}
+
+        {planned.length > 0 && (
+          <section className="today-section" aria-labelledby="today-plan">
+            <h2 className="today-eyebrow" id="today-plan">{t.todaysPlan}</h2>
+            <div className="today-plans">
+              {planned.map(p => <PlanCard plan={p} childrenData={childrenData} open={() => openActivity(p.activityId)} markTried={() => completePlan(p)} t={t} key={p.id} />)}
+            </div>
           </section>
         )}
 
@@ -139,6 +155,28 @@ export function TodayPage({ entries, records, childrenData, lang, openActivity, 
 }
 
 export default TodayPage;
+
+// One of today's plans: the activity, who it's for and the planning note. Tapping opens the activity; Mark as Tried
+// completes the plan as My Week does.
+function PlanCard({ plan, childrenData, open, markTried, t }: { plan: Plan; childrenData: Child[]; open: () => void; markTried: () => void; t: Copy }) {
+  const a = localizeActivity(findActivity(plan.activityId)!, t);
+  // Children still in My Children (a removed child's name is not shown).
+  const names = plan.childIds.map(id => childrenData.find(c => c.id === id)).filter((c): c is Child => !!c).map(c => childShortName(c, childrenData)).join(t.nameJoin);
+  const note = plan.note?.trim();
+  return (
+    <article className="today-plan">
+      <button className="today-plan-open" onClick={open}>
+        <img src={a.image} alt="" />
+        <span>
+          <strong>{a.title}</strong>
+          {names && <small>{names}</small>}
+          {note && <span className="plan-note">{note}</span>}
+        </span>
+      </button>
+      <button className="today-plan-tried" onClick={markTried}><Icon name="check" size={15} />{t.markAsTried}</button>
+    </article>
+  );
+}
 
 // The week's Moments, offered to revisit: a few of its photos (or its first words) and the week's dates. A moment
 // shared by siblings comes in once (mergeShared), and a photo is never shown twice.

@@ -1,5 +1,6 @@
 import { areaLessons } from "../data/progress";
 import { findActivity, isMusicId } from "./catalog";
+import { fmtShort } from "./dates";
 import { categoryOptionLabel, learningAreaLabel, lessonLabel, localizeActivity, stageLabel, type Copy } from "./i18n";
 import type { Activity, LessonRecord, Plan, Stage } from "../types";
 
@@ -117,6 +118,15 @@ export function recentActivityIds(records: LessonRecord[], childId: string | und
     .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""));
   const ordered = [...newest.filter(r => r.childId === childId), ...newest.filter(r => r.childId !== childId)];
   return [...new Set(ordered.map(r => r.activityId!))].slice(0, limit);
+}
+
+// Kids › child card: "I Spy a Color · Nov 4", from the child's most recent activity record; undefined when they
+// haven't tried anything yet.
+export function lastTriedLine(records: LessonRecord[], childId: string, t: Copy): string | undefined {
+  const last = records
+    .filter(r => r.childId === childId && !r.deletedAt)
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
+  return last && `${recordView(last, t).title} · ${fmtShort(last.date, t.code === "zh" ? "zh" : "en")}`;
 }
 
 // My Week › complete: the records a completed plan adds to its children's activity history, one per child still in

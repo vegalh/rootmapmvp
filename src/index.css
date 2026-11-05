@@ -132,20 +132,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .section-title h2, .detail-content h2 { margin: 0; font: 600 24px var(--font-heading); color: var(--dark-purple); }
 .section-title > span { color: var(--muted); font-size: 15px; }
 .activity-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px 10px; }
-.activity-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--card); box-shadow: var(--shadow); }
+.activity-card { min-width: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 15px; background: var(--card); box-shadow: var(--shadow); }
 .activity-image { display: block; width: 100%; height: 116px; border: 0; padding: 0; position: relative; background: var(--elevated); }
 .activity-image img { width: 100%; height: 100%; object-fit: cover; }
 .activity-image span { position: absolute; left: 7px; bottom: 7px; padding: 4px 7px; border-radius: 10px; background: color-mix(in srgb, var(--card) 90%, transparent); color: var(--primary); font-size: 14px; font-weight: 700; }
-.activity-card > div { padding: 9px 9px 10px; position: relative; }
+/* A column whose quick facts sit at the bottom, so the cards in a row (all as tall as the tallest) line up. */
+.activity-card > div { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding: 9px 9px 10px; position: relative; }
 /* Long titles get two lines (then an ellipsis) rather than being cut off after a word or two. */
 .activity-name { max-width: calc(100% - 25px); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; border: 0; padding: 0; background: transparent; font: 600 20px/1.15 var(--font-heading); text-align: left; }
 .heart { position: absolute; top: 7px; right: 7px; padding: 2px; border: 0; background: transparent; color: var(--muted); }.heart.saved { color: var(--orange); }
 .activity-card p { margin: 5px 0 7px; color: var(--muted); font-size: 15px; }
 .activity-card small { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 14px; color: var(--muted); }.activity-card small > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-/* What the activity builds: one quiet line, cut off with an ellipsis. */
-.activity-card p.activity-builds { margin: 5px 0 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* What the activity builds: wraps rather than being cut off (both abilities always shown), with two lines kept
+   even when shorter or empty. */
+.activity-card p.activity-builds { align-self: stretch; margin: 5px 0 0; font-size: 13px; line-height: 1.3; min-height: 2.6em; overflow-wrap: anywhere; }
 /* Quick facts: time, age, materials. */
-.activity-facts { display: flex; flex-wrap: wrap; gap: 4px; margin: 7px 0 0; padding: 0; list-style: none; }
+.activity-facts { align-self: stretch; display: flex; flex-wrap: wrap; gap: 4px; margin: auto 0 0; padding: 7px 0 0; list-style: none; }
 .activity-facts li { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; padding: 2px 7px; border-radius: 9px; background: var(--elevated); color: var(--muted); font-size: 12.5px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .activity-facts li svg { flex: 0 0 auto; }
 
@@ -521,6 +523,17 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-memory.tried strong { display: block; margin: 2px 0; font: 700 26px/1.1 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
 .today-memory.tried em { display: block; font-style: normal; font-size: 14px; color: var(--muted); }
 .today-memory.tried .today-link { margin-top: 8px; }
+/* Today's plan: one small card per plan still to do today. */
+.today-plans { display: flex; flex-direction: column; gap: 10px; }
+.today-plan { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 12px 10px 10px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
+.today-plan-open { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.today-plan-open img { width: 64px; height: 64px; display: block; object-fit: cover; border-radius: 14px; background: var(--elevated); }
+.today-plan-open > span { display: block; min-width: 0; }
+.today-plan-open strong { display: block; font: 600 20px/1.15 var(--font-heading); color: var(--dark-purple); overflow-wrap: anywhere; }
+.today-plan-open small { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.today-plan-tried { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border: 1px solid var(--primary); border-radius: 22px; background: transparent; color: var(--primary); font-size: 14px; font-weight: 700; white-space: nowrap; }
+/* A plan's planning note (Today and My Week): a short muted line, two lines at most. */
+.plan-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin-top: 3px; font-size: 13.5px; line-height: 1.35; color: var(--muted); }
 /* A Thought for Parents: quiet, text only. */
 /* Today's idea is for one child at a time; siblings switch with these chips (also used, as .child-chips, to find a
    child's Moments on Moments and in the weekly recap). */
@@ -549,6 +562,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-thought blockquote::before { content: "\201C"; display: block; height: 26px; font-size: 52px; line-height: 1; color: var(--orange); }
 .today-eyebrow:lang(zh), .today-feature-caption small:lang(zh) { letter-spacing: .04em; font-size: 13.5px; }
 .today-feature-caption strong:lang(zh), .today-memory-caption strong:lang(zh), .today-memory.tried strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 22px; font-weight: 500; line-height: 1.35; }
+.today-plan-open strong:lang(zh) { font-family: var(--font-heading-zh); font-size: 18px; font-weight: 500; line-height: 1.35; }
 .today-thought blockquote:lang(zh) { font-family: var(--font-heading-zh); font-size: 19px; font-weight: 500; line-height: 1.75; }
 
 /* Private beta label and notice (staging builds only, components/BetaNotice.tsx); above the opening screens too. */
@@ -708,7 +722,7 @@ body::before { content: ""; position: fixed; z-index: 75; top: 0; left: 0; right
 button, .photo-upload-button, .journal-add-photo { transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease; }
 button:not(:disabled):active, .photo-upload-button:active, .journal-add-photo:active { opacity: .6; transition-duration: 0s; }
 :is(.wide-primary, .wide-secondary, .modal-primary, .sheet-buttons button, .sticky-action button, .form-bottom button, .small-primary, .journal-save, .goal-form-actions .goal-submit, .round-add, .audio-toggle, .header-add-child, .picker-custom, .deleted-row button, .photo-upload-button):not(:disabled):active { opacity: .88; transform: scale(.97); transition-duration: var(--dur-tap); }
-:is(.today-feature, .collection-card, .today-memory, .today-week, .book-tile, .journal-card, .activity-image, .child-select-card, .recap-row, .picker-row, .lesson-list > button, .recent-activity > button, .quick-actions button, .activity-row, .journal-draft, .entry-child-pick, .goals-legacy):not(:disabled):active { opacity: 1; transform: scale(.985); transition-duration: var(--dur-tap); }
+:is(.today-feature, .today-plan-open, .collection-card, .today-memory, .today-week, .book-tile, .journal-card, .activity-image, .child-select-card, .recap-row, .picker-row, .lesson-list > button, .recent-activity > button, .quick-actions button, .activity-row, .journal-draft, .entry-child-pick, .goals-legacy):not(:disabled):active { opacity: 1; transform: scale(.985); transition-duration: var(--dur-tap); }
 :is(.menu-section button, .choice-list button, .filter-popover-option):not(:disabled):active { opacity: 1; background-color: color-mix(in srgb, var(--text) 6%, transparent); transition-duration: 0s; }
 .bottom-nav button:active { opacity: .6; }
 /* Positioned by a transform, so it only dims. */

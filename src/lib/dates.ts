@@ -35,6 +35,8 @@ const asDate = (d: string) => new Date(`${d}T12:00:00`);
 export const fmtMonthYear = (d: string, lang: Lang) => asDate(d).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" });
 // "October 11" / "10月11日"
 export const fmtMonthDay = (d: string, lang: Lang) => asDate(d).toLocaleDateString(dateLocale(lang), { month: "long", day: "numeric" });
+// "Nov 4" / "11月4日" (with the year when it isn't this year)
+export const fmtShort = (d: string, lang: Lang) => asDate(d).toLocaleDateString(dateLocale(lang), { month: "short", day: "numeric", ...(d.slice(0, 4) === localIsoToday().slice(0, 4) ? {} : { year: "numeric" }) });
 // "October 11, 2026" / "2026年10月11日"
 export const fmtLong = (d: string, lang: Lang) => asDate(d).toLocaleDateString(dateLocale(lang), { month: "long", day: "numeric", year: "numeric" });
 // "Mon" / "周一"

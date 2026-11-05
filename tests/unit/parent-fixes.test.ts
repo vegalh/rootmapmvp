@@ -96,7 +96,7 @@ test("age filters: overlapping ranges, and only filters that have activities", (
   for (const range of offered.slice(1)) assert.ok(activities.some(a => activityAgeRanges(a).includes(range as never)), range);
   assert.ok(!offered.includes("6+"), "no activity for 6+, so no 6+ filter");
   assert.ok(!offered.includes("0–2"), "no activity for 0–2 yet, so no 0–2 filter");
-  // The songs are for babies, so Discover offers 0–2 (it has nothing else for 0–2 yet).
+  // The songs suit every age (0–6), so Discover offers 0–2 (it has nothing else for 0–2 yet).
   assert.ok(ageOptionsFor(catalogItems().map(activityAgeRanges)).includes("0–2"), "the songs");
   assert.ok(catalogItems().filter(a => activityAgeRanges(a).includes("0–2")).every(a => a.id.startsWith("song-")), "only the songs");
   assert.equal(ageRangeForYears(0.5), "0–2");

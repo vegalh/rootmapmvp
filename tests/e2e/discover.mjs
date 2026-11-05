@@ -325,7 +325,8 @@ await step("My Week shows the music activity in Weekly Plan, Completed and Saved
   assert.equal((await live("plans")).filter(p => p.activityId === musicId).length, 2, "repeated");
   await page.eval(`__t.click("Saved", ".segmented button")`); await sleep(150);
   assert.ok(await page.eval(`document.querySelector(".week-list").innerText.includes(${q(musicTitle)})`), "in saved");
-  await page.eval(`[...document.querySelectorAll(".week-list .activity-row")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector("button").click()`);
+  // Saved shows Discover's cards.
+  await page.eval(`[...document.querySelectorAll(".week-list .activity-card")].find(r => r.innerText.includes(${q(musicTitle)})).querySelector(".activity-name").click()`);
   await page.waitFor(`document.querySelector(".music-detail")`, 3000, "opens the music page");
   await page.eval(`__t.clickSel(".detail-actions button")`);
   await page.waitFor(`document.querySelector(".week-page")`, 3000, "back to My Week");
@@ -503,8 +504,8 @@ await step("Every screen shows an activity's current category, in English and Ch
     await page.eval(`location.hash = "#/my-week"`);
     await page.waitFor(`document.querySelector(".week-page")`, 3000, "My Week");
     await page.eval(`__t.click(${q(lang === "zh" ? "已收藏" : "Saved")}, ".segmented button")`); await sleep(150);
-    const rows = await page.eval(`[...document.querySelectorAll(".week-list .activity-row small")].map(s => s.textContent)`);
-    assert.ok(rows.length > 0 && rows.every(r => LABELS[lang].includes(r.split(" · ").pop())), `${lang} My Week: ${JSON.stringify(rows)}`);
+    const rows = await page.eval(`[...document.querySelectorAll(".week-list .activity-card .activity-image span")].map(s => s.textContent)`);
+    assert.ok(rows.length > 0 && rows.every(r => LABELS[lang].includes(r)), `${lang} My Week: ${JSON.stringify(rows)}`);
   };
   const setLang = async (label, code) => {
     await page.eval(`location.hash = "#/language"`); await sleep(300);

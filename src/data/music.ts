@@ -163,15 +163,15 @@ const guidedActivities: MusicActivity[] = [
 // The songs in src/data/songs.json (copy changes there exactly as supplied; never edit lyrics, tunes or sources here).
 // Each is a music activity with id "song-<id>" (stable: saved activities and records refer to it). Its name is in
 // English and Chinese (the English classics' title is English, the Chinese songs' title Chinese), its length is the
-// melody's once through, and it suits babies (0–12 months). No Setting or Materials, so the songs are listed under
-// "All" for those filters and don't fill the collections built on them.
+// melody's once through, and it suits every age RootMap is for (0–6 years: a baby listens, an older child sings along).
+// No Setting or Materials, so the songs are listed under "All" for those filters and don't fill the collections built on them.
 function songActivity(song: Song): MusicActivity {
   const en = song.group === "en";
   return {
     id: `song-${song.id}`,
     title: en ? song.title : song.subtitle,
     titleZh: en ? song.subtitle : song.title,
-    ageRanges: ["0–2"],
+    ageRanges: ["0–2", "2–3", "3–6"],
     duration: Math.max(1, Math.ceil(songSeconds(song) / 60)),
     description: "",
     howToPlay: [],

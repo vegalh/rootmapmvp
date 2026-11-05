@@ -3,7 +3,7 @@ import { Icon } from "../components/Icon";
 import { PageHeader, FilterPill, Empty } from "../components/ui";
 import BooksBrowser from "../components/BooksBrowser";
 import CollectionCard from "../components/CollectionCard";
-import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, durationLabel, filterDiscoverActivities, findMusic, suitableFirst } from "../lib/catalog";
+import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, durationLabel, filterDiscoverActivities, findMusic, materialsTagLabel, suitableFirst } from "../lib/catalog";
 import { childShortName } from "../lib/children";
 import { collectionImages, shownCollections } from "../lib/collections";
 import type { Activity, Child } from "../types";
@@ -132,7 +132,6 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
   const category = categoryOptionLabel(a.category, t);
   const lang = t.code === "zh" ? "zh" : "en";
   const builds = buildsDomains(rawActivity, lang);
-  const materials = a.materialType === "none" ? t.factNothingNeeded : a.materialType === "everyday" ? t.factAtHome : a.materialsLabel;
   return (
     <article className={`activity-card ${music ? "music-card" : ""} ${music?.song ? "song-card" : ""}`}>
       <button className="activity-image" onClick={() => open(a.id)}>
@@ -142,11 +141,12 @@ export function ActivityCard({ activity: rawActivity, saved, toggleSaved, open, 
       <div>
         <button className="activity-name" onClick={() => open(a.id)}>{a.title}</button>
         <button className={`heart ${saved ? "saved" : ""}`} onClick={() => toggleSaved(a.id)} aria-pressed={saved} aria-label={(saved ? t.unsaveActivityLabel : t.saveActivityLabel).replace("{title}", a.title)}><Icon name="heart" size={18} filled={saved} /></button>
-        {builds.length > 0 && <p className="activity-builds">{t.buildsLabel}{builds.join(" · ")}</p>}
+        {/* Two lines kept for it even when empty, so cards side by side line up. */}
+        {builds.length > 0 ? <p className="activity-builds">{t.buildsLabel}{builds.join(" · ")}</p> : <p className="activity-builds" aria-hidden="true" />}
         <ul className="activity-facts">
           <li><Icon name="clock" size={12} />{durationLabel(rawActivity, lang)}</li>
           <li>{ageTagLabel(rawActivity, lang)}</li>
-          <li><Icon name="layers" size={12} />{materials}</li>
+          <li><Icon name="layers" size={12} />{materialsTagLabel(rawActivity, t)}</li>
         </ul>
       </div>
     </article>

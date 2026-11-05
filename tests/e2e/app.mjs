@@ -386,7 +386,7 @@ await step("My Week / Goals / Saved still read and write", async () => {
   await page.eval(`__t.click("My Week")`);
   await page.waitFor(`document.querySelector(".week-page")`);
   await page.eval(`__t.click("Saved", ".segmented button")`);
-  await page.waitFor(`document.querySelectorAll(".week-list .activity-row").length === 3`, 5000, "3 saved activities");
+  await page.waitFor(`document.querySelectorAll(".week-list .activity-card").length === 3`, 5000, "3 saved activities");
   await page.eval(`__t.click("Weekly Plan", ".segmented button")`).catch(() => {});
 });
 

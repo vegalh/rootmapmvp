@@ -260,6 +260,18 @@ export const DISCOVER_CATEGORIES: DiscoverCategory[] = ["practical-life", "langu
 export const ACTIVITY_SETTINGS: ActivitySetting[] = ["home", "restaurant", "waiting", "airplane", "train", "walking", "park", "grocery"];
 export const MATERIAL_TYPES: MaterialType[] = ["none", "everyday"];
 
+// The materials tag every card and row shows: "Nothing needed", "At home" (everyday things), or "Needs prep"
+// (special or prepared materials: an activity without a materialType). A song only needs a voice.
+export type MaterialsTag = MaterialType | "prep";
+export function materialsTag(a: Pick<Activity, "id" | "materialType">): MaterialsTag {
+  if (a.materialType) return a.materialType;
+  return findMusic(a.id)?.song ? "none" : "prep";
+}
+export function materialsTagLabel(a: Pick<Activity, "id" | "materialType">, t: Copy): string {
+  const tag = materialsTag(a);
+  return tag === "none" ? t.factNothingNeeded : tag === "everyday" ? t.factAtHome : t.factNeedsPrep;
+}
+
 // An activity without setting or materials metadata is only listed under "All".
 export const matchesSetting = (a: Pick<Activity, "settings">, setting: string) => setting === "All" || !!a.settings?.includes(setting as ActivitySetting);
 export const matchesMaterials = (a: Pick<Activity, "materialType">, materials: string) => materials === "All" || a.materialType === materials;

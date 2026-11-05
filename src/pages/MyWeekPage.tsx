@@ -4,19 +4,21 @@ import { PageHeader, Empty, FilterPill } from "../components/ui";
 import CollectionCard from "../components/CollectionCard";
 import type { Collection } from "../data/collections";
 import { collectionImages } from "../lib/collections";
-import { ACTIVITY_SETTINGS, MATERIAL_TYPES, TIME_BANDS, durationLabel, findActivity, matchesMaterials, matchesSetting, matchesTime } from "../lib/catalog";
+import { ACTIVITY_SETTINGS, MATERIAL_TYPES, TIME_BANDS, durationLabel, findActivity, matchesMaterials, matchesSetting, matchesTime, materialsTagLabel } from "../lib/catalog";
 import { childOptionLabel, childShortName } from "../lib/children";
 import { fmt, fmtWeekday } from "../lib/dates";
 import type { Activity, Child, Plan } from "../types";
 import { categoryOptionLabel, localizeActivity, materialsOptionLabel, settingOptionLabel, timeOptionLabel, type Copy } from "../lib/i18n";
+import { ActivityCard } from "./DiscoverPage";
 
 export type WeekTab = "saved" | "plan" | "completed";
 
-export function MyWeekPage({ tab, setTab, saved, savedCollections, openCollection, plans, setPlans, completePlan, repeatPlan, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: {
+export function MyWeekPage({ tab, setTab, saved, toggleSaved, savedCollections, openCollection, plans, setPlans, completePlan, repeatPlan, childFilter, setChildFilter, childrenData, openActivity, openAdd, back, t }: {
   // Kept by App, so coming back from an activity or a collection returns to the same tab.
   tab: WeekTab;
   setTab: (tab: WeekTab) => void;
   saved: string[];
+  toggleSaved: (id: string) => void;
   // Saved collections that are shown now (in season, see lib/collections.ts).
   savedCollections: Collection[];
   openCollection: (id: string) => void;
@@ -58,7 +60,7 @@ export function MyWeekPage({ tab, setTab, saved, savedCollections, openCollectio
         </div>
       </div>
       <div className="week-list">
-        {tab === "saved" && <SavedList saved={saved} savedCollections={savedCollections} openCollection={openCollection} openActivity={openActivity} t={t} />}
+        {tab === "saved" && <SavedList saved={saved} toggleSaved={toggleSaved} savedCollections={savedCollections} openCollection={openCollection} openActivity={openActivity} t={t} />}
         {tab === "plan" && (
           <>
             {planned.map(p => {
@@ -71,6 +73,7 @@ export function MyWeekPage({ tab, setTab, saved, savedCollections, openCollectio
                     a={a}
                     t={t}
                     subtitle={names(p) || t.noChildAssigned}
+                    note={p.note}
                     action={<div className="plan-actions">
                       <button onClick={() => completePlan(p)} aria-label={t.markDoneLabel.replace("{title}", localizeActivity(a, t).title)}><Icon name="check" size={16} /></button>
                       <button onClick={() => setPlans(x => x.filter(y => y.id !== p.id))} aria-label={t.removePlanLabel.replace("{title}", localizeActivity(a, t).title)}>×</button>
@@ -107,9 +110,9 @@ export function MyWeekPage({ tab, setTab, saved, savedCollections, openCollectio
 
 type OpenFilter = "setting" | "materials" | "time" | null;
 
-// Saved: the family's saved collections, then their saved activities with Discover's Setting and Materials filters
-// plus Time. A filter only offers options some saved activity has.
-function SavedList({ saved, savedCollections, openCollection, openActivity, t }: { saved: string[]; savedCollections: Collection[]; openCollection: (id: string) => void; openActivity: (id: string) => void; t: Copy }) {
+// Saved: the family's saved collections, then their saved activities (Discover's cards) with Discover's Setting and
+// Materials filters plus Time. A filter only offers options some saved activity has.
+function SavedList({ saved, toggleSaved, savedCollections, openCollection, openActivity, t }: { saved: string[]; toggleSaved: (id: string) => void; savedCollections: Collection[]; openCollection: (id: string) => void; openActivity: (id: string) => void; t: Copy }) {
   const [setting, setSetting] = useState("All");
   const [materials, setMaterials] = useState("All");
   const [time, setTime] = useState("All");
@@ -140,7 +143,11 @@ function SavedList({ saved, savedCollections, openCollection, openActivity, t }:
           {timeOptions.length > 1 && <FilterPill label={t.timeFilter} value={time} defaultValue="All" onChange={setTime} options={timeOptions} renderLabel={v => timeOptionLabel(v, t)} columns={1} align="right" {...pill("time")} />}
         </div>
       )}
-      {shown.map(a => <ActivityRow a={a} t={t} action={<button onClick={() => openActivity(a.id)} aria-label={localizeActivity(a, t).title}><Icon name="chevron" /></button>} key={a.id} />)}
+      {shown.length > 0 && (
+        <div className="activity-grid">
+          {shown.map(a => <ActivityCard activity={a} saved toggleSaved={toggleSaved} open={openActivity} t={t} key={a.id} />)}
+        </div>
+      )}
       {filtered && !shown.length && (
         <Empty text={t.noMatchingActivities}>
           <button className="reset-link" onClick={clear}>{t.clearFilters}</button>
@@ -153,12 +160,13 @@ function SavedList({ saved, savedCollections, openCollection, openActivity, t }:
   );
 }
 
-export function ActivityRow({ a: rawActivity, subtitle, action, t }: { a: Activity; subtitle?: string; action: React.ReactNode; t: Copy }) {
+// `note`: a plan's planning note, a muted line of up to two lines.
+export function ActivityRow({ a: rawActivity, subtitle, note, action, t }: { a: Activity; subtitle?: string; note?: string; action: React.ReactNode; t: Copy }) {
   const a = localizeActivity(rawActivity, t);
   return (
     <div className="activity-row">
       <img src={a.image} alt="" />
-      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${categoryOptionLabel(a.category, t)}`}</small><em><Icon name="clock" size={12} />{durationLabel(rawActivity, t.code === "zh" ? "zh" : "en")} · {a.materialsLabel}</em></span>
+      <span><strong>{a.title}</strong><small>{subtitle || `${a.age} · ${categoryOptionLabel(a.category, t)}`}</small><em><Icon name="clock" size={12} />{durationLabel(rawActivity, t.code === "zh" ? "zh" : "en")} · {materialsTagLabel(rawActivity, t)}</em>{note?.trim() && <span className="plan-note">{note.trim()}</span>}</span>
       {action}
     </div>
   );

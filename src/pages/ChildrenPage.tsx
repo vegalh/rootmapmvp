@@ -3,16 +3,19 @@ import { ChildPhoto } from "../components/ui";
 import { TreeLogo } from "../components/TreeLogo";
 import { fmt } from "../lib/dates";
 import { entryText, mergeShared, newestFirst } from "../lib/entries";
-import type { Child, Entry } from "../types";
+import { lastTriedLine } from "../lib/activityRecords";
+import type { Child, Entry, LessonRecord } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName } from "../lib/children";
 
-export function ChildrenPage({ notice, childrenData, entries, goChild, openEntry, openAddChild, openMoments, t }: {
+export function ChildrenPage({ notice, childrenData, entries, records, goChild, openEntry, openAddChild, openMoments, t }: {
   // A note about children no longer shared with this parent (components/AccessNotice.tsx), when there is one.
   notice?: React.ReactNode;
   childrenData: Child[];
   // The shared Moments collection.
   entries: Entry[];
+  // Activity records (the card's "Last tried").
+  records: LessonRecord[];
   goChild: (id: string) => void;
   // Opens one Moment (Recent moments).
   openEntry: (id: string) => void;
@@ -41,6 +44,7 @@ export function ChildrenPage({ notice, childrenData, entries, goChild, openEntry
           <div className="children-carousel">
             {childrenData.map(c => {
               const lastObs = latest(c.id);
+              const lastTried = lastTriedLine(records, c.id, t);
               const interests = c.interests?.length ? c.interests.join("、") : t.notAddedYet;
               return (
                 <button className="child-select-card" onClick={() => goChild(c.id)} key={c.id} aria-label={childOptionLabel(c, childrenData, t)}>
@@ -50,6 +54,7 @@ export function ChildrenPage({ notice, childrenData, entries, goChild, openEntry
                     <span className="child-select-age">{childAge(c, t)}</span>
                     <p><em>{t.interestedInLabel}</em> {interests}</p>
                     <p><em>{t.lastObservationLabel}</em> {lastObs ? fmt(lastObs.date, lang) : t.noObservationsYet}</p>
+                    {lastTried && <p><em>{t.lastTriedLabel}</em> {lastTried}</p>}
                   </div>
                 </button>
               );

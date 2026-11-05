@@ -68,6 +68,7 @@ import { findActivity, findMusic, isMusicId } from "./lib/catalog";
 import { findShownCollection } from "./lib/collections";
 import type { Collection } from "./data/collections";
 import { buildActivityRecord, planCompletionRecords, problemMessage, type RecordInput } from "./lib/activityRecords";
+import { plansTriedBy } from "./lib/plans";
 import { defaultChildId, isActiveChild } from "./lib/children";
 import { localIsoToday } from "./lib/dates";
 import { shelfOf, useBookshelf } from "./lib/bookshelf";
@@ -738,9 +739,19 @@ export default function App() {
     setToast(t.planRepeated);
   };
   // "Mark as Tried": the quick record for the activity already open in Discover. Each child gets their own record,
-  // with the same date and note.
-  const saveTried = (childIds: string[], date: string, notes: string) =>
-    addActivityRecord(...childIds.map((childId): RecordInput => ({ kind: "tried", childId, date, activityId: activity.id, notes })));
+  // with the same date and note. An open plan for this activity on that date for one of the children is completed
+  // too (lib/plans.ts), and each record notes the plan it completed, as My Week's completion does.
+  const saveTried = async (childIds: string[], date: string, notes: string) => {
+    const done = plansTriedBy(plans, activity.id, childIds, date);
+    const failure = await addActivityRecord(...childIds.map((childId): RecordInput => {
+      const planId = done.find(p => p.childIds.includes(childId))?.id;
+      return { kind: "tried", childId, date, activityId: activity.id, notes, ...(planId ? { planId } : {}) };
+    }));
+    if (failure || !done.length) return failure;
+    const ids = new Set(done.map(p => p.id));
+    savedOk(await commitPlans(plans.map(p => (ids.has(p.id) ? { ...p, completed: true, completedDate: date } : p))));
+    return null;
+  };
 
   const closeModal = (destination?: Screen | ModalKind) => {
     setModal(null);
@@ -820,6 +831,8 @@ export default function App() {
           entries={entries}
           records={records}
           childrenData={childrenData}
+          plans={plans}
+          completePlan={plan => void completePlan(plan)}
           lang={lang}
           openActivity={openActivity}
           openEntry={id => openEntry(id, "today")}
@@ -844,6 +857,7 @@ export default function App() {
           </>}
           childrenData={childrenData}
           entries={entries}
+          records={records}
           goChild={goChild}
           openEntry={id => openEntry(id, "children")}
           openAddChild={() => setModal("addChild")}
@@ -1128,6 +1142,7 @@ export default function App() {
           tab={weekTab}
           setTab={setWeekTab}
           saved={saved}
+          toggleSaved={toggleSaved}
           savedCollections={savedCollectionIds.map(id => findShownCollection(id)).filter((c): c is Collection => !!c)}
           openCollection={id => openCollection(id, "week")}
           plans={plans}

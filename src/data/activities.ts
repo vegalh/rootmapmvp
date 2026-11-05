@@ -103,6 +103,7 @@ export const activities: Activity[] = [
     safety: "Dry the floor afterwards: a wet floor is slippery.",
     keywords: "mopping cleaning floor care of environment practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "拖地",
       age: "2–3岁",
@@ -191,6 +192,7 @@ export const activities: Activity[] = [
     steps: ["Invite your child to try sweeping, and name the materials together.", "Show how to hold the broom with both hands.", "Demonstrate small, deliberate strokes toward a pile.", "Use the dustpan together to collect the debris.", "Give your child space to repeat as many times as they like."],
     keywords: "sweeping broom cleaning care of environment practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "扫地",
       age: "2–3岁",
@@ -278,6 +280,7 @@ export const activities: Activity[] = [
     steps: ["Invite your child to try dotting, and name the materials together.", "Show how to dip the sponge brush in one color and press it onto the paper to make a dot.", "Lift and move to a new spot for the next dot.", "Let your child try.", "Give your child space to explore and repeat freely."],
     keywords: "dotting painting fine motor art creativity",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "点画",
       age: "2–6岁",
@@ -334,6 +337,7 @@ export const activities: Activity[] = [
     safety: "Stay with your child whenever water is out, even a small basin, and wipe up spills so the floor isn't slippery.",
     keywords: "water pouring filling a cup drink practical life care of environment",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "接水练习",
       age: "2–3岁",
@@ -363,6 +367,7 @@ export const activities: Activity[] = [
     safety: "Check the juice for seeds before your child drinks it.",
     keywords: "orange juicing food preparation practical life independence",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "榨橙汁",
       age: "3–6岁",
@@ -421,6 +426,7 @@ export const activities: Activity[] = [
     safety: "Lemon juice stings, so remind your child to keep their hands away from their eyes and wash their hands afterwards.",
     keywords: "lemon squeezing juice juicer food preparation practical life hand strength",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "挤柠檬汁",
       age: "3–6岁",
@@ -479,6 +485,7 @@ export const activities: Activity[] = [
     safety: "Show your child how to keep the holding hand away from the knife, and stay beside them. Check the egg for bits of shell before eating.",
     keywords: "egg peeling cutting food preparation practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "剥蛋切蛋",
       age: "3–6岁",
@@ -916,6 +923,7 @@ export const activities: Activity[] = [
     safety: "Whole spices are small and hard, so stay close and keep them out of mouths. Choose mild spices (not chili or pepper), and wash hands afterwards so nothing stings the eyes.",
     keywords: "grinding spices mortar pestle food preparation sensory practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "研磨香料",
       keywords: "研磨 香料 研钵 捣 食物准备 嗅觉",
@@ -1036,6 +1044,7 @@ export const activities: Activity[] = [
     safety: "Use child-safe scissors with an adult beside your child, and a vase that won't shatter. Keep flowers away from mouths: some garden flowers are poisonous.",
     keywords: "flower arranging vase pouring funnel scissors care of environment practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "插花",
       keywords: "插花 花瓶 鲜花 漏斗 剪刀 倒水",
@@ -1065,6 +1074,7 @@ export const activities: Activity[] = [
     steps: ["Show your child the peaceful spot at a calm moment, and name what is there.", "Explain that they can go there whenever they feel upset, tired, or need a break.", "Model sitting quietly, taking slow breaths, hugging the soft toy or looking at a book.", "When your child chooses to use the spot, give them space and stay nearby.", "Afterward, talk gently about how they feel, and tidy the spot together."],
     keywords: "peaceful spot calm corner emotions self-regulation breathing quiet",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "安静角",
       keywords: "安静角 冷静 情绪 平静 深呼吸",
@@ -1094,6 +1104,7 @@ export const activities: Activity[] = [
     safety: "Use washable, non-toxic paint, and stay close so paint stays off faces and out of mouths.",
     keywords: "finger painting hand print stamping paint art creativity sensory",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "手指画与印章",
       age: "2–3岁",
@@ -1180,6 +1191,7 @@ export const activities: Activity[] = [
     steps: ["Invite your child to paint a corn, and name the materials together.", "Show how to dip the brush in one color and dab it onto the bubbles.", "Notice together how each bubble becomes a kernel.", "Let your child add more colors.", "Let the painting dry and talk about the corn you made."],
     keywords: "painting corn bubble wrap paint brush fall harvest autumn art texture",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "画玉米",
       age: "2–6岁",
@@ -1295,6 +1307,7 @@ export const activities: Activity[] = [
     domains: ["Fine Motor Coordination", "Problem Solving", "Concentration"],
     materials: ["Toy animals", "Fabric hair bands", "Tray"],
     steps: ["Before inviting your child, wrap a few bands around each animal's body or legs.", "Invite your child to rescue the animals, and name each animal together.", "Show how to stretch a band with both hands and slide it off.", "Let your child free the rest of the animals.", "Place the freed animals and the bands back on the tray."],
+    safety: "Use soft fabric hair bands that are too big to fit in the mouth, and stay beside your child. Put the bands away when you finish.",
     keywords: "rescuing animals rescue toy animals bands elastic fine motor problem solving",
     settings: ["home", "restaurant", "airplane", "train"],
     materialType: "everyday",
@@ -1306,6 +1319,7 @@ export const activities: Activity[] = [
       domains: ["精细动作协调", "解决问题", "专注力"],
       materials: ["动物玩具", "布质发圈", "托盘"],
       steps: ["邀请孩子之前，先在每只动物的身体或腿上套几根发圈。", "邀请孩子一起解救动物，并说出每只动物的名称。", "示范用两只手撑开发圈，把它拉下来。", "让孩子解救剩下的动物。", "把解救出来的动物和发圈放回托盘。"],
+      safety: "使用柔软、足够大、放不进嘴里的布发圈，并全程陪在孩子身边。玩完后把发圈收好。",
       keywords: "解救动物 救援 动物玩具 发圈 弹力带 精细动作",
     },
   },
@@ -1810,6 +1824,7 @@ export const activities: Activity[] = [
     safety: "Use child-safe scissors and stay beside your child. Show them to carry scissors closed, with the blades pointing down.",
     keywords: "snipping paper strips cutting with scissors scissor skills fine motor hand eye coordination practical life",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "剪纸条",
       age: "2–6岁",
@@ -2144,6 +2159,7 @@ export const activities: Activity[] = [
     keywords: "pinecone painting rolling paint tray print pattern art nature",
     safety: "Use washable, non-toxic paint, and keep pinecones and paint away from mouths.",
     settings: ["home"],
+    materialType: "everyday",
     zh: {
       title: "松果滚画",
       age: "2–6岁",
