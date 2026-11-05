@@ -99,7 +99,7 @@ export type ActivitySetting = "home" | "restaurant" | "waiting" | "airplane" | "
 export type MaterialType = "none" | "everyday";
 // Discover's Category filter: one primary category per activity, chosen for what the activity is for. Separate from
 // `area` (the learning area that activity records snapshot and Add Activity groups by), which stays as it was.
-export type DiscoverCategory = "practical-life" | "language" | "math" | "art-creativity" | "nature-culture" | "sensory-movement";
+export type DiscoverCategory = "practical-life" | "language" | "math" | "art-creativity" | "music" | "nature-culture" | "sensory-movement";
 
 export type Activity = {
   id: string;
@@ -192,7 +192,7 @@ export type MusicActivity = {
   // Optional extra search words (space-separated), English and Chinese.
   keywords?: string;
   keywordsZh?: string;
-  // Discover's Setting and Materials filters, as on Activity. Music is always in the Art & Creativity category.
+  // Discover's Setting and Materials filters, as on Activity. Music is always in the Music category.
   settings?: ActivitySetting[];
   materialType?: MaterialType;
   // A song (src/data/songs.json): its page shows the jianpu score, lyrics and a Listen button instead of a recording.

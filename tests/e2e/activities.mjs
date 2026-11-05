@@ -75,7 +75,7 @@ await step("Kids › child › Activities › Add Activity opens the search-firs
   assert.ok(await page.eval(`document.querySelector(".picker-page .search input").placeholder.includes("Search activities")`));
   pickerChips = await page.eval(`[...document.querySelectorAll(".category-chips button")].map(b => b.textContent)`);
   // The same parent-facing categories as Discover; Math has no activities yet, so it isn't offered.
-  assert.deepEqual(pickerChips, ["All", "Practical Life", "Language", "Art & Creativity", "Nature & Culture", "Sensory & Movement"]);
+  assert.deepEqual(pickerChips, ["All", "Practical Life", "Language", "Art & Creativity", "Music", "Nature & Culture", "Sensory & Movement"]);
   assert.ok(!(await page.eval(`document.body.innerText.includes("Recently Used")`)), "no recent activities yet: section hidden");
   assert.ok((await rows()).length > 0);
   assert.ok(await page.eval(`!!document.querySelector(".picker-custom")`), "custom option offered");
@@ -98,7 +98,7 @@ await step("Search: English title, Chinese title, keywords, partial and no resul
   await search("");
 });
 
-await step("Category and search filter together; music is in Art & Creativity", async () => {
+await step("Category and search filter together; music has its own category", async () => {
   await chip("Practical Life");
   await search("water");
   const found = await rows();
@@ -108,10 +108,10 @@ await step("Category and search filter together; music is in Art & Creativity", 
   await chip("Art & Creativity");
   const art = await rows();
   assert.ok(art.length > 0 && art.every(r => r.meta.startsWith("Art & Creativity")));
-  await search("music");
+  await chip("Music");
   const music = await rows();
-  // Both lists can fill a page ("Show more"), so compare what's in them rather than how long they are.
-  assert.ok(music.length > 0 && art.some(r => !music.some(m => m.title === r.title)) && music.every(r => r.meta.startsWith("Art & Creativity")), "music among the art activities");
+  assert.ok(music.length > 0 && music.every(r => r.meta.startsWith("Music")), "music in its own category");
+  assert.ok(!art.some(r => music.some(m => m.title === r.title)), "and not among the art activities");
   await noOverflow("picker filtered");
 });
 
@@ -121,7 +121,7 @@ await step("Choosing an activity opens the form prefilled; notes start empty; sa
   await page.eval(`__t.clickSel(".picker-row")`);
   await page.waitFor(`document.querySelector(".form-bottom")`, 3000, "form open");
   assert.equal(await page.eval(`document.querySelector(".picked-activity strong").textContent`), musicTitle);
-  assert.ok(await page.eval(`document.querySelector(".picked-activity small").textContent.startsWith("Art & Creativity")`), "category prefilled");
+  assert.ok(await page.eval(`document.querySelector(".picked-activity small").textContent.startsWith("Music")`), "category prefilled");
   assert.ok(await page.eval(`!!document.querySelector(".form-child")`), "child shown, not asked again");
   assert.ok(!(await page.eval(`!!document.querySelector(".form-fields select")`)), "no child or activity dropdown");
   assert.equal(await page.eval(`document.querySelector(".form-fields input[type=date]").value`), today, "today's local date");
@@ -190,7 +190,7 @@ await step("Custom activity: name and learning area, stored as typed and never a
   assert.ok(await page.eval(`document.querySelector(".journal-status.error")?.textContent === "Choose a category."`));
   assert.equal((await live("records")).length, before, "nothing saved without an area");
   const areas = await page.eval(`[...document.querySelectorAll(".form-fields select option")].map(o => o.value).filter(Boolean)`);
-  assert.deepEqual(areas, ["practical-life", "language", "math", "art-creativity", "nature-culture", "sensory-movement"], "the six categories (Math too: it's the parent's own activity)");
+  assert.deepEqual(areas, ["practical-life", "language", "math", "art-creativity", "music", "nature-culture", "sensory-movement"], "every category (Math too: it's the parent's own activity)");
   await page.eval(`__t.type(".form-fields select", "sensory-movement")`);
   await save();
   await page.waitFor(`document.querySelector(".child-profile")`, 3000, "saved");

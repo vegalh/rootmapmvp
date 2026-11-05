@@ -73,21 +73,22 @@ test("unified catalog: every activity and music activity, once each, with their 
   for (const m of musicActivities) assert.equal(findActivity(m.id)?.title, m.title);
 });
 
-test("music: Art & Creativity, works with every filter, and is found by search in English and Chinese", () => {
+test("music: the Music category, works with every filter, and is found by search in English and Chinese", () => {
   const music = catalogItems().filter(a => a.type === "music");
   assert.equal(music.length, musicActivities.length);
   for (const m of music) {
-    assert.equal(m.category, "art-creativity", m.id);
+    assert.equal(m.category, "music", m.id);
     // Songs have no Setting or Materials: they're listed under "All" and don't fill the collections built on them.
     if (m.id.startsWith("song-")) { assert.equal(m.settings, undefined, m.id); assert.equal(m.materialType, undefined, m.id); continue; }
     assert.ok(m.settings?.length, `${m.id}: settings`);
     assert.ok(m.materialType, `${m.id}: materials`);
   }
-  assert.deepEqual(filter({ category: "art-creativity" }, catalogItems()).filter(id => musicIds.includes(id)), musicIds);
+  assert.deepEqual(filter({ category: "music" }, catalogItems()), musicIds);
+  assert.ok(!filter({ category: "art-creativity" }, catalogItems()).some(id => musicIds.includes(id)), "not in Art & Creativity");
   const m = musicActivities[0];
   assert.ok(filter({ q: m.title.toLowerCase() }, catalogItems()).includes(m.id));
   assert.ok(filter({ q: m.titleZh! }, catalogItems()).includes(m.id));
-  assert.ok(filter({ q: "艺术" }, catalogItems()).includes(m.id), "category name in Chinese");
+  assert.ok(filter({ q: "音乐" }, catalogItems()).includes(m.id), "category name in Chinese");
   for (const s of m.settings!) assert.ok(filter({ setting: s }, catalogItems()).includes(m.id), s);
   assert.ok(filter({ age: m.ageRanges[0] }, catalogItems()).includes(m.id));
   // Music is never suggested for quiet public places.
@@ -111,7 +112,7 @@ test("music materials: only activities a parent can sing or call out are Nothing
     assert.equal(findActivity(m.id)?.zh?.materialsLabel, "可选音频引导", m.id);
   }
   assert.equal(findActivity("music-freeze-dance")?.materialsLabel, "Audio guide");
-  assert.deepEqual(filter({ materials: "none", category: "art-creativity" }, catalogItems()).filter(id => id.startsWith("music-")).sort(), ["music-animal-walks", "music-clap-the-beat", "music-echo-song"]);
+  assert.deepEqual(filter({ materials: "none", category: "music" }, catalogItems()).filter(id => id.startsWith("music-")).sort(), ["music-animal-walks", "music-clap-the-beat", "music-echo-song"]);
 });
 
 test("discover data: one known category per activity; settings and materials use known ids", () => {
@@ -137,8 +138,8 @@ test("discover filters: English and Chinese labels", () => {
   const options = ["All", ...ACTIVITY_SETTINGS];
   assert.deepEqual(options.map(o => settingOptionLabel(o, copy.en)), ["All Settings", "Home", "Restaurant", "Waiting in Line", "Airplane", "Train", "Walking", "Park", "Grocery Store"]);
   assert.deepEqual(options.map(o => settingOptionLabel(o, copy.zh)), ["全部场景", "家里", "餐厅", "排队等候", "飞机上", "火车上", "散步途中", "公园", "超市"]);
-  assert.deepEqual(DISCOVER_CATEGORIES.map(c => categoryOptionLabel(c, copy.en)), ["Practical Life", "Language", "Math", "Art & Creativity", "Nature & Culture", "Sensory & Movement"]);
-  assert.deepEqual(DISCOVER_CATEGORIES.map(c => categoryOptionLabel(c, copy.zh)), ["日常生活", "语言", "数学", "艺术与创造", "自然与文化", "感官与运动"]);
+  assert.deepEqual(DISCOVER_CATEGORIES.map(c => categoryOptionLabel(c, copy.en)), ["Practical Life", "Language", "Math", "Art & Creativity", "Music", "Nature & Culture", "Sensory & Movement"]);
+  assert.deepEqual(DISCOVER_CATEGORIES.map(c => categoryOptionLabel(c, copy.zh)), ["日常生活", "语言", "数学", "艺术与创造", "音乐", "自然与文化", "感官与运动"]);
   assert.deepEqual(["All", ...MATERIAL_TYPES].map(o => materialsOptionLabel(o, copy.en)), ["All", "Nothing Needed", "Everyday Items"]);
   assert.deepEqual(["All", ...MATERIAL_TYPES].map(o => materialsOptionLabel(o, copy.zh)), ["全部", "无需材料", "日常物品"]);
   assert.deepEqual([copy.en.setting, copy.en.age, copy.en.category, copy.en.materialsFilter], ["Setting", "Age", "Category", "Materials"]);

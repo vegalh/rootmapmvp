@@ -231,13 +231,15 @@ await step("Music in Activities: search, Category, and Setting + Age + Category 
   assert.ok(await page.eval(`!!document.querySelector(".empty .reset-link")`), "empty state offers Clear filters");
   await search("");
   await pickFilter("Category", "Art & Creativity");
-  assert.equal(await count(".music-card"), total, "every music activity is in Art & Creativity");
-  assert.ok((await count(".activity-card")) > total, "with the art activities");
-  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-card .activity-image span")].every(s => s.textContent.includes("Art & Creativity"))`));
+  assert.equal(await count(".music-card"), 0, "music isn't in Art & Creativity");
+  await pickFilter("Category", "Music");
+  assert.equal(await count(".music-card"), total, "every music activity is in Music");
+  assert.equal(await count(".activity-card"), total, "and only music");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".activity-card .activity-image span")].every(s => s.textContent.includes("Music"))`));
   await pickFilter("Setting", "Park");
   await pickFilter("Materials", "Nothing Needed");
   const n = await count(".activity-card");
-  assert.ok(n > 0 && n === (await count(".music-card")) && n < total, "park + art + nothing needed: the music a parent can sing or call out");
+  assert.ok(n > 0 && n === (await count(".music-card")) && n < total, "park + music + nothing needed: the music a parent can sing or call out");
   await pickFilter("Age", "3–6");
   assert.ok((await count(".music-card")) > 0 && (await count(".music-card")) < n, "age narrows it further");
   await page.eval(`__t.click("Reset", ".reset-link")`); await sleep(150);
@@ -447,7 +449,7 @@ await step("Chinese: tabs, Books search in Chinese, Music labels; then back to E
   await page.eval(`__t.clickSel(".detail-actions button")`); await sleep(200);
   await tab("活动");
   await search("你唱我学");
-  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-image span")].some(s => s.textContent.includes("艺术与创造"))`), "Chinese music search and category");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-image span")].some(s => s.textContent.includes("音乐"))`), "Chinese music search and category");
   await page.eval(`__t.clickSel(".music-card .activity-image")`);
   await page.waitFor(`document.querySelector(".music-detail")`, 3000, "music");
   for (const text of ["玩法介绍", "孩子在探索什么", "标记已尝试"]) assert.ok(await page.eval(`document.body.innerText.includes(${q(text)})`), text);
@@ -484,7 +486,7 @@ await step("Dark mode: the new screens use the dark theme and fit 390px", async 
 
 await step("Every screen shows an activity's current category, in English and Chinese", async () => {
   // Matching Color Caps: learning area Practical Life (shown as "Everyday Life" before), category Sensory & Movement.
-  const LABELS = { en: ["Practical Life", "Language", "Math", "Art & Creativity", "Nature & Culture", "Sensory & Movement"], zh: ["日常生活", "语言", "数学", "艺术与创造", "自然与文化", "感官与运动"] };
+  const LABELS = { en: ["Practical Life", "Language", "Math", "Art & Creativity", "Music", "Nature & Culture", "Sensory & Movement"], zh: ["日常生活", "语言", "数学", "艺术与创造", "音乐", "自然与文化", "感官与运动"] };
   const check = async (lang, expected, old) => {
     await page.eval(`location.hash = "#/activity/matching-color-caps"`);
     await page.waitFor(`document.querySelector(".detail-page .meta")`, 3000, "activity detail");

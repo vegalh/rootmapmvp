@@ -164,7 +164,7 @@ export function musicAsActivity(m: MusicActivity): Activity {
     ageKey: m.ageRanges[0] ?? "",
     area: "Music",
     topic: "",
-    category: "art-creativity",
+    category: "music",
     minutes: m.duration,
     // "Optional" when a parent can just as well sing or call it out (see materialType in data/music.ts).
     materialsLabel: m.song ? "Sing along" : m.materialType === "none" ? "Optional audio guide" : "Audio guide",
@@ -197,7 +197,7 @@ export function findActivity(id: string | undefined): Activity | undefined {
 }
 
 export type CatalogType = "activity" | "music";
-// A catalog entry in the shared activity shape (music is converted with `musicAsActivity`, category Art & Creativity).
+// A catalog entry in the shared activity shape (music is converted with `musicAsActivity`, category Music).
 export type CatalogItem = Activity & { type: CatalogType };
 
 // `extra` spread evenly through `main`, each list keeping its own order: with 61 and 5, one after every ~10. The
@@ -222,7 +222,7 @@ export function catalogItems(): CatalogItem[] {
 
 // The parent-facing categories (Discover's Category filter and Add Activity's chips), in their usual order. `inUse`
 // keeps only categories with activities (filters never offer an empty one, so Math stays hidden until it has some);
-// without it all six are offered (a custom activity's category).
+// without it all of them are offered (a custom activity's category).
 export function catalogCategories({ inUse = false } = {}): DiscoverCategory[] {
   return inUse ? DISCOVER_CATEGORIES.filter(c => catalogItems().some(a => a.category === c)) : DISCOVER_CATEGORIES;
 }
@@ -256,7 +256,7 @@ export function matchesCatalogQuery(a: Activity, query: string): boolean {
 }
 
 // Discover's Category, Setting and Materials filters, in the order they're offered. "All" is the default of each.
-export const DISCOVER_CATEGORIES: DiscoverCategory[] = ["practical-life", "language", "math", "art-creativity", "nature-culture", "sensory-movement"];
+export const DISCOVER_CATEGORIES: DiscoverCategory[] = ["practical-life", "language", "math", "art-creativity", "music", "nature-culture", "sensory-movement"];
 export const ACTIVITY_SETTINGS: ActivitySetting[] = ["home", "restaurant", "waiting", "airplane", "train", "walking", "park", "grocery"];
 export const MATERIAL_TYPES: MaterialType[] = ["none", "everyday"];
 

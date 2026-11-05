@@ -210,10 +210,11 @@ await step("Chinese and dark mode on a phone, and the desktop frame: the recap r
 
 await step("Music: each activity has its own cover", async () => {
   await go("#/discover/music");
-  await page.waitFor(`document.querySelectorAll(".music-card").length === 5`, 3000, "music cards");
-  const covers = await page.eval(`[...document.querySelectorAll(".music-card .activity-image img")].map(i => i.getAttribute("src"))`);
+  // The guided music activities; the songs share the default music cover.
+  await page.waitFor(`document.querySelectorAll(".music-card:not(.song-card)").length === 5`, 3000, "music cards");
+  const covers = await page.eval(`[...document.querySelectorAll(".music-card:not(.song-card) .activity-image img")].map(i => i.getAttribute("src"))`);
   assert.equal(new Set(covers).size, covers.length, covers.join(" "));
-  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card .activity-image img")].every(i => i.complete && i.naturalWidth > 0)`), "covers load");
+  assert.ok(await page.eval(`[...document.querySelectorAll(".music-card:not(.song-card) .activity-image img")].every(i => i.complete && i.naturalWidth > 0)`), "covers load");
 });
 
 await page.close();

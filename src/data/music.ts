@@ -8,7 +8,7 @@ import coverFastAndSlow from "../assets/music/cover-fast-and-slow.svg";
 import coverEchoSong from "../assets/music/cover-echo-song.svg";
 
 // Music activities a parent and child do together, guided by a short recording, followed by the songs (see `songs`
-// at the end). They're listed in Discover > Activities (category Art & Creativity) and open their own page: the audio
+// at the end). They're listed in Discover > Activities (category Music) and open their own page: the audio
 // player for a guided activity, the score, lyrics and Listen button for a song.
 //
 // To add one, append an object with a unique, stable `id` (saved activities, My Week plans and "Mark as Tried"

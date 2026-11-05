@@ -18,7 +18,7 @@ export const copy = {
     noSavedActivities: "Nothing saved yet. Tap the heart on an activity or a collection to save it here.",
     ageAll: "All Ages", natureTopic: "Nature", seasonsTopic: "Seasons", everydayLifeTopic: "At Home", foodPrepTopic: "Food Prep", creativityTopic: "Creativity", sensoryExplorationTopic: "Sensory Exploration", languageDevelopmentTopic: "Language Development",
     setting: "Setting", allSettings: "All Settings", settingHome: "Home", settingRestaurant: "Restaurant", settingWaiting: "Waiting in Line", settingAirplane: "Airplane", settingTrain: "Train", settingWalking: "Walking", settingPark: "Park", settingGrocery: "Grocery Store",
-    category: "Category", categoryPracticalLife: "Practical Life", categoryLanguage: "Language", categoryMath: "Math", categoryArtCreativity: "Art & Creativity", categoryNatureCulture: "Nature & Culture", categorySensoryMovement: "Sensory & Movement",
+    category: "Category", categoryPracticalLife: "Practical Life", categoryLanguage: "Language", categoryMath: "Math", categoryArtCreativity: "Art & Creativity", categoryMusic: "Music", categoryNatureCulture: "Nature & Culture", categorySensoryMovement: "Sensory & Movement",
     materialsFilter: "Materials", materialsNone: "Nothing Needed", materialsEveryday: "Everyday Items",
     noMatchingActivities: "No activities match. Try fewer filters or a different search.", clearFilters: "Clear filters",
     activitiesCount: "activities", lessonsWord: "activities", noRecentObservation: "No recent moment", independentObservation: "A little moment", interestedInLabel: "Interested in:", lastObservationLabel: "Last moment:", notAddedYet: "Not added yet", noObservationsYet: "No moments yet",
@@ -102,7 +102,7 @@ export const copy = {
     noSavedActivities: "还没有收藏任何内容。点一下活动或合集上的心形图标即可收藏。",
     ageAll: "所有年龄", natureTopic: "自然", seasonsTopic: "季节", everydayLifeTopic: "居家", foodPrepTopic: "食物准备", creativityTopic: "创造力", sensoryExplorationTopic: "感官探索", languageDevelopmentTopic: "语言发展",
     setting: "场景", allSettings: "全部场景", settingHome: "家里", settingRestaurant: "餐厅", settingWaiting: "排队等候", settingAirplane: "飞机上", settingTrain: "火车上", settingWalking: "散步途中", settingPark: "公园", settingGrocery: "超市",
-    category: "类别", categoryPracticalLife: "日常生活", categoryLanguage: "语言", categoryMath: "数学", categoryArtCreativity: "艺术与创造", categoryNatureCulture: "自然与文化", categorySensoryMovement: "感官与运动",
+    category: "类别", categoryPracticalLife: "日常生活", categoryLanguage: "语言", categoryMath: "数学", categoryArtCreativity: "艺术与创造", categoryMusic: "音乐", categoryNatureCulture: "自然与文化", categorySensoryMovement: "感官与运动",
     materialsFilter: "所需材料", materialsNone: "无需材料", materialsEveryday: "日常物品",
     noMatchingActivities: "没有符合条件的活动。试试减少筛选条件或换个关键词。", clearFilters: "清除筛选",
     activitiesCount: "个活动", lessonsWord: "个活动", noRecentObservation: "暂无最近的成长点滴", independentObservation: "一个小点滴", interestedInLabel: "感兴趣的内容：", lastObservationLabel: "最近的点滴：", notAddedYet: "尚未添加", noObservationsYet: "还没有成长点滴",
@@ -264,6 +264,7 @@ export function categoryOptionLabel(v: string, t: Copy): string {
     : v === "language" ? t.categoryLanguage
     : v === "math" ? t.categoryMath
     : v === "art-creativity" ? t.categoryArtCreativity
+    : v === "music" ? t.categoryMusic
     : v === "nature-culture" ? t.categoryNatureCulture
     : v === "sensory-movement" ? t.categorySensoryMovement
     : v;

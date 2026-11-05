@@ -15,7 +15,7 @@ test("songs: all 50, in id order, each a music activity with a stable id", () =>
   assert.deepEqual(songs.map(m => m.id), songData.songs.map(s => `song-${s.id}`));
   for (const m of songs) {
     assert.ok(isMusicId(m.id), m.id);
-    assert.equal(findActivity(m.id)?.category, "art-creativity", m.id);
+    assert.equal(findActivity(m.id)?.category, "music", m.id);
     assert.ok(songData.tunes[m.song!.tune as keyof typeof songData.tunes], `${m.id} has its tune`);
     assert.equal(m.song, songData.songs[m.song!.id - 1], `${m.id} keeps its record as supplied`);
   }
