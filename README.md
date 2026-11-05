@@ -118,15 +118,36 @@ To try sign-in and sync against a local or staging Supabase project, copy the re
 src/
   pages/        one file per screen
   components/   shared UI
-  data/         activities, books, music and other built-in content
+  data/         activities, books, music, songs and other built-in content
   lib/          data layer, sync, i18n, dates and other helpers
+  assets/       images and audio (activity photos, book covers, music)
+prompts/        the briefs used to add content (songs, 0–12 month activities)
+docs/           architecture and Shared Child Profiles notes, README images
+design/         the opening animation's original design
 supabase/       database migrations and the verify-photo Edge Function
 ios/            Capacitor iOS project
 tests/          unit, browser and database tests
-docs/           architecture notes and README images
 ```
 
-To add an activity, book or music recording, see the notes in [AGENTS.md](AGENTS.md).
+### Where to find things
+
+| I want to… | Open |
+|---|---|
+| Add or edit an activity (2–6 years) | [src/data/activities.ts](src/data/activities.ts) |
+| Add or edit a 0–12 month activity, or add its photo | [src/data/infantActivities.ts](src/data/infantActivities.ts), photos in `src/assets/activities/infant/` |
+| Add a book or its covers | [src/data/books.ts](src/data/books.ts), covers in `src/assets/books/` |
+| Add a music activity or connect a recording | [src/data/music.ts](src/data/music.ts), audio in `src/assets/music/` |
+| Change a song | [src/data/songs.json](src/data/songs.json) (only as supplied, see [prompts/](prompts/README.md)) |
+| Add a collection (After Work, Nothing to Buy…) | [src/data/collections.ts](src/data/collections.ts) |
+| Change "A Thought for Parents" | [src/data/thoughts.ts](src/data/thoughts.ts) |
+| Change any English or Chinese wording | [src/lib/i18n.ts](src/lib/i18n.ts) |
+| Change a screen | `src/pages/` (one file per screen, e.g. [TodayPage.tsx](src/pages/TodayPage.tsx)) |
+| Change colours or fonts | [src/index.css](src/index.css), Chinese fonts in [src/rootmap-theme.css](src/rootmap-theme.css) |
+| Read a content brief | [prompts/](prompts/README.md) |
+| Understand how data is stored, synced or shared | [docs/](docs/README.md) |
+| Change the database | a **new** file in `supabase/migrations/` (never edit an applied one) |
+
+More detail for each of these is in [AGENTS.md](AGENTS.md).
 
 ## Status
 

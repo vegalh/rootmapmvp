@@ -1,7 +1,7 @@
 import placeholder from "../assets/activities/infant/placeholder.svg";
 import type { Activity, ActivitySetting, DiscoverCategory, MaterialType } from "../types";
 
-// The 0–12 month activities (rootmap-0-12m-activities-prompt.md), listed in Discover after the other activities.
+// The 0–12 month activities (prompts/0-12-month-activities.md), listed in Discover after the other activities.
 // Original RootMap writing. Each is an ordinary Activity, built by `infant()` below so the lines every one of them
 // shares are written once: the direct aim, the universal safety line, the age in months and the materials label.
 //

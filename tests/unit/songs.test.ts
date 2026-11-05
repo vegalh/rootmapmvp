@@ -24,8 +24,8 @@ test("songs: all 50, in id order, each a music activity with a stable id", () =>
   assert.deepEqual([songs[30].title, songs[30].titleZh], ["Little Hands Clap", "小手拍拍"]);
 });
 
-test("songs: the data file is the JSON block of rootmap-songs-prompt.md, unchanged", { skip: !safeRead("rootmap-songs-prompt.md") }, () => {
-  const prompt = safeRead("rootmap-songs-prompt.md")!;
+test("songs: the data file is the JSON block of prompts/songs.md, unchanged", { skip: !safeRead("prompts/songs.md") }, () => {
+  const prompt = safeRead("prompts/songs.md")!;
   const block = prompt.slice(prompt.indexOf("```json", prompt.indexOf("## Song data")) + "```json\n".length);
   assert.equal(readFileSync("src/data/songs.json", "utf8").trimEnd(), block.slice(0, block.indexOf("```")).trimEnd());
 });
