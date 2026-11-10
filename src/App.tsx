@@ -67,7 +67,10 @@ import { musicActivities } from "./data/music";
 import { findActivity, findMusic, isMusicId } from "./lib/catalog";
 import { findShownCollection } from "./lib/collections";
 import type { Collection } from "./data/collections";
-import { buildActivityRecord, planCompletionRecords, problemMessage, type RecordInput } from "./lib/activityRecords";
+import { REMINDER_KEY, REMINDER_OFF, parseReminderTime, type ReminderSetting } from "./lib/platform/reminders";
+import { platform } from "./lib/platform";
+import { IDEA_KEY, NO_ROUTINE, ROUTINES, ROUTINE_KEY, chosenRoutines, type IdeaChoice, type Routine, type RoutineSetting } from "./lib/todayIdeas";
+import { buildActivityRecord, planCompletionRecords, problemMessage, rememberEntries, type RecordInput } from "./lib/activityRecords";
 import { plansTriedBy } from "./lib/plans";
 import { defaultChildId, isActiveChild } from "./lib/children";
 import { localIsoToday } from "./lib/dates";
@@ -228,6 +231,8 @@ export default function App() {
   const [editorReturn, setEditorReturn] = useState<Screen>("observations");
   const [momentsFilter, setMomentsFilter] = useState("All");
   const [toast, setToast] = useState(afterSwitch?.toast ?? "");
+  // The tried records "Want to remember this?" is about (the "remember" sheet).
+  const [remember, setRemember] = useState<{ activityId: string; recordIds: string[] }>();
   // The token of the invitation being opened; "" when there is none. Held outside the address (lib/inviteToken.ts):
   // the address is just #/invite. Never logged.
   const [inviteToken, setInviteToken] = useState(() => (start.screen === "invite" ? pendingInviteToken() ?? "" : ""));
@@ -273,6 +278,11 @@ export default function App() {
   const [lastBackup, setLastBackup] = useSetting<string>(LAST_BACKUP_KEY, "");
   const [lang, setLang] = useSetting<Lang>("rootmap-language", deviceLanguage());
   const [appearance, setAppearance] = useSetting<string>("rootmap-appearance", "light");
+  const [routineSetting, setRoutineSetting] = useSetting<RoutineSetting>(ROUTINE_KEY, NO_ROUTINE);
+  const routines = useMemo(() => chosenRoutines(routineSetting), [routineSetting]);
+  const [reminder, setReminder] = useSetting<ReminderSetting>(REMINDER_KEY, REMINDER_OFF);
+  const [ideaChoice, setIdeaChoice] = useSetting<IdeaChoice>(IDEA_KEY, { date: "", shown: {} });
+  const setRoutines = (next: Routine[]) => setRoutineSetting({ routines: ROUTINES.filter(r => next.includes(r)), answeredAt: new Date().toISOString() });
   const [filters, setFilters] = useSetting<ChildFilters>("rootmap-child-filters", { age: "All Ages", group: "All Groups", recent: "Any Time", sort: "Name A–Z" });
   const [weekFilter, setWeekFilter] = useState("all");
   // The book Wishlist belongs to the family, not to a child (lib/bookshelf.ts).
@@ -682,16 +692,20 @@ export default function App() {
   // Every activity record (Add Activity and Mark as Tried) is built and stored here, through the same builder.
   // Repeat attempts are separate records. Several inputs (Mark as Tried for siblings) are stored in one write, so
   // either all of them are stored or none is. Resolves to an error message, or null once stored.
-  const addActivityRecord = async (...inputs: RecordInput[]) => {
+  const storeActivityRecords = async (inputs: RecordInput[]): Promise<{ error: string } | { added: LessonRecord[] }> => {
     const now = new Date().toISOString();
     const added: LessonRecord[] = [];
     for (const input of inputs) {
       const built = buildActivityRecord(input, newRecordId(input.kind === "tried" ? "t" : "r"), now, activeChildIds);
-      if ("problem" in built) return problemMessage(built.problem, t);
+      if ("problem" in built) return { error: problemMessage(built.problem, t) };
       added.push(built.record);
     }
     const failure = await commitRecords([...added, ...records]);
-    return failure ? storageMessage(failure) : null;
+    return failure ? { error: storageMessage(failure) } : { added };
+  };
+  const addActivityRecord = async (...inputs: RecordInput[]) => {
+    const result = await storeActivityRecords(inputs);
+    return "error" in result ? result.error : null;
   };
   // Corrects a record's date, notes or child. Same id and everything else unchanged (stage, skills and the activity
   // stay as recorded). Resolves to an error message, or null once stored.
@@ -727,7 +741,13 @@ export default function App() {
       const added = planCompletionRecords(plan, records, activeChildIds, date, new Date().toISOString(), () => newRecordId("t"));
       if (added.length && !savedOk(await commitRecords([...added, ...records]))) return;
       if (!savedOk(await commitPlans(plans.map(p => (p.id === plan.id ? { ...p, completed: true, completedDate: date } : p))))) return;
-      setToast(added.length ? t.planCompletedRecorded : t.planCompleted);
+      // The children's tried records for this plan, new or recorded earlier today: offered to keep as a Moment.
+      const tried = [...added, ...records.filter(r => !r.deletedAt && r.kind === "tried" && plan.childIds.includes(r.childId)
+        && (r.planId === plan.id || (r.activityId === plan.activityId && r.date === date)))];
+      const forChildren = writableChildren.map(c => c.id);
+      const offered = [...new Map(tried.filter(r => forChildren.includes(r.childId)).map(r => [r.childId, r])).values()];
+      if (offered.length) offerRemember(plan.activityId, offered);
+      else setToast(added.length ? t.planCompletedRecorded : t.planCompleted);
     } finally {
       completing.current.delete(plan.id);
     }
@@ -743,14 +763,63 @@ export default function App() {
   // too (lib/plans.ts), and each record notes the plan it completed, as My Week's completion does.
   const saveTried = async (childIds: string[], date: string, notes: string) => {
     const done = plansTriedBy(plans, activity.id, childIds, date);
-    const failure = await addActivityRecord(...childIds.map((childId): RecordInput => {
+    const result = await storeActivityRecords(childIds.map((childId): RecordInput => {
       const planId = done.find(p => p.childIds.includes(childId))?.id;
       return { kind: "tried", childId, date, activityId: activity.id, notes, ...(planId ? { planId } : {}) };
     }));
-    if (failure || !done.length) return failure;
-    const ids = new Set(done.map(p => p.id));
-    savedOk(await commitPlans(plans.map(p => (ids.has(p.id) ? { ...p, completed: true, completedDate: date } : p))));
+    if ("error" in result) return result.error;
+    if (done.length) {
+      const ids = new Set(done.map(p => p.id));
+      savedOk(await commitPlans(plans.map(p => (ids.has(p.id) ? { ...p, completed: true, completedDate: date } : p))));
+    }
+    offerRemember(activity.id, result.added);
     return null;
+  };
+
+  // "Want to remember this?": offered after every Mark as Tried (an activity page, a plan on Today or My Week). Saving
+  // keeps a Moment per child, linked to that child's tried record; "Not now" changes nothing.
+  const offerRemember = (activityId: string, tried: LessonRecord[]) => {
+    setRemember({ activityId, recordIds: tried.map(r => r.id) });
+    setModal("remember");
+  };
+  const rememberTried = remember ? records.filter(r => remember.recordIds.includes(r.id)) : [];
+  const saveRemember = async (text: string, photos: string[], enjoyed?: LessonRecord["enjoyed"]) => {
+    const found = findActivity(remember?.activityId);
+    if (!found || !rememberTried.length) return false;
+    if (enjoyed) {
+      const ids = new Set(rememberTried.map(r => r.id));
+      if (!savedOk(await commitRecords(records.map(r => (ids.has(r.id) ? { ...r, enjoyed } : r))))) return false;
+    }
+    const photosByChild = photos.length ? await photosForChildren(rememberTried.map(r => r.childId), photos) : {};
+    if (!photosByChild) { setToast(t.photoCopyFailed); return false; }
+    const now = new Date().toISOString();
+    const created = rememberEntries(rememberTried, { title: localizeActivity(found, t).title, text, photosFor: id => photosByChild[id] ?? [] }, now, () => newRecordId("m"));
+    if (created.length && !(await storeEntries([...created, ...entries]))) { setToast(t.journalStorageFull); return false; }
+    if (created.length) setToast(t.entrySaved);
+    return true;
+  };
+
+  // The daily idea reminder (iOS app only, lib/platform/reminders.ts): one notification a day at the parent's time,
+  // naming their own children. Permission is asked only when the parent turns it on; after that, a new time, a new
+  // child or another language just sets the same reminder again.
+  const reminderText = {
+    title: "RootMap",
+    body: t.reminderBody.replace("{name}", ownChildren.map(c => c.first).join(t.nameJoin) || t.reminderNoName),
+  };
+  useEffect(() => {
+    if (platform.reminders.available && reminder.on) void platform.reminders.reschedule(parseReminderTime(reminder.time), reminderText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminder.on, reminder.time, reminderText.body]);
+  useEffect(() => platform.reminders.onOpen(() => go("today")), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const setReminderOn = async (on: boolean) => {
+    if (!on) {
+      await platform.reminders.disable();
+      setReminder({ ...reminder, on: false });
+      return;
+    }
+    const result = await platform.reminders.enable(parseReminderTime(reminder.time), reminderText);
+    if (result === "on") setReminder({ ...reminder, on: true });
+    else setToast(result === "denied" ? t.reminderDenied : t.reminderFailed);
   };
 
   const closeModal = (destination?: Screen | ModalKind) => {
@@ -833,6 +902,18 @@ export default function App() {
           childrenData={childrenData}
           plans={plans}
           completePlan={plan => void completePlan(plan)}
+          routines={routines}
+          answeredRoutine={!!routineSetting.answeredAt}
+          setRoutines={setRoutines}
+          ideaChoice={ideaChoice}
+          setIdeaChoice={setIdeaChoice}
+          planToday={(activityId, childId) => {
+            if (!isActiveChild(ownChildren, childId) || !findActivity(activityId)) return;
+            haptic("light");
+            setPlans(current => [...current, { id: newRecordId("p"), activityId, date: localIsoToday(), childIds: [childId] }]);
+            setToast(t.addedToToday);
+          }}
+          plannable={ownChildren.map(c => c.id)}
           lang={lang}
           openActivity={openActivity}
           openEntry={id => openEntry(id, "today")}
@@ -954,7 +1035,7 @@ export default function App() {
         />
       );
     }
-    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} profile={profile} deletedCount={deletedChildren.length + deletedShared.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
+    if (screen === "profile") return <ProfilePage go={go} lang={lang} appearance={appearance} routines={routines} reminder={reminder} profile={profile} deletedCount={deletedChildren.length + deletedShared.length} bookshelfCount={bookshelf.items.filter(i => books.some(b => b.id === i.bookId)).length} cloud={cloud} isAdmin={isAdmin} t={t} />;
     if (screen === "admin") return <AdminPage back={() => goBack("profile")} refused={() => setAdminAnswer({ user: adminUser, yes: false })} lang={lang} t={t} />;
     if (screen === "account") return <AccountPage cloud={cloud} back={() => goBack("profile")} signOut={signOut} changePassword={() => go("password")} openImport={importAvailable ? () => go("guestImport") : undefined} t={t} />;
     if (screen === "invite") {
@@ -1253,7 +1334,7 @@ export default function App() {
     }
     // Notes opens from Goals or My Week (the weekAdd modal); its Back returns to whichever one it was. Every
     // other settings screen here (language, appearance, personal, …) opens only from Profile.
-    return <SettingsPage screen={screen} go={go} back={() => goBack(screen === "notes" ? previous : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
+    return <SettingsPage screen={screen} go={go} back={() => goBack(screen === "notes" ? previous : "profile")} lang={lang} setLang={setLang} appearance={appearance} setAppearance={setAppearance} routines={routines} setRoutines={setRoutines} reminder={reminder} setReminderOn={setReminderOn} setReminderTime={time => setReminder({ ...reminder, time })} profile={profile} setProfile={setProfile} notify={setToast} t={t} />;
   };
 
   // An invitation link opened while signed out asks to sign in first (spec §5, §9): the invitation itself is never
@@ -1306,7 +1387,8 @@ export default function App() {
         setPlans={async next => savedOk(await commitPlans(next))}
         selectedChild={selectedChild}
         saveTried={saveTried}
-        addMemory={(childIds, date, notes) => { setModal(null); startEntry("activity", childIds[0], { title: localizeActivity(activity, t).title, date, text: notes || undefined, childIds }); }}
+        remember={remember && findActivity(remember.activityId) ? { activity: findActivity(remember.activityId)!, tried: rememberTried } : undefined}
+        saveRemember={saveRemember}
         notify={setToast}
         t={t}
       />

@@ -1,10 +1,14 @@
+import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
-import { ChildPhoto, PageHeader } from "../components/ui";
+import { ChildPhoto, PageHeader, useConfirm } from "../components/ui";
 import { ChildFilter, EntryChildren, EntryPhotos } from "../components/EntryTimeline";
 import { fmtDayMonth, localIsoToday } from "../lib/dates";
 import { entryText, mergeShared } from "../lib/entries";
 import { photoUrl } from "../lib/photos";
 import { addDays, firstRecapWeek, recapEntries, recapWeekForToday, weekEntries, weekHighlights, weekRange, weekStart } from "../lib/memories";
+import { drawWeekImage, shareMoments, shareNames } from "../lib/shareWeek";
+import { platform } from "../lib/platform";
+import { useSetting } from "../lib/data/hooks";
 import type { Child, Entry, Lang } from "../types";
 import type { Copy } from "../lib/i18n";
 
@@ -45,9 +49,42 @@ export function WeeklyRecapPage({ entries, childrenData, week, setWeek, child, s
   const childOf = (id: string) => childrenData.find(c => c.id === id);
   const childrenOf = (e: Entry) => weekList.childrenOf?.get(e.id) ?? [e.childId];
 
+  // Share: one picture of the week (lib/shareWeek.ts), made ahead so the share sheet opens straight from the tap.
+  // The first time, a note says the picture leaves RootMap once shared.
+  const confirm = useConfirm();
+  const [noteSeen, setNoteSeen] = useSetting<boolean>("rootmap-share-note-seen", false);
+  const [picture, setPicture] = useState<{ key: string; blob: Blob }>();
+  const pictureKey = `${shown}|${forChild}|${lang}|${list.map(e => `${e.id}:${e.updatedAt}`).join()}`;
+  const makePicture = () => drawWeekImage({
+    title: t.shareImageTitle,
+    range: weekRange(shown, lang),
+    names: shareNames([...new Set(list.flatMap(childrenOf))], childrenData, t.nameJoin),
+    moments: shareMoments(list, lang, canShowPhoto),
+    photoUrl,
+  });
+  useEffect(() => {
+    if (!list.length) return;
+    let current = true;
+    makePicture().then(blob => { if (current) setPicture({ key: pictureKey, blob }); }, () => { /* made again on tap */ });
+    return () => { current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pictureKey]);
+  const share = async () => {
+    try {
+      const blob = picture?.key === pictureKey ? picture.blob : await makePicture();
+      await platform.shareImage(`rootmap-week-${shown}.png`, blob, t.shareImageTitle);
+    } catch {
+      // The picture couldn't be made or handed over; nothing left RootMap.
+    }
+  };
+  const askShare = () => {
+    if (noteSeen) { void share(); return; }
+    confirm({ title: t.shareNoteTitle, body: <p>{t.shareNote}</p>, confirmLabel: t.share, onConfirm: () => { setNoteSeen(true); return share(); } });
+  };
+
   return (
     <main className="page-content recap-page">
-      <PageHeader title={t.recapPageTitle} subtitle={t.recapSubtitle} back={back} />
+      <PageHeader title={t.recapPageTitle} subtitle={t.recapSubtitle} back={back} action={list.length ? <button className="recap-share" onClick={askShare}><Icon name="share" size={17} />{t.share}</button> : undefined} />
       {childrenData.length > 1 && <ChildFilter value={forChild} onChange={setChild} childrenData={childrenData} allValue="" t={t} />}
       <nav className="recap-weeks" aria-label={t.recapPageTitle}>
         <button className="icon-button" onClick={() => setWeek(addDays(shown, -7))} disabled={!first || shown <= first} aria-label={t.recapPrevious}><Icon name="back" size={18} /></button>

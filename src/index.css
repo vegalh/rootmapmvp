@@ -212,6 +212,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .child-header-actions button { border: 0; background: transparent; color: var(--primary); font-size: 15px; font-weight: 600; padding: 8px 0; display: flex; align-items: center; }
 .profile-hero { width: 100%; text-align: center; padding: 19px 20px 17px; display: flex; flex-direction: column; align-items: center; }
 .profile-hero > img { display: block; flex: 0 0 auto; width: 88px; height: 88px; margin: 0 auto; border: 4px solid var(--card); border-radius: 50%; object-fit: cover; object-position: center; box-shadow: var(--shadow); }
+.profile-hero .profile-interests { margin: 4px 0 0; font-size: 14.5px; color: var(--text); }.profile-interests em { font-style: normal; color: var(--muted); }
 .profile-hero h1 { margin: 8px 0 0; font: 700 29px var(--font-heading); color: var(--dark-purple); }
 .profile-hero p { margin: 4px 0; font-size: 16px; color: var(--muted); }.profile-hero small { color: var(--muted); font-size: 15px; }
 .tabs { display: grid; grid-template-columns: repeat(3,1fr); padding: 0 14px; border-bottom: 1px solid var(--border); }.tabs button { border: 0; background: transparent; padding: 12px 2px; color: var(--muted); font-size: 15px; position: relative; }.tabs button.active { color: var(--primary); font-weight: 700; }.tabs button.active:after { content:""; position: absolute; bottom: -1px; left: 20%; right: 20%; height: 2px; background: var(--primary); }
@@ -265,6 +266,13 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .plan-activity > span { min-width: 0; flex: 1; }.plan-activity > span strong,.plan-activity > span small { display: block; }.plan-activity > span small { color: var(--muted); font-size: 14px; margin-top: 2px; }
 .picked-activity { border: 1px solid var(--border); margin-bottom: 0; }.picked-activity .text-action { flex: 0 0 auto; }
 .tried-done { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 13px; border-radius: 13px; background: var(--lavender); color: var(--primary); font-size: 15px; font-weight: 700; line-height: 1.4; }.sheet-buttons button:disabled { opacity: .5; }
+/* "Want to remember this?" after Mark as Tried (components/ModalOverlay.tsx RememberSheet). */
+.remember-sheet { display: flex; flex-direction: column; gap: 12px; }.remember-sheet .plan-activity { margin-bottom: 0; }
+.remember-text { width: 100%; min-height: 84px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; line-height: 1.5; resize: vertical; }
+.remember-photos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.remember-photo { position: relative; width: 64px; height: 64px; }.remember-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 11px; display: block; }
+.remember-photo button { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; border: 2px solid var(--bg); border-radius: 50%; background: var(--elevated); color: var(--text); display: grid; place-items: center; padding: 0; }
+.remember-add-photo { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1.5px dashed var(--primary); border-radius: 13px; color: var(--primary); background: var(--lavender); font-size: 15px; font-weight: 700; cursor: pointer; }
 .backup-card p { margin: 10px 0 0; }.backup-card .backup-includes { font-size: 14px; }.backup-card .backup-last { color: var(--text); font-weight: 600; }
 .wide-secondary { width: 100%; min-height: 48px; margin-top: 10px; border: 1.5px solid var(--primary); border-radius: 13px; color: var(--primary); background: var(--card); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 700; cursor: pointer; }
 .backup-card .backup-message { margin-top: 12px; font-size: 14px; line-height: 1.5; }
@@ -398,6 +406,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .moments-week-link { margin: 6px 0 -10px; }
 /* Weekly recap (pages/WeeklyRecapPage.tsx). */
 .recap-page .child-chips { margin-bottom: 4px; }
+.recap-share { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--primary); border-radius: 22px; background: transparent; color: var(--primary); font-size: 15px; font-weight: 700; white-space: nowrap; }
 .recap-weeks { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 6px; margin: 8px 0 16px; }
 .recap-weeks h2 { margin: 0; text-align: center; font: 600 23px var(--font-heading); color: var(--primary); }
 .recap-weeks h2:lang(zh) { font-family: var(--font-heading-zh); font-size: 18px; font-weight: 500; }
@@ -503,8 +512,13 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-eyebrow { margin: 0 0 12px 2px; font: 800 12.5px var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .today-link { display: inline-flex; align-items: center; gap: 2px; color: var(--primary); font-size: 15px; font-weight: 700; }
 .today-feature, .today-memory { width: 100%; display: block; padding: 0; border: 0; color: inherit; text-align: left; transition: transform .15s ease; }
-.today-feature:active, .today-memory:active { transform: scale(.985); }
+.today-memory:active { transform: scale(.985); }
 .today-feature { overflow: hidden; border: 1px solid var(--border); border-radius: 26px; background: var(--card); box-shadow: var(--shadow); }
+.today-feature-open { width: 100%; display: block; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; transition: transform .15s ease; }
+.today-feature-open:active { transform: scale(.985); }
+.today-feature-actions { padding: 0 18px 18px; }
+.today-do { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 14px; background: var(--primary); color: white; font-size: 16px; font-weight: 700; }
+:root[data-theme="dark"] .today-do { color: #17131e; }
 .today-feature-image { position: relative; display: block; aspect-ratio: 4 / 3.3; background: var(--elevated); }
 .today-feature-image img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .today-feature-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 64px 18px 16px; display: flex; flex-direction: column; gap: 2px; color: #fff; background: linear-gradient(to top, rgba(28, 22, 14, .72), rgba(28, 22, 14, 0)); }
@@ -553,6 +567,32 @@ fieldset { border: 0; padding: 0; margin: 0 0 16px; }.stage-choices { display: g
 .today-for button.active, .child-chips button.active { border-color: var(--primary); background: var(--lavender); color: var(--primary); font-weight: 700; }
 .today-feature-child { display: block; margin-bottom: 6px; font-size: 14.5px; font-weight: 700; color: var(--primary); }
 .today-more { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 4px; padding: 0 2px; border: 0; background: transparent; color: var(--primary); font-size: 15px; font-weight: 700; }
+/* "When are you usually together?": asked once on Today (pages/TodayPage.tsx RoutineQuestion). */
+.today-routine { margin-top: 22px; padding: 16px 16px 14px; border-radius: 22px; background: var(--lavender); }
+.today-routine h2 { margin: 0; font: 700 26px/1.15 var(--font-heading); color: var(--dark-purple); }
+.today-routine p { margin: 4px 0 12px; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
+.routine-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.routine-options button { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 22px; background: var(--card); color: var(--text); font-size: 15px; font-weight: 600; }
+.routine-options button.active { border-color: var(--primary); color: var(--primary); font-weight: 700; }
+.routine-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.routine-actions button { min-height: 44px; padding: 0 16px; border: 0; border-radius: 13px; background: transparent; color: var(--primary); font-size: 15px; font-weight: 700; }
+.routine-actions button.primary { background: var(--primary); color: white; }.routine-actions button:disabled { opacity: .5; }
+:root[data-theme="dark"] .routine-actions button.primary { color: #17131e; }
+/* A long value (Our routine) stays on one line beside its label. */
+.menu-section button span { white-space: nowrap; }.menu-section button small { max-width: 170px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.settings-intro { margin: -4px 2px 14px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+/* "Again?" under Today's idea: one small card. */
+.today-again { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
+.today-again-open { width: 100%; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.today-again-open img { width: 56px; height: 56px; border-radius: 13px; object-fit: cover; display: block; background: var(--elevated); }
+.today-again-open small { display: block; font-size: 13px; font-weight: 800; color: var(--orange); }
+.today-again-open strong { display: block; font-size: 15.5px; line-height: 1.4; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.today-again-do { width: 100%; min-height: 44px; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1.5px solid var(--primary); border-radius: 13px; background: transparent; color: var(--primary); font-size: 15px; font-weight: 700; }
+/* "Did Ada enjoy it?" in Want to remember this?: two optional chips. */
+.enjoy-row legend { margin-bottom: 7px; font-size: 15px; font-weight: 700; color: var(--text); }
+.enjoy-row > div { display: flex; gap: 8px; }
+.enjoy-row button { min-height: 44px; padding: 0 16px; border: 1px solid var(--border); border-radius: 22px; background: var(--card); color: var(--text); font-size: 15px; font-weight: 600; }
+.enjoy-row button.active { border-color: var(--primary); background: var(--lavender); color: var(--primary); font-weight: 700; }
 /* The week's Moments, offered to revisit. */
 .today-week { width: 100%; display: block; padding: 16px 16px 18px; border: 1px solid var(--border); border-radius: 24px; background: var(--card); box-shadow: var(--shadow); color: inherit; text-align: left; transition: transform .15s ease; }
 .today-week:active { transform: scale(.985); }

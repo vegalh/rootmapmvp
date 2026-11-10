@@ -1,4 +1,5 @@
 import { webPlatform } from "./web";
+import { nativeReminders, noReminders, type Reminders } from "./reminders";
 
 // The only code that differs between the website and the iOS app (Capacitor). Everything else calls these
 // adapters instead of a browser or native API. See docs/data-architecture-phase2.md, section 2.
@@ -22,6 +23,11 @@ export type Platform = {
   // Hands a file to the parent: a download on the website, the share sheet on iOS. On the website it throws at
   // once if the browser refuses; it cannot tell whether the file was actually saved.
   saveFile(fileName: string, blob: Blob): Promise<void>;
+  // Offers a picture to share: the share sheet where the browser (or the iOS web view) can share files, otherwise a
+  // download. "cancelled" when the parent closed the share sheet.
+  shareImage(fileName: string, blob: Blob, title: string): Promise<"shared" | "saved" | "cancelled">;
+  // The daily idea reminder: iOS app only (reminders.ts); none on the website.
+  reminders: Reminders;
 };
 
 type CapacitorGlobal = { isNativePlatform?: () => boolean; getPlatform?: () => string };
@@ -36,7 +42,8 @@ export function detectPlatform(win: { Capacitor?: CapacitorGlobal } | undefined 
   }
 }
 
-export const platform: Platform = { ...webPlatform(), kind: detectPlatform() };
+const kind = detectPlatform();
+export const platform: Platform = { ...webPlatform(), kind, reminders: kind === "ios" ? nativeReminders() : noReminders };
 
 // Inside the iOS app the page never zooms: a pinch, or tapping a field with text under 16px, would enlarge the whole
 // app and leave it sliding sideways under the finger. The website stays zoomable (accessibility).

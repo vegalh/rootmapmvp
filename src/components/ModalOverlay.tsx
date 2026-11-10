@@ -5,7 +5,9 @@ import { fmtLong, localIsoToday } from "../lib/dates";
 import { addPhoto, photoUrl } from "../lib/photos";
 import { DEFAULT_CHILD_PHOTO } from "../lib/sync/mapping";
 import { newRecordId } from "../lib/data/schema";
-import type { Activity, Child, Lang, ModalKind, Plan, Screen } from "../types";
+import type { Activity, Child, Lang, LessonRecord, ModalKind, Plan, Screen } from "../types";
+
+type Enjoyed = NonNullable<LessonRecord["enjoyed"]>;
 import { categoryOptionLabel, groupOptionLabel, localizeActivity, recentOptionLabel, sortOptionLabel, type Copy } from "../lib/i18n";
 import { childShortName, defaultChildId, isActiveChild } from "../lib/children";
 import { plannedNote } from "../lib/plans";
@@ -18,7 +20,7 @@ export function ModalOverlay({ closing = false, ...props }: OverlayProps & { clo
   return <SheetContext.Provider value={sheet}><ModalSheets {...props} /></SheetContext.Provider>;
 }
 
-function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, addMemory, notify, t }: {
+function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren, setChildrenData, filters, setFilters, selectedActivity, plans, setPlans, selectedChild, saveTried, remember, saveRemember, notify, t }: {
   modal: ModalKind;
   close: (destination?: Screen | ModalKind) => void;
   childrenData: Child[];
@@ -39,8 +41,11 @@ function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren
   saveTried: (childIds: string[], date: string, notes: string) => Promise<string | null>;
   // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
   notify: (message: string) => void;
-  // Opens the Moments editor for `childIds`, prefilled with the selected activity and the note as context.
-  addMemory: (childIds: string[], date: string, notes: string) => void;
+  // "Want to remember this?": the activity just marked as tried and each child's tried record.
+  remember?: { activity: Activity; tried: LessonRecord[] };
+  // Keeps the words and photos as a Moment per child, and whether they enjoyed it on each tried record; resolves to
+  // false (with an error already shown) when not saved.
+  saveRemember: (text: string, photos: string[], enjoyed?: Enjoyed) => Promise<boolean>;
   t: Copy;
 }) {
   const [name, setName] = useState("");
@@ -116,7 +121,12 @@ function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren
   };
 
   if (modal === "tried") {
-    return <TriedSheet activity={selectedActivity} plans={plans} childrenData={writableChildren} preferredChild={selectedChild} saveTried={saveTried} addMemory={addMemory} close={() => close()} t={t} />;
+    return <TriedSheet activity={selectedActivity} plans={plans} childrenData={writableChildren} preferredChild={selectedChild} saveTried={saveTried} close={() => close()} t={t} />;
+  }
+
+  if (modal === "remember") {
+    if (!remember?.tried.length) return null;
+    return <RememberSheet key={remember.tried.map(r => r.id).join()} activity={remember.activity} tried={remember.tried} childrenData={childrenData} save={saveRemember} close={() => close()} t={t} />;
   }
 
   if (modal === "quick") {
@@ -216,7 +226,7 @@ function ModalSheets({ modal, close, childrenData, writableChildren, ownChildren
 
 // "Mark as Tried": a few-second record that one or more children tried this activity (siblings often try it
 // together). Mounted fresh on every open.
-function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, addMemory, close, t }: {
+function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, close, t }: {
   activity: Activity;
   // My Week: an open plan for this activity on the chosen date for a chosen child starts Notes with its note.
   plans: Plan[];
@@ -224,8 +234,8 @@ function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, 
   // always preselected). With several children and none preferred, nobody is.
   preferredChild: string;
   childrenData: Child[];
+  // Once stored, App moves on to "Want to remember this?".
   saveTried: (childIds: string[], date: string, notes: string) => Promise<string | null>;
-  addMemory: (childIds: string[], date: string, notes: string) => void;
   close: () => void;
   t: Copy;
 }) {
@@ -242,7 +252,6 @@ function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, 
   const [typedNotes, setTypedNotes] = useState<string>();
   const notes = typedNotes ?? plannedNote(plans, activity.id, validChosen, date);
   const [error, setError] = useState("");
-  const [savedFor, setSavedFor] = useState<{ childIds: string[]; date: string; notes: string }>();
   // Guards against a double tap storing the same attempt twice before the sheet re-renders.
   const saving = useRef(false);
 
@@ -256,23 +265,8 @@ function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, 
     if (!validChosen.length) { setError(t.chooseChildFirst); return; }
     saving.current = true;
     const failure = await saveTried(validChosen, date, notes.trim());
-    if (failure) { setError(failure); saving.current = false; return; }
-    setSavedFor({ childIds: validChosen, date, notes: notes.trim() });
+    if (failure) { setError(failure); saving.current = false; }
   };
-
-  if (savedFor) {
-    const names = childrenData.filter(c => savedFor.childIds.includes(c.id)).map(c => c.first).join(t.nameJoin);
-    return (
-      <Modal title={t.markAsTried} close={close}>
-        <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{categoryOptionLabel(a.category, t)}</small></span></div>
-        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", names)} · {fmtLong(savedFor.date, t.code as Lang)}</p>
-        <div className="sheet-buttons">
-          <button onClick={() => addMemory(savedFor.childIds, savedFor.date, savedFor.notes)}>{t.addMemory}</button>
-          <button onClick={close}>{t.done}</button>
-        </div>
-      </Modal>
-    );
-  }
 
   return (
     <Modal title={t.markAsTried} close={close}>
@@ -302,6 +296,86 @@ function TriedSheet({ activity, plans, childrenData, preferredChild, saveTried, 
       <div className="sheet-buttons">
         <button onClick={close}>{t.cancel}</button>
         <button onClick={save} disabled={!validChosen.length}>{t.save}</button>
+      </div>
+    </Modal>
+  );
+}
+
+// "Want to remember this?": right after Mark as Tried, a photo or a few words to keep as a Moment for each child
+// (same date, titled with the activity). Optional: "Not now" (or closing) changes nothing. Mounted fresh each time.
+function RememberSheet({ activity, tried, childrenData, save, close, t }: {
+  activity: Activity;
+  tried: LessonRecord[];
+  childrenData: Child[];
+  save: (text: string, photos: string[], enjoyed?: Enjoyed) => Promise<boolean>;
+  close: () => void;
+  t: Copy;
+}) {
+  const a = localizeActivity(activity, t);
+  const [enjoyed, setEnjoyed] = useState<Enjoyed>();
+  const [text, setText] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState("");
+  const saving = useRef(false);
+  const names = childrenData.filter(c => tried.some(r => r.childId === c.id)).map(c => c.first).join(t.nameJoin);
+
+  // Each photo is stored as soon as it's added, as in the Moment editor; the Moment keeps only its id.
+  const addPhotos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setAdding(true);
+    setError("");
+    const results = await Promise.allSettled(Array.from(files).map(f => addPhoto(f)));
+    const reasons = results.flatMap(r => (r.status === "rejected" ? [String((r.reason as Error)?.message)] : []));
+    if (reasons.includes("full")) setError(t.storageFull);
+    else if (reasons.includes("failed")) setError(t.storageFailed);
+    else if (reasons.length) setError(t.photoUnsupported);
+    setPhotos(current => [...current, ...results.flatMap(r => (r.status === "fulfilled" ? [r.value] : []))]);
+    setAdding(false);
+  };
+
+  const canSave = (!!text.trim() || photos.length > 0 || !!enjoyed) && !adding;
+  const submit = async () => {
+    if (saving.current || !canSave) return;
+    saving.current = true;
+    if (await save(text, photos, enjoyed)) close();
+    else saving.current = false;
+  };
+
+  return (
+    <Modal title={t.rememberTitle} close={close}>
+      <div className="sheet-fields remember-sheet">
+        <div className="plan-activity"><img src={a.image} alt="" /><span><strong>{a.title}</strong><small>{categoryOptionLabel(a.category, t)}</small></span></div>
+        <p className="tried-done" role="status"><Icon name="check" size={18} />{t.markedTriedFor.replace("{name}", names)} · {fmtLong(tried[0].date, t.code as Lang)}</p>
+        {/* Optional, and never shown back as a rating or a count. */}
+        <fieldset className="enjoy-row">
+          <legend>{t.enjoyQuestion.replace("{name}", names)}</legend>
+          <div>
+            {(["loved", "not-today"] as const).map(v => (
+              <button key={v} data-enjoyed={v} aria-pressed={enjoyed === v} className={enjoyed === v ? "active" : ""} onClick={() => setEnjoyed(e => (e === v ? undefined : v))}>
+                {v === "loved" ? t.enjoyLoved : t.enjoyNotToday}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <textarea className="remember-text" value={text} onChange={e => setText(e.target.value)} placeholder={t.rememberPlaceholder} rows={3} aria-label={t.rememberTitle} />
+        <div className="remember-photos">
+          {photos.map(p => (
+            <span className="remember-photo" key={p}>
+              <img src={photoUrl(p)} alt="" />
+              <button aria-label={t.removePhoto} onClick={() => setPhotos(current => current.filter(x => x !== p))}><Icon name="close" size={14} /></button>
+            </span>
+          ))}
+          <label className="remember-add-photo">
+            <Icon name="camera" size={18} />{adding ? "…" : t.rememberAddPhoto}
+            <input type="file" accept="image/*" multiple hidden onChange={e => { void addPhotos(e.target.files); e.target.value = ""; }} />
+          </label>
+        </div>
+      </div>
+      {error && <p className="journal-status error" role="alert">{error}</p>}
+      <div className="sheet-buttons">
+        <button onClick={close}>{t.notNow}</button>
+        <button onClick={submit} disabled={!canSave}>{t.save}</button>
       </div>
     </Modal>
   );

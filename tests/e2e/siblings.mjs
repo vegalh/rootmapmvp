@@ -4,7 +4,7 @@ import { HELPERS, launch, sleep } from "./cdp.mjs";
 import { BASE, IMG, tempProfile } from "./env.mjs";
 
 // Siblings, on a phone set to Chinese: the app opens in Chinese (until the parent picks a language); Mark as Tried
-// for several children at once; Add a Memory keeps the note and the children; a Moment for several children is one
+// for several children at once; Want to remember this? keeps the words and photo for both children; a Moment for several children is one
 // card in Moments (All), Kids › Recent moments, and each child's own copy in their Journal; editing one copy splits
 // it off; completing a plan after Mark as Tried adds no second record that day.
 
@@ -116,19 +116,16 @@ await step("Three children: Mark as Tried for two at once stores one record each
 });
 
 let shared;
-await step("Add a Memory keeps the note and both children; with a photo it saves one entry per child, same photos and createdAt", async () => {
-  await page.eval(`__t.click("Add a Memory", ".overlay .sheet-buttons button")`);
-  await page.waitFor(`document.querySelector(".journal-editor .entry-children")`, 3000, "editor with child chips");
-  assert.equal(await textOf(".journal-editor .entry-children legend"), "Who is this moment about?");
-  assert.equal(await page.eval(`document.querySelector(".journal-text-input").value`), "Both loved the bright dots");
-  assert.ok((await page.eval(`document.querySelector(".journal-title-input").value`)).length > 0, "activity title prefilled");
-  assert.deepEqual(await pressed(".journal-editor"), [anan.id, lele.id]);
-  await page.setFiles(".journal-add-photo input[type=file]", [path.join(IMG, "landscape.png")]);
-  await page.waitFor(`document.querySelectorAll(".journal-photos figure").length === 1`, 10000, "photo added");
-  await page.waitFor(`!document.querySelector(".journal-save").disabled`, 3000, "Save enabled");
+await step("Want to remember this? saves one entry per child, same words, photos and createdAt, linked to each child's record", async () => {
+  assert.equal(await textOf(".overlay .bottom-sheet h2"), "Want to remember this?");
+  const triedRecords = (await live("records")).filter(r => r.kind === "tried" && r.activityId === "dotting" && r.date === TODAY);
+  await page.eval(`__t.type(".overlay .remember-text", "Both loved the bright dots")`);
+  await page.setFiles(".remember-add-photo input[type=file]", [path.join(IMG, "landscape.png")]);
+  await page.waitFor(`document.querySelectorAll(".remember-photo").length === 1`, 10000, "photo added");
+  await page.waitFor(`!document.querySelector(".overlay .sheet-buttons button:last-child").disabled`, 3000, "Save enabled");
   const before = await live("entries");
-  await page.eval(`__t.clickSel(".journal-save")`);
-  await page.waitFor(`!document.querySelector(".journal-editor")`, 5000, "editor closed");
+  await saveSheet();
+  await page.waitFor(`!document.querySelector(".overlay")`, 5000, "sheet closed");
 
   shared = (await live("entries")).filter(e => !before.some(b => b.id === e.id));
   assert.equal(shared.length, 2, "one entry per child");
@@ -137,7 +134,10 @@ await step("Add a Memory keeps the note and both children; with a photo it saves
   assert.equal(shared[0].photos.length, 1);
   assert.deepEqual(shared[0].photos, shared[1].photos, "same photos");
   assert.equal(shared[0].createdAt, shared[1].createdAt, "same createdAt");
-  for (const e of shared) { assert.equal(e.text, "Both loved the bright dots"); assert.equal(e.date, TODAY); }
+  for (const e of shared) {
+    assert.equal(e.text, "Both loved the bright dots"); assert.equal(e.date, TODAY); assert.ok(e.title, "activity title");
+    assert.equal(e.recordId, triedRecords.find(r => r.childId === e.childId)?.id, "linked to the child's tried record");
+  }
 });
 
 await step("Moments (All) shows the shared moment once, naming both; a child's filter and each Journal show their own copy", async () => {

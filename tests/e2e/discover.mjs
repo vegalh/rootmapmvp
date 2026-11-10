@@ -289,7 +289,7 @@ await step("Music: save, Add to My Week, Mark as Tried, all through the existing
   const tried = (await live("records")).filter(r => r.kind === "tried" && r.activityId === musicId);
   assert.equal(tried.length, 1);
   assert.equal(tried[0].childId, "emma");
-  await page.eval(`__t.click("Done", ".overlay button")`);
+  await page.eval(`__t.click("Not now", ".overlay button")`);
   await page.waitFor(`!document.querySelector(".overlay")`, 3000, "closed");
 
   await page.eval(`__t.click("Add to My Week", ".sticky-action button")`);

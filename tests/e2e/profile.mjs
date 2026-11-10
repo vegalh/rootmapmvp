@@ -4,7 +4,7 @@ import { BASE, tempProfile, openDemoEraDevice } from "./env.mjs";
 
 // Profile's menu (every row reaches its screen and Back returns to Profile), My Goals (add, edit, complete/reopen,
 // delete with cancel and with confirm, the legacy notes link, empty states), and Settings' static subsections
-// (Personal name/contact, Notifications/Privacy/Help info cards). Language, Appearance, Personal photo upload and
+// (Personal name/contact, Daily idea reminder/Privacy/Help info cards). Language, Appearance, Personal photo upload and
 // the Wishlist row already have thorough coverage in app.mjs and discover.mjs and are not repeated here.
 // Also regression-covers the "nothing saved yet" message added to Profile › Saved Activities and My Week › Saved
 // (previously blank when there was nothing saved at all).
@@ -52,7 +52,7 @@ await step("Profile lists My Activities, Preferences and Account menu sections w
   await nav(NAV.profile);
   const sections = await page.eval(`[...document.querySelectorAll(".menu-section")].map(s => ({ h: s.querySelector("h3").textContent, rows: [...s.querySelectorAll("button span")].map(x => x.textContent) }))`);
   assert.deepEqual(sections[0].rows, ["My Week", "Saved Activities", "Wishlist", "My Goals"]);
-  assert.deepEqual(sections[1].rows, ["Language", "Appearance", "Notification Preferences"]);
+  assert.deepEqual(sections[1].rows, ["Language", "Appearance", "Our routine", "Daily idea reminder"]);
   assert.ok(sections[2].rows.includes("Personal Information"));
   assert.ok(sections[2].rows.includes("Recently Deleted Children"));
   assert.ok(sections[2].rows.includes("Privacy & Data"));
@@ -68,7 +68,8 @@ await step("Every Profile row opens its own screen, and Back returns to Profile"
     ["My Goals", () => page.waitFor(`document.querySelector(".goals-page")`, 3000)],
     ["Language", () => page.waitFor(`document.querySelector(".choice-list")`, 3000)],
     ["Appearance", () => page.waitFor(`document.querySelector(".choice-list")`, 3000)],
-    ["Notification Preferences", () => page.waitFor(`document.querySelector(".info-card")`, 3000)],
+    ["Our routine", () => page.waitFor(`document.querySelector(".choice-list [data-routine]")`, 3000)],
+    ["Daily idea reminder", () => page.waitFor(`document.querySelector(".info-card")`, 3000)],
     ["Personal Information", () => page.waitFor(`document.querySelector(".form-fields")`, 3000)],
     ["Recently Deleted Children", () => page.waitFor(`document.querySelector(".page-header")`, 3000)],
     ["Privacy & Data", () => page.waitFor(`document.querySelector(".info-card")`, 3000)],
@@ -126,11 +127,13 @@ await step("Privacy & Data and Help & Support show their static info text (no Ro
   await back();
 });
 
-await step("Notification Preferences (from Profile) and the direct #/notifications page both say reminders are coming, with different headings", async () => {
+await step("Daily idea reminder (from Profile) says it's in the iOS app on the website; the direct #/notifications page has its own heading", async () => {
   await nav(NAV.profile);
-  await menuRow("Notification Preferences");
+  await menuRow("Daily idea reminder");
   await page.waitFor(`document.querySelector(".info-card")`);
-  assert.equal(await page.eval(`document.querySelector(".info-card h2").textContent`), "Reminders are coming");
+  assert.equal(await page.eval(`document.querySelector(".info-card h2").textContent`), "Daily idea reminder");
+  assert.ok((await page.eval(`document.querySelector(".info-card").innerText`)).includes("Available in the iOS app"));
+  assert.equal(await page.eval(`!!document.querySelector('[role="switch"]')`), false, "nothing to switch on in a browser");
   await back();
   await openLink("#/notifications");
   await page.waitFor(`document.querySelector(".notification-page .info-card")`, 3000, "orphan notifications page");

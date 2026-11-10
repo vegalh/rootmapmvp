@@ -35,6 +35,7 @@ export const BACKUP_KEYS: Record<string, Shape> = {
   "rootmap-appearance": "string",
   "rootmap-seed-version": "number",
   "rootmap-seed-ids": "array",
+  "rootmap-routine": "object",
 };
 
 export type BackupFile = {

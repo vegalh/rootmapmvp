@@ -42,4 +42,21 @@ function saveFile(fileName: string, blob: Blob): Promise<void> {
   return Promise.resolve();
 }
 
-export const webPlatform = (): Omit<Platform, "kind"> => ({ sessionStore: webSessionStore(), saveFile });
+// The share sheet with the picture where files can be shared (Safari, Chrome on phones, the iOS web view), else a
+// download.
+async function shareImage(fileName: string, blob: Blob, title: string): Promise<"shared" | "saved" | "cancelled"> {
+  const file = new File([blob], fileName, { type: blob.type });
+  if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title });
+      return "shared";
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return "cancelled";
+      // Refused (e.g. no user gesture left): fall back to a download.
+    }
+  }
+  await saveFile(fileName, blob);
+  return "saved";
+}
+
+export const webPlatform = (): Omit<Platform, "kind" | "reminders"> => ({ sessionStore: webSessionStore(), saveFile, shareImage });

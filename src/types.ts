@@ -78,6 +78,10 @@ export type LessonRecord = SyncMeta & {
   // My Week: the plan this record completed. Kept on this device to avoid recording one completion twice; not part
   // of the synced columns, so another device sees an ordinary "tried" record.
   planId?: string;
+  // "Did {name} enjoy it?" after Mark as Tried (optional; never shown as a rating or counted). "loved" brings the
+  // activity back on Today ("Again?") and into the child's interests; "not-today" keeps it out of Today's idea for
+  // 14 days (lib/todayIdeas.ts). Kept on this device like `planId`: not part of the synced columns yet.
+  enjoyed?: "loved" | "not-today";
 };
 
 export type Observation = SyncMeta & {
@@ -261,6 +265,9 @@ export type Entry = SyncMeta & {
   fromNotes?: boolean;
   // Original observation this entry was imported from, kept intact (incl. educational metadata) but not shown.
   legacyObservation?: Observation;
+  // The "tried" activity record this Moment was saved from ("Want to remember this?" after Mark as Tried). Kept on
+  // this device like LessonRecord.planId: not part of the synced columns yet.
+  recordId?: string;
 };
 
 // Unsaved editor state, autosaved locally per child + entry (see lib/journalDrafts.ts).
@@ -316,6 +323,8 @@ export type Screen =
   | "appearance"
   | "notifications"
   | "notificationPrefs"
+  // Profile › Preferences › Our routine (lib/todayIdeas.ts).
+  | "routine"
   | "personal"
   | "privacy"
   | "help"
@@ -331,4 +340,5 @@ export type Screen =
   // Change the signed-in parent's password (components/PasswordForm.tsx).
   | "password";
 
-export type ModalKind = "quick" | "filters" | "addChild" | "editChild" | "plan" | "weekAdd" | "tried" | null;
+// "remember": "Want to remember this?", offered after every Mark as Tried (components/ModalOverlay.tsx).
+export type ModalKind = "quick" | "filters" | "addChild" | "editChild" | "plan" | "weekAdd" | "tried" | "remember" | null;

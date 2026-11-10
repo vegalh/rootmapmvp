@@ -4,12 +4,15 @@ import { PageHeader, Field } from "../components/ui";
 import { cloudConfig } from "../lib/cloud/config";
 import { setUsageSharing, usageSharingAvailable, useUsageSharing } from "../lib/analytics/tracker";
 import type { Lang, ProfileInfo, Screen } from "../types";
-import type { Copy } from "../lib/i18n";
+import { routineLabel, type Copy } from "../lib/i18n";
 import { saveSetting } from "../lib/data/hooks";
 import { readSetting } from "../lib/data/store";
 import { addPhoto, photoUrl } from "../lib/photos";
+import { ROUTINES, type Routine } from "../lib/todayIdeas";
+import { platform } from "../lib/platform";
+import type { ReminderSetting } from "../lib/platform/reminders";
 
-export function SettingsPage({ screen, go, back, lang, setLang, appearance, setAppearance, profile, setProfile, notify, t }: {
+export function SettingsPage({ screen, go, back, lang, setLang, appearance, setAppearance, routines, setRoutines, reminder, setReminderOn, setReminderTime, profile, setProfile, notify, t }: {
   screen: Screen;
   go: (s: Screen) => void;
   // Shows a short message in the app's toast (e.g. a photo that couldn't be added).
@@ -19,6 +22,12 @@ export function SettingsPage({ screen, go, back, lang, setLang, appearance, setA
   setLang: (l: Lang) => void;
   appearance: string;
   setAppearance: (v: string) => void;
+  routines: Routine[];
+  setRoutines: (routines: Routine[]) => void;
+  // The daily idea reminder (iOS app only, lib/platform/reminders.ts).
+  reminder: ReminderSetting;
+  setReminderOn: (on: boolean) => void;
+  setReminderTime: (time: string) => void;
   profile: ProfileInfo;
   setProfile: (p: ProfileInfo) => void;
   t: Copy;
@@ -29,7 +38,8 @@ export function SettingsPage({ screen, go, back, lang, setLang, appearance, setA
   const title = screen === "language" ? t.language
     : screen === "appearance" ? t.appearance
     : screen === "notes" ? t.myNotes
-    : screen === "notificationPrefs" ? t.notifications
+    : screen === "notificationPrefs" ? t.reminderTitle
+    : screen === "routine" ? t.ourRoutine
     : screen === "personal" ? t.personal
     : screen === "privacy" ? t.privacy
     : t.help;
@@ -64,17 +74,57 @@ export function SettingsPage({ screen, go, back, lang, setLang, appearance, setA
     );
   }
 
+  // Our routine: any of the moments, or none (Today's Inspiration as before).
+  if (screen === "routine") {
+    return (
+      <main className="simple-page">
+        <PageHeader title={title} back={back} />
+        <p className="settings-intro">{t.routineIntro}</p>
+        <div className="choice-list" role="group" aria-label={t.ourRoutine}>
+          {ROUTINES.map(r => {
+            const on = routines.includes(r);
+            return (
+              <button className={on ? "active" : ""} aria-pressed={on} data-routine={r} onClick={() => setRoutines(on ? routines.filter(x => x !== r) : [...routines, r])} key={r}>
+                <span>{routineLabel(r, t)}</span>{on && <Icon name="check" />}
+              </button>
+            );
+          })}
+        </div>
+      </main>
+    );
+  }
+
   if (screen === "notificationPrefs") {
     return (
       <main className="simple-page">
         <PageHeader title={title} back={back} />
-        {/* Reminders don't exist yet, so there is nothing to switch on or off; the page says so instead of showing
-            switches that would change nothing. */}
-        <div className="info-card">
-          <Icon name="bell" size={28} />
-          <h2>{t.notificationsComingSoonTitle}</h2>
-          <p>{t.notificationsComingSoon}</p>
-        </div>
+        {/* One gentle reminder a day, off until the parent turns it on (permission is asked only then). The website
+            can't send one, so it says where it can. */}
+        {platform.reminders.available ? (
+          <>
+            <div className="usage-switch">
+              <span>
+                <strong id="reminder-label">{t.reminderTitle}</strong>
+                <small>{t.reminderHint}</small>
+              </span>
+              <button role="switch" aria-checked={reminder.on} aria-labelledby="reminder-label" className={reminder.on ? "on" : ""} onClick={() => setReminderOn(!reminder.on)}>
+                <i />
+              </button>
+            </div>
+            {reminder.on && (
+              <div className="form-fields">
+                <Field label={t.reminderTime}><input type="time" value={reminder.time} onChange={e => e.target.value && setReminderTime(e.target.value)} /></Field>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="info-card">
+            <Icon name="bell" size={28} />
+            <h2>{t.reminderTitle}</h2>
+            <p>{t.reminderHint}</p>
+            <p><strong>{t.reminderWebOnly}</strong></p>
+          </div>
+        )}
       </main>
     );
   }

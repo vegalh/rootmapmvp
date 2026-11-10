@@ -300,7 +300,7 @@ await step("18. Mark as Tried still works (stored with uuid id and timestamps)",
   assert.equal(added.length, 1);
   assert.equal(added[0].kind, "tried"); assert.equal(added[0].notes, "Tried again 再试一次");
   assert.ok(/^t-[0-9a-f]{8}-/.test(added[0].id) && added[0].createdAt && added[0].origin === "user");
-  await page.eval(`__t.click("Done")`);
+  await page.eval(`__t.click("Not now")`);
   db = now;
 });
 

@@ -226,7 +226,7 @@ await step("History shows older records, new records and Mark as Tried; never bl
   await page.waitFor(`document.querySelector(".tried-done")`, 3000, "tried saved");
   const tried = (await live("records")).find(r => r.kind === "tried" && r.lesson === title && !recordsBefore.some(x => x.id === r.id));
   assert.ok(tried && tried.childId === childId && tried.area === undefined && tried.stage === undefined, "tried record keeps its shape");
-  await page.eval(`__t.click("Done", ".overlay button")`);
+  await page.eval(`__t.click("Not now", ".overlay button")`);
   await openChild();
   const h = await history();
   assert.ok(h.every(x => x && !x.includes("undefined")), JSON.stringify(h));

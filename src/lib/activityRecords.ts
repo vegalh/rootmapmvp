@@ -2,7 +2,7 @@ import { areaLessons } from "../data/progress";
 import { findActivity, isMusicId } from "./catalog";
 import { fmtShort } from "./dates";
 import { categoryOptionLabel, learningAreaLabel, lessonLabel, localizeActivity, stageLabel, type Copy } from "./i18n";
-import type { Activity, LessonRecord, Plan, Stage } from "../types";
+import type { Activity, Entry, LessonRecord, Plan, Stage } from "../types";
 
 // The one way an activity record is made, whichever screen it comes from: Add Activity (a catalog or a custom
 // activity, with optional stage, notes and skills) and Mark as Tried (kind "tried": a catalog activity, a date
@@ -144,4 +144,16 @@ export function planCompletionRecords(plan: Plan, records: LessonRecord[], activ
     if ("record" in built) out.push(built.record);
   }
   return out;
+}
+
+// "Want to remember this?" after Mark as Tried: one Moment per tried record (each child's own), on the record's date,
+// titled with the activity and linked to the record. Nothing without words or a photo. `photosFor` gives each child
+// their photos (a copy for another family's child, lib/sharedPhotos.ts).
+export function rememberEntries(tried: LessonRecord[], moment: { title: string; text: string; photosFor: (childId: string) => string[] }, now: string, newId: () => string): Entry[] {
+  const text = moment.text.trim();
+  return tried.flatMap(r => {
+    const photos = moment.photosFor(r.childId);
+    if (!text && !photos.length) return [];
+    return [{ id: newId(), childId: r.childId, date: r.date, title: moment.title, ...(text ? { text } : {}), photos, recordId: r.id, createdAt: now, updatedAt: now }];
+  });
 }

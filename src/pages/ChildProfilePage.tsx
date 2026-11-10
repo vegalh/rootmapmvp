@@ -8,6 +8,7 @@ import { matchesQuery, newestFirst } from "../lib/entries";
 import { fmt, fmtLong } from "../lib/dates";
 import { recordView } from "../lib/activityRecords";
 import type { Child, Entry, Lang, LessonRecord } from "../types";
+import { interestsLine } from "../lib/todayIdeas";
 import { childAge, childTabLabel, localizeActivity, noteText, skillLabel, type Copy } from "../lib/i18n";
 import { childOptionLabel } from "../lib/children";
 import { canAddAndEdit, canManage, type Access } from "../lib/childAccess";
@@ -74,6 +75,7 @@ export function ChildProfilePage({ child, childrenData, moveTargets, access, cir
     destructive: true,
     onConfirm: () => latestRemove.current(),
   });
+  const interests = interestsLine(child, records, t);
   return (
     <main className="child-profile">
       <header className="child-header">
@@ -90,6 +92,7 @@ export function ChildProfilePage({ child, childrenData, moveTargets, access, cir
         <ChildPhoto child={child} />
         <h1>{child.first} {child.last}</h1>
         <p>{childAge(child, t)}</p>
+        {interests && <p className="profile-interests"><em>{interests.label}</em> {interests.text}</p>}
       </section>
       {circle}
       <div className="tabs">

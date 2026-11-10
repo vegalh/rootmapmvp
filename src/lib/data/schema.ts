@@ -89,6 +89,15 @@ export const SETTING_SHAPES: Record<string, Shape> = {
   "rootmap-access-notices": "array",
   // Moments where this device's change lost to a concurrent one, not yet looked at (lib/sync/runner.ts). Device-only.
   "rootmap-kept-edits": "array",
+  // "Our routine": when the family is usually together, for Today's idea (lib/todayIdeas.ts). In backups.
+  "rootmap-routine": "object",
+  // "Show me another": which of the day's ideas each child is on (lib/todayIdeas.ts). Device-only.
+  "rootmap-today-idea": "object",
+  // The daily idea reminder (iOS app only, lib/platform): on/off and its time. Device-only: each phone asks for its own
+  // permission.
+  "rootmap-reminder": "object",
+  // Weekly recap › Share: the one-time note about the picture leaving RootMap has been seen. Device-only.
+  "rootmap-share-note-seen": "boolean",
 };
 // Notification toggles ("rootmap-pref-<label>").
 export const PREF_PREFIX = "rootmap-pref-";

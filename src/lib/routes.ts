@@ -44,6 +44,7 @@ const NAMED: Partial<Record<Screen, string>> = {
   appearance: "appearance",
   notifications: "notifications",
   notificationPrefs: "notification-settings",
+  routine: "our-routine",
   personal: "personal",
   privacy: "privacy",
   help: "help",

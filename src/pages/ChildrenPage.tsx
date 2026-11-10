@@ -4,6 +4,7 @@ import { TreeLogo } from "../components/TreeLogo";
 import { fmt } from "../lib/dates";
 import { entryText, mergeShared, newestFirst } from "../lib/entries";
 import { lastTriedLine } from "../lib/activityRecords";
+import { interestsLine } from "../lib/todayIdeas";
 import type { Child, Entry, LessonRecord } from "../types";
 import { childAge, type Copy } from "../lib/i18n";
 import { childOptionLabel, childShortName } from "../lib/children";
@@ -45,14 +46,14 @@ export function ChildrenPage({ notice, childrenData, entries, records, goChild, 
             {childrenData.map(c => {
               const lastObs = latest(c.id);
               const lastTried = lastTriedLine(records, c.id, t);
-              const interests = c.interests?.length ? c.interests.join("、") : t.notAddedYet;
+              const interests = interestsLine(c, records, t);
               return (
                 <button className="child-select-card" onClick={() => goChild(c.id)} key={c.id} aria-label={childOptionLabel(c, childrenData, t)}>
                   <div className="child-select-photo"><ChildPhoto child={c} /></div>
                   <div className="child-select-info">
                     <strong>{childShortName(c, childrenData)}</strong>
                     <span className="child-select-age">{childAge(c, t)}</span>
-                    <p><em>{t.interestedInLabel}</em> {interests}</p>
+                    <p><em>{interests?.label ?? t.interestedInLabel}</em> {interests?.text ?? t.notAddedYet}</p>
                     <p><em>{t.lastObservationLabel}</em> {lastObs ? fmt(lastObs.date, lang) : t.noObservationsYet}</p>
                     {lastTried && <p><em>{t.lastTriedLabel}</em> {lastTried}</p>}
                   </div>
