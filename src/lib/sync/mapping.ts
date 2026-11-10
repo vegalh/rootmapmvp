@@ -20,6 +20,15 @@ export const COLLECTION_OF = Object.fromEntries(Object.entries(TABLE).map(([c, t
 export const SYNC_ORDER: SyncedCollection[] = ["photos", "children", "entries", "records", "plans", "goals", "saved", "savedCollections"];
 export const isSyncedCollection = (c: string): c is SyncedCollection => c in TABLE;
 
+// The daily loop's columns (migration 20261110000100): `activity_records.enjoyed` and `entries.record_id`. Sent and
+// compared only once the server has them, which the runner checks at the start of each sync session
+// (lib/sync/dailyLoop.ts); a server without them never receives them, and the fields stay on the device until it has.
+// Reading is by presence: a row that carries the column sets the field, a row without it leaves the device's value.
+let dailyColumns = false;
+export const setDailyColumns = (on: boolean) => { dailyColumns = on; };
+const DAILY_COLUMNS: Partial<Record<SyncedCollection, string[]>> = { records: ["enjoyed"], entries: ["record_id"] };
+const ENJOYED = ["loved", "not-today"];
+
 // Columns that can't change after insert (sent on insert only).
 export const INSERT_ONLY: Partial<Record<Table, string[]>> = { goals: ["owner_user_id"], photos: ["sha256", "mime_type", "byte_size", "child_id"] };
 
@@ -71,11 +80,11 @@ export function toRow(collection: SyncedCollection, r: Record<string, unknown>, 
     }
     case "records": {
       const x = r as LessonRecord;
-      return { ...base, child_id: x.childId, kind: x.kind === "tried" ? "tried" : "record", activity_id: opt(x.activityId), lesson: x.lesson ?? "", area: opt(x.area), stage: opt(x.stage), date: need(date(x.date), "date"), notes: opt(x.notes), next_steps: opt(x.nextSteps), skills: x.skills ?? [], notes_zh: opt(x.notesZh) };
+      return { ...base, child_id: x.childId, kind: x.kind === "tried" ? "tried" : "record", activity_id: opt(x.activityId), lesson: x.lesson ?? "", area: opt(x.area), stage: opt(x.stage), date: need(date(x.date), "date"), notes: opt(x.notes), next_steps: opt(x.nextSteps), skills: x.skills ?? [], notes_zh: opt(x.notesZh), ...(dailyColumns ? { enjoyed: ENJOYED.includes(x.enjoyed as string) ? x.enjoyed : null } : {}) };
     }
     case "entries": {
       const e = r as Entry;
-      return { ...base, child_id: e.childId, date: need(date(e.date), "date"), title: opt(e.title), text: opt(e.text), text_zh: opt(e.textZh), photo_ids: (e.photos ?? []).filter(isPhotoId), from_notes: !!e.fromNotes, legacy: e.legacyObservation ?? null };
+      return { ...base, child_id: e.childId, date: need(date(e.date), "date"), title: opt(e.title), text: opt(e.text), text_zh: opt(e.textZh), photo_ids: (e.photos ?? []).filter(isPhotoId), from_notes: !!e.fromNotes, legacy: e.legacyObservation ?? null, ...(dailyColumns ? { record_id: opt(e.recordId) } : {}) };
     }
     case "plans": {
       const p = r as Plan;
@@ -109,9 +118,9 @@ export function fromRow(collection: SyncedCollection, row: Row, local: Record<st
       return { ...base, first: row.first, last: row.last, dob: row.dob ?? "", enrolled: row.enrolled ?? "", enrolledZh: und(row.enrolled_zh), lessons: row.lessons ?? 0, group: row.group_name ?? "", photo, notes: und(row.notes), interests: (row.interests as string[]).length || local?.interests ? row.interests : undefined };
     }
     case "records":
-      return { ...base, childId: row.child_id, kind: row.kind === "tried" ? "tried" : undefined, activityId: und(row.activity_id), lesson: row.lesson, area: und(row.area), stage: und(row.stage), date: row.date, notes: und(row.notes), nextSteps: und(row.next_steps), skills: (row.skills as string[]).length || local?.skills ? row.skills : undefined, notesZh: und(row.notes_zh) };
+      return { ...base, childId: row.child_id, kind: row.kind === "tried" ? "tried" : undefined, activityId: und(row.activity_id), lesson: row.lesson, area: und(row.area), stage: und(row.stage), date: row.date, notes: und(row.notes), nextSteps: und(row.next_steps), skills: (row.skills as string[]).length || local?.skills ? row.skills : undefined, notesZh: und(row.notes_zh), ...("enjoyed" in row ? { enjoyed: und(row.enjoyed) } : {}) };
     case "entries":
-      return { ...base, childId: row.child_id, date: row.date, title: und(row.title), text: und(row.text), textZh: und(row.text_zh), photos: row.photo_ids, fromNotes: row.from_notes ? true : undefined, legacyObservation: und(row.legacy) };
+      return { ...base, childId: row.child_id, date: row.date, title: und(row.title), text: und(row.text), textZh: und(row.text_zh), photos: row.photo_ids, fromNotes: row.from_notes ? true : undefined, legacyObservation: und(row.legacy), ...("record_id" in row ? { recordId: und(row.record_id) } : {}) };
     case "plans":
       return { ...base, activityId: row.activity_id, date: row.date, childIds: row.child_ids, note: und(row.note), completed: row.completed ? true : local && "completed" in local ? false : undefined, completedDate: und(row.completed_date), observation: und(row.observation) };
     case "goals":
@@ -128,7 +137,7 @@ export function fromRow(collection: SyncedCollection, row: Row, local: Record<st
 // ISO strings, and only the columns toRow produces.
 export function clientRow(collection: SyncedCollection, row: Row): Row {
   const out: Row = {};
-  const sample = SAMPLE_COLUMNS[collection];
+  const sample = dailyColumns ? [...SAMPLE_COLUMNS[collection], ...(DAILY_COLUMNS[collection] ?? [])] : SAMPLE_COLUMNS[collection];
   for (const k of sample) {
     let v = row[k] === undefined ? null : row[k];
     if (TIMESTAMP_COLUMNS.has(k) && typeof v === "string") v = new Date(v).toISOString();

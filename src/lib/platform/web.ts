@@ -42,8 +42,7 @@ function saveFile(fileName: string, blob: Blob): Promise<void> {
   return Promise.resolve();
 }
 
-// The share sheet with the picture where files can be shared (Safari, Chrome on phones, the iOS web view), else a
-// download.
+// The share sheet with the picture where the browser can share files (Safari and Chrome on phones), else a download.
 async function shareImage(fileName: string, blob: Blob, title: string): Promise<"shared" | "saved" | "cancelled"> {
   const file = new File([blob], fileName, { type: blob.type });
   if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {

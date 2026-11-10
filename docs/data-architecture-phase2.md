@@ -1293,6 +1293,44 @@ The dashboard needs a cloud build with a signed-in admin. It never uses the serv
 
 ---
 
+## 21. The daily loop's shared data
+
+Added 2026-11-10. Migration `20261110000100_daily_loop_sync.sql`, additive only:
+
+| Data | Where | Synced | Backup file |
+|---|---|---|---|
+| "Did {name} enjoy it?" (`LessonRecord.enjoyed`) | `activity_records.enjoyed` (`loved` / `not-today` / null) | yes, with the record (same child-role access) | yes (whole record) |
+| A Moment's tried record (`Entry.recordId`) | `entries.record_id` (plain id, no foreign key) | yes, with the Moment | yes (whole entry) |
+| "Our routine" (setting `rootmap-routine`) | `family_settings` (`family_id`, `key` = `routine`, `value`) | yes, the user's own family only | yes |
+| A plan's completing record (`LessonRecord.planId`) | not on the server | no, device-only by design (avoids completing twice on this device) | yes |
+| Daily idea reminder (`rootmap-reminder`) | not on the server | no, device-only (each phone has its own permission) | no |
+
+**Compatibility.** The client sends and compares `enjoyed` and `record_id` only after it has seen that the server has
+the migration (`lib/sync/dailyLoop.ts` `dailyLoopOnServer`: a `family_settings` select at the start of each sync
+session, repeated every 5 minutes while the answer is no). Against an older server nothing it sends changes, so the
+pre-sharing CI check (`tests/ops/oldSchema.mjs`) is unaffected. A row read without those columns leaves the device's
+value as it is. Older clients against a migrated server neither send the new columns nor erase them: an update only
+writes the columns it names (`tests/db/dailyLoop.test.ts`).
+
+**`record_id` has no foreign key.** Entries sync before records, a record can be deleted while its Moment stays, and
+older Moments have none. For a child shared from another family the id is stored locally as a scoped id, like
+`childId` (`lib/sync/scopes.ts`).
+
+**`family_settings`.** RLS: select, insert and update for members of the row's family (`private.my_family_ids()`,
+i.e. `family_members`; someone who only shares a child with the family has no access); no delete policy; grants
+only on `family_id`, `key`, `value`; `updated_at` and `updated_by` set by a trigger. The routine syncs like the
+profile (`lib/sync/profile.ts`): pull first, adopt the server's value if it changed since this device last saw it,
+otherwise push this device's change; the first change to reach the server wins, without device clocks. A device that
+never answered sends nothing.
+
+**Staging.** Applied to `rootmap-staging` on 2026-11-10 (`supabase db push --linked`, after a data-only dump and a
+dry run listing only this file; 19 local = 19 remote). Checked there, as an existing account inside a transaction that
+was rolled back: own record's `enjoyed` and own Moment's `record_id` writable; another family's record unchanged
+(0 rows); `family_settings` insert for the own family, `updated_by` set by the server, another family's rows
+invisible and not insertable; an unknown `enjoyed` value and any delete refused. Row counts, revisions and change
+numbers were identical before and after. Not yet done on staging: a two-device sync with a real account. No
+production project exists.
+
 ## Sources
 
 Checked on 2026-10-11:

@@ -7,6 +7,8 @@ import { dayHash } from "../../src/lib/memories";
 import { REMINDER_OFF, noReminders, parseReminderTime } from "../../src/lib/platform/reminders";
 import { AGAIN_DAYS, againIdea, childInterests, dayIdeas, doneOrPlannedToday, fewSongs, forAge, IDEA_KEY, lovedInterests, notTodayIds, routineForDay, routinePool, showAnother, shownIdea, todaysIdeas, type Routine } from "../../src/lib/todayIdeas";
 import { SHARE_MOMENTS, shareMoments, shareNames } from "../../src/lib/shareWeek";
+import { dailyLoopOnServer, nextRoutineAction, routineValue } from "../../src/lib/sync/dailyLoop";
+import { clientRow, fromRow, setDailyColumns, toRow } from "../../src/lib/sync/mapping";
 import type { Child, LessonRecord, Plan } from "../../src/types";
 
 // The daily loop (Today's idea → Mark as Tried → a Moment → the weekly recap), lib/todayIdeas.ts and
@@ -237,4 +239,52 @@ test("the share picture: up to 6 moments, a photo when there is one and the firs
   assert.ok(!shown.some(m => m.photo === "hidden"));
   const kids = [{ id: "a", first: "Ada", last: "Lin", dob: "2022-03-01" }, { id: "b", first: "Ben", last: "Lin", dob: "2024-01-01" }, { id: "c", first: "Cy", last: "Lin", dob: "2020-01-01" }] as Child[];
   assert.equal(shareNames(["b", "a"], kids, ", "), "Ada, Ben", "family order, first names, no ages or last names");
+});
+
+// ── Sync: the daily loop's shared data (lib/sync/dailyLoop.ts, mapping.ts) ──────────────────────────────────
+test("new columns go to the server only once it has them; a row without them never erases the device's value", () => {
+  const record = { id: "t-1", childId: "a", lesson: "Pouring", date: "2026-11-09", kind: "tried", activityId: "water-pouring", enjoyed: "loved" };
+  const entry = { id: "m-1", childId: "a", date: "2026-11-09", photos: [], recordId: "t-1" };
+  setDailyColumns(false);
+  assert.equal("enjoyed" in toRow("records", record, { userId: "u" }), false, "an older server never receives it");
+  assert.equal("record_id" in toRow("entries", entry, { userId: "u" }), false);
+  assert.equal("enjoyed" in clientRow("records", { enjoyed: "loved" }), false);
+  // A row from a server without the column keeps what the device has.
+  const back = fromRow("records", toRow("records", record, { userId: "u" }), record);
+  assert.equal(back.enjoyed, "loved");
+  setDailyColumns(true);
+  try {
+    assert.equal(toRow("records", record, { userId: "u" }).enjoyed, "loved");
+    assert.equal(toRow("records", { ...record, enjoyed: undefined }, { userId: "u" }).enjoyed, null);
+    assert.equal(toRow("records", { ...record, enjoyed: "meh" }, { userId: "u" }).enjoyed, null, "only the two answers");
+    assert.equal(toRow("entries", entry, { userId: "u" }).record_id, "t-1");
+    assert.equal(clientRow("entries", { record_id: "t-1" }).record_id, "t-1");
+    // The server's answer wins, including "no answer".
+    assert.equal(fromRow("records", { ...toRow("records", record, { userId: "u" }), enjoyed: null }, record).enjoyed, undefined);
+    assert.equal(fromRow("entries", { ...toRow("entries", entry, { userId: "u" }), record_id: "t-9" }, entry).recordId, "t-9");
+  } finally {
+    setDailyColumns(false);
+  }
+});
+
+test("whether the server has the daily loop: a missing table means no; other errors are retried", async () => {
+  const client = (error: unknown) => ({ from: () => ({ select: () => ({ limit: async () => ({ error }) }) }) }) as never;
+  assert.equal(await dailyLoopOnServer(client(null)), true);
+  assert.equal(await dailyLoopOnServer(client({ code: "PGRST205" })), false);
+  assert.equal(await dailyLoopOnServer(client({ code: "42P01" })), false);
+  await assert.rejects(dailyLoopOnServer(client({ code: "", message: "Failed to fetch" })));
+});
+
+test("Our routine across the family's devices: adopt what changed on the server, else send this device's change", () => {
+  const v = (routines: string[], at: string) => ({ routines, answeredAt: at });
+  const a = v(["cooking"], "1"), b = v(["bedtime"], "2");
+  assert.deepEqual(nextRoutineAction(null, null, null), { kind: "none" }, "nobody has answered");
+  assert.deepEqual(nextRoutineAction(null, null, a), { kind: "push", value: a }, "first answer");
+  assert.deepEqual(nextRoutineAction(a, null, null), { kind: "adopt", value: a }, "a new device takes the family's answer");
+  assert.deepEqual(nextRoutineAction(a, null, b), { kind: "adopt", value: a }, "first sync of a device: the family's answer wins");
+  assert.deepEqual(nextRoutineAction(a, a, b), { kind: "push", value: b }, "only this device changed");
+  assert.deepEqual(nextRoutineAction(b, a, v(["after-dinner"], "3")), { kind: "adopt", value: b }, "both changed: the server's (first) wins");
+  assert.deepEqual(nextRoutineAction(a, a, a), { kind: "none" });
+  assert.equal(routineValue({ routines: [] }), null, "unanswered");
+  assert.deepEqual(routineValue({ routines: ["bedtime", "cooking"], answeredAt: "x" }), { routines: ["cooking", "bedtime"], answeredAt: "x" }, "usual order");
 });

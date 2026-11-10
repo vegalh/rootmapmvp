@@ -58,15 +58,16 @@ class RootMapViewController: CAPBridgeViewController {
     }
 }
 
-// Native touches the web app asks for (src/lib/native.ts): haptic feedback, and the status bar and web view
-// background following the app's light or dark theme.
+// Native touches the web app asks for (src/lib/native.ts): haptic feedback, the status bar and web view background
+// following the app's light or dark theme, and the share sheet for a picture (src/lib/platform/nativeShare.ts).
 @objc(RootMapNativePlugin)
 public class RootMapNativePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "RootMapNativePlugin"
     public let jsName = "RootMapNative"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "haptic", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setAppearance", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setAppearance", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise)
     ]
 
     @objc func haptic(_ call: CAPPluginCall) {
@@ -96,6 +97,36 @@ public class RootMapNativePlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         call.resolve()
+    }
+
+    // Weekly recap › Share: the picture (a base64 PNG) in the system share sheet, as a file named `fileName` so saving
+    // or sending it keeps that name. The temporary file is removed when the sheet closes. Resolves with whether the
+    // parent shared or saved it; rejects only when there is no picture or nothing to present the sheet from.
+    @objc func shareImage(_ call: CAPPluginCall) {
+        guard let base64 = call.getString("data"), let data = Data(base64Encoded: base64), UIImage(data: data) != nil else {
+            call.reject("No picture to share")
+            return
+        }
+        let requested = call.getString("fileName") ?? ""
+        let safeName = requested.range(of: "^[A-Za-z0-9._-]{1,80}\\.png$", options: .regularExpression) != nil ? requested : "RootMap.png"
+        DispatchQueue.main.async { [weak self] in
+            guard let presenter = self?.bridge?.viewController, let view = presenter.view else {
+                call.reject("Nothing to present the share sheet from")
+                return
+            }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(safeName)
+            let item: Any = (try? data.write(to: url, options: .atomic)) != nil ? url : UIImage(data: data) as Any
+            let sheet = UIActivityViewController(activityItems: [item], applicationActivities: nil)
+            // On an iPad the sheet is a popover; centred, without an arrow.
+            sheet.popoverPresentationController?.sourceView = view
+            sheet.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            sheet.popoverPresentationController?.permittedArrowDirections = []
+            sheet.completionWithItemsHandler = { _, completed, _, _ in
+                try? FileManager.default.removeItem(at: url)
+                call.resolve(["shared": completed])
+            }
+            presenter.present(sheet, animated: true)
+        }
     }
 
     // "#rrggbb" → UIColor; nil for anything else.

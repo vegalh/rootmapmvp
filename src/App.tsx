@@ -806,8 +806,12 @@ export default function App() {
     title: "RootMap",
     body: t.reminderBody.replace("{name}", ownChildren.map(c => c.first).join(t.nameJoin) || t.reminderNoName),
   };
+  // Settings belong to the open space (guest or an account), so after switching, a reminder the screen shows as off is
+  // cancelled too: the phone never sends one the parent can't see.
   useEffect(() => {
-    if (platform.reminders.available && reminder.on) void platform.reminders.reschedule(parseReminderTime(reminder.time), reminderText);
+    if (!platform.reminders.available) return;
+    if (reminder.on) void platform.reminders.reschedule(parseReminderTime(reminder.time), reminderText);
+    else void platform.reminders.disable();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminder.on, reminder.time, reminderText.body]);
   useEffect(() => platform.reminders.onOpen(() => go("today")), []); // eslint-disable-line react-hooks/exhaustive-deps

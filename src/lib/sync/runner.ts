@@ -18,7 +18,9 @@ import { isShared, scopedId } from "../data/schema";
 import { familyPhotos, sharedScopes, sharedSyncEnabled, syncScopes, type CleanupLocal, type ScopeBase } from "./scopes";
 import { resetPhotoRetries, syncPhotos, type LocalPhoto, type PhotoLocal } from "./photos";
 import { EMPTY_PROFILE, syncProfile, type ProfileLocal, type ProfileRow } from "./profile";
-import type { SyncedCollection } from "./mapping";
+import { setDailyColumns, type SyncedCollection } from "./mapping";
+import { dailyLoopOnServer, syncRoutine, type RoutineLocal, type RoutineValue } from "./dailyLoop";
+import { NO_ROUTINE, ROUTINE_KEY, type RoutineSetting } from "../todayIdeas";
 import { computeStatus, type SyncPhase, type SyncStatus } from "./status";
 import type { ProfileInfo } from "../../types";
 
@@ -61,6 +63,16 @@ const profileLocal: ProfileLocal = {
   set: next => void write({ settings: [["rootmap-profile", next]] }),
   known: () => readSetting<ProfileRow | null>(PROFILE_KNOWN_KEY, null),
   setKnown: row => void write({ settings: [[PROFILE_KNOWN_KEY, row]] }),
+};
+
+// "Our routine" (dailyLoop.ts): the family's answer, and what this device last knew the server to hold (bookkeeping,
+// never shown or backed up, like PROFILE_KNOWN_KEY).
+const ROUTINE_KNOWN_KEY = "rootmap-routine-known-server";
+const routineLocal: RoutineLocal = {
+  get: () => readSetting<RoutineSetting>(ROUTINE_KEY, NO_ROUTINE),
+  set: next => void write({ settings: [[ROUTINE_KEY, next]] }),
+  known: () => readSetting<RoutineValue | null>(ROUTINE_KNOWN_KEY, null),
+  setKnown: value => void write({ settings: [[ROUTINE_KNOWN_KEY, value]] }),
 };
 
 // Bringing the guest data into the account (guestImport.ts), on this device's stores.
@@ -172,6 +184,10 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
   let timer: number | undefined;
   let failures = 0;
   let sessionCheckedAt = 0;
+  // Whether the server has the daily loop migration (dailyLoop.ts): asked before the first round, and again every few
+  // minutes while it doesn't, so a migration applied while the app is open is picked up without a reload.
+  let daily = false;
+  let dailyCheckedAt = 0;
   let seenOutbox = outboxSignature();
   let seenProfile = profileSignature();
 
@@ -191,6 +207,11 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       if (valid === false) { stopped = true; await signOutHere(); return; }
       if (valid === true) sessionCheckedAt = Date.now();
     }
+    if (!daily && Date.now() - dailyCheckedAt >= SESSION_CHECK_MS) {
+      daily = await dailyLoopOnServer(client);
+      dailyCheckedAt = Date.now();
+      setDailyColumns(daily);
+    }
     const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
     const go = async () => {
       phase = "syncing"; update();
@@ -206,6 +227,8 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
       // The parent's own profile (name/photo/contact): a user-scoped singleton, so it syncs on its own, not
       // through the record-sync engine above.
       await syncProfile(client, userId, profileLocal);
+      // The family's routine: a family-level singleton, synced the same way (only once the server has it).
+      if (daily) await syncRoutine(client, familyId, routineLocal);
       // Then the files of photos whose details are on the server (and downloads of others' photos).
       if (cloudConfig.enabled) {
         // Each family's photo files in its own folder: the user's own, then each shared family's.
@@ -277,6 +300,7 @@ export function startSync({ userId, familyId }: { userId: string; familyId: stri
 
   return () => {
     stopped = true;
+    setDailyColumns(false);
     if (runNow === now) runNow = null;
     if (isRunning(account)) setRunning(null);
     window.clearTimeout(timer);
@@ -293,6 +317,7 @@ const isRunning = (a: { userId: string; familyId: string }) => syncAccount === a
 
 const outboxSignature = () => pendingOutbox().map(e => `${e.key}@${e.seq}`).join("|");
 // What profileLocal.get() currently holds, as a value the "a change happened" watcher below can compare cheaply.
-const profileSignature = () => JSON.stringify(profileLocal.get());
+// The routine is watched with it: both are settings that never reach the outbox.
+const profileSignature = () => JSON.stringify([profileLocal.get(), routineLocal.get()]);
 
 export { allPhotoMetas };

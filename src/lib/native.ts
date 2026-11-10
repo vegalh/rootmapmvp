@@ -1,23 +1,14 @@
 import { platform } from "./platform";
+import { nativePlugin, type Haptic } from "./platform/nativePlugin";
 
 // Native touches for the iOS app: haptic feedback and a status bar that follows the app's theme. On the website
 // every call does nothing. The native side is RootMapNativePlugin in ios/App/App/AppDelegate.swift; @capacitor/core
 // is only loaded inside the app, so the website bundle doesn't carry it.
 
-export type Haptic = "light" | "medium" | "selection" | "success" | "warning" | "error";
+export type { Haptic };
 
-type NativePlugin = {
-  haptic(options: { kind: Haptic }): Promise<void>;
-  setAppearance(options: { dark: boolean; background: string }): Promise<void>;
-};
-
-// Wrapped in an object: a Capacitor plugin proxy answers every property, `then` included, so it must never be the
-// value a promise resolves to.
-let plugin: Promise<{ native: NativePlugin } | null> | undefined;
 function native() {
-  if (platform.kind !== "ios") return null;
-  plugin ??= import("@capacitor/core").then(m => ({ native: m.registerPlugin<NativePlugin>("RootMapNative") }), () => null);
-  return plugin;
+  return platform.kind === "ios" ? nativePlugin() : null;
 }
 
 // A short tap from the Taptic Engine. Use it for meaningful moments (something saved, a choice made, a destructive

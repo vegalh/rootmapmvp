@@ -144,6 +144,27 @@ await step("Kids: Enjoys, from what Mira loved; Profile: Our routine and the dai
   assert.ok(!profile.includes("Coming soon"));
 });
 
+await step("Chinese: the same loop in Chinese words", async () => {
+  await go("#/language");
+  await page.eval(`__t.click("简体中文", ".choice-list button")`);
+  await page.waitFor(`document.documentElement.lang === "zh-CN"`, 3000, "Chinese");
+  await go("#/today");
+  await page.waitFor(`document.querySelector("#today-inspiration")`, 3000, "Today");
+  assert.equal(await textOf("#today-inspiration"), "今晚饭后");
+  await page.eval(`__t.clickSel(".today-do")`);
+  await page.waitFor(`document.querySelector(".today-plan-tried")`, 3000, "planned");
+  await page.eval(`__t.clickSel(".today-plan-tried")`);
+  await page.waitFor(`document.querySelector(".overlay .remember-text")`, 3000, "sheet");
+  assert.equal(await textOf(".overlay .bottom-sheet h2"), "想记下这一刻吗？");
+  assert.equal(await textOf(".enjoy-row legend"), "Mira喜欢吗？");
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll(".enjoy-row button")].map(b => b.innerText)`), ["很喜欢", "今天没兴趣"]);
+  await page.eval(`__t.click("先不用", ".overlay button")`);
+  await page.waitFor(`!document.querySelector(".overlay")`, 3000, "closed");
+  await go("#/moments-week");
+  await page.waitFor(`document.querySelector(".recap-share")`, 3000, "recap");
+  assert.match(await textOf(".recap-share"), /分享/);
+});
+
 await page.close();
 const failedSteps = results.filter(r => r[0] === "FAIL");
 console.log(`\n${results.length - failedSteps.length}/${results.length} passed`);

@@ -67,6 +67,8 @@ function toLocal(collection: string, record: Record<string, unknown>, familyId: 
   if (collection === "photos") return { ...record, familyId };
   const out: Record<string, unknown> = { ...record, id: scopedId(familyId, String(record.id)), familyId };
   if (typeof record.childId === "string") out.childId = scopedId(familyId, record.childId);
+  // A Moment's tried record (Entry.recordId) is in the same family.
+  if (typeof record.recordId === "string") out.recordId = scopedId(familyId, record.recordId);
   return out;
 }
 function toServer(collection: string, record: Record<string, unknown>): Record<string, unknown> {
@@ -74,6 +76,7 @@ function toServer(collection: string, record: Record<string, unknown>): Record<s
   if (collection === "photos") return rest;
   const out: Record<string, unknown> = { ...rest, id: unscope(String(record.id))?.id ?? record.id };
   if (typeof record.childId === "string") out.childId = unscope(record.childId)?.id ?? record.childId;
+  if (typeof record.recordId === "string") out.recordId = unscope(record.recordId)?.id ?? record.recordId;
   return out;
 }
 
