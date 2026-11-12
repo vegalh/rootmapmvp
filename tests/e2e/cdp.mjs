@@ -64,7 +64,10 @@ export class Page {
         if (m.params.type === "warning") this.warnings.push(text);
       }
       if (m.method === "Runtime.exceptionThrown") this.errors.push(`exception: ${m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text}`);
-      if (m.method === "Log.entryAdded" && m.params.entry.level === "error" && !/favicon\.ico/.test(m.params.entry.url || "")) this.errors.push(`log: ${m.params.entry.text} ${m.params.entry.url || ""}`);
+      // The app asks once per sync session whether the server has the daily loop migration (lib/sync/dailyLoop.ts); on
+      // an older server (tests/ops/oldSchema.mjs) that answer is a 404 the browser logs. It's expected, so not an error.
+      const capabilityCheck = /\/rest\/v1\/family_settings\?select=key&limit=0$/.test(m.params.entry?.url || "") && / 40[04] /.test(m.params.entry?.text || "");
+      if (m.method === "Log.entryAdded" && m.params.entry.level === "error" && !/favicon\.ico/.test(m.params.entry.url || "") && !capabilityCheck) this.errors.push(`log: ${m.params.entry.text} ${m.params.entry.url || ""}`);
       if (m.method === "Page.javascriptDialogOpening") {
         // The app asks with its own dialogs; a native alert/confirm/prompt is a regression (step fails on errors).
         this.dialogs.push(m.params.message);

@@ -22,7 +22,7 @@ const guestDump = async () => {
 };
 const welcomeSetting = async () => (await u.dump("rootmap"))?.settings.find(s => s.key === "rootmap-welcome")?.value ?? null;
 // Sign-in, account set-up, and sync reading this (empty) account's family. No data is written to the server.
-const AUTH_ONLY = /^((GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))|PUT \/auth\/v1\/user|(GET|OPTIONS) \/rest\/v1\/(children|entries|activity_records|plans|goals|saved_activities|saved_collections|photos|cloud_migrations))$/;
+const AUTH_ONLY = /^((GET|POST|HEAD|OPTIONS) \/(auth\/v1\/(otp|verify|logout|token|user)|rest\/v1\/(family_members|rpc\/create_family|profiles))|PUT \/auth\/v1\/user|(GET|OPTIONS) \/rest\/v1\/(children|entries|activity_records|plans|goals|saved_activities|saved_collections|photos|cloud_migrations|family_settings))$/;
 
 const email = `parent-${randomUUID()}@example.com`;
 let guestBefore, userId, familyId;
