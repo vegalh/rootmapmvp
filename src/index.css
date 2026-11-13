@@ -177,7 +177,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .saved-filters { margin-bottom: 3px; }
 
 .detail-page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); background: var(--bg); }
-.detail-actions { height: 93px; padding: var(--safe-top) 19px 8px; display: flex; align-items: center; justify-content: space-between; }
+/* Back, save and share stay at the top while the page scrolls under them. The bar itself is see-through and lets
+   touches pass; only its round buttons are solid. */
+.detail-actions { position: sticky; top: 0; z-index: 5; pointer-events: none; height: 93px; padding: var(--safe-top) 19px 8px; display: flex; align-items: center; justify-content: space-between; }
+.detail-actions button { pointer-events: auto; }
 .detail-actions button { width: 34px; height: 34px; border: 0; background: var(--card); color: var(--primary); border-radius: 50%; display: grid; place-items: center; box-shadow: var(--shadow); }
 .detail-actions div { display: flex; gap: 8px; }.detail-actions button.saved { color: var(--orange); }
 .detail-hero { width: calc(100% - 40px); height: 235px; margin: 0 20px; object-fit: cover; border-radius: 20px; box-shadow: var(--shadow); }

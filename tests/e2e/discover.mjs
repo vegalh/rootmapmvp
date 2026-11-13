@@ -545,6 +545,19 @@ await step("Discover: search and filters are still applied after opening an acti
   assert.equal(await count(".reset-link"), 0);
 });
 
+await step("Activity page: Back, save and share stay on screen while the page is scrolled, and Back still works", async () => {
+  await nav(NAV.discover); await tab("Activities");
+  await page.eval(`__t.clickSel(".activity-grid .activity-name")`);
+  await page.waitFor(`document.querySelector(".detail-actions")`, 3000, "activity page");
+  await sleep(400);
+  await page.eval(`window.scrollTo(0, 600)`); await sleep(300);
+  const at = await page.eval(`(() => { const r = document.querySelector(".detail-actions button").getBoundingClientRect(); return { scrolled: window.scrollY, top: r.top, tappable: !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2).closest(".detail-actions button") }; })()`);
+  assert.ok(at.scrolled > 100, `the page scrolled (${at.scrolled})`);
+  assert.ok(at.top >= 0 && at.top < 100 && at.tappable, `Back is on screen and tappable: ${JSON.stringify(at)}`);
+  await page.eval(`__t.clickSel(".detail-actions button")`);
+  await page.waitFor(`document.querySelector(".discover-page")`, 3000, "Discover again");
+});
+
 await page.close();
 const failed = results.filter(r => r[0] === "FAIL");
 console.log(`\n${results.length - failed.length}/${results.length} passed`);
