@@ -43,7 +43,8 @@ export function InviteGate({ children }: { children: ReactNode }) {
   const [wrong, setWrong] = useState(false);
   if (entered) return <>{children}</>;
 
-  const t = words[gateLanguage()];
+  const lang = gateLanguage();
+  const t = words[lang];
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (enterInviteCode(code)) setEntered(true);
@@ -72,7 +73,7 @@ export function InviteGate({ children }: { children: ReactNode }) {
           </label>
           {wrong && <p id="invite-gate-error" role="alert" className="invite-gate-error">{t.wrong}</p>}
           <button className="wide-primary" type="submit" disabled={!code.trim()}>{t.button}</button>
-          <a className="invite-gate-request" href={REQUEST_INVITE_URL}>{t.request}</a>
+          <a className="invite-gate-request" href={REQUEST_INVITE_URL[lang]}>{t.request}</a>
         </form>
       </main>
     </div>

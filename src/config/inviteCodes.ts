@@ -12,5 +12,8 @@ export const INVITE_CODES: readonly string[] = [
   "GROW-2026", // first early-access group. Replace with your own before sharing.
 ];
 
-// Where someone without a code can ask for one.
-export const REQUEST_INVITE_URL = "https://myrootmap.com/#invite";
+// Where someone without a code can ask for one: the Request an invite page on the website, in their language.
+export const REQUEST_INVITE_URL = {
+  en: "https://myrootmap.com/invite/",
+  zh: "https://myrootmap.com/zh/invite/",
+} as const;
