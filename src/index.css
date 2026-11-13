@@ -888,3 +888,13 @@ html[data-page-motion="tab"]::view-transition-old(root), html[data-page-motion="
 .kept-versions ul { list-style: none; margin: 10px 0 0; padding: 0; }
 .kept-versions li + li { margin-top: 10px; }
 .kept-versions li p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* The early-access invite gate (components/InviteGate.tsx): shown before the app on the website */
+.invite-gate { display: grid; place-items: center; padding-top: 30px; }
+.invite-gate .info-card { width: 100%; max-width: 380px; }
+.invite-gate .info-card h2 { margin-top: 10px; }
+.invite-gate .field { margin: 18px 0 0; }
+.invite-gate .field input { text-align: center; letter-spacing: .06em; }
+.invite-gate .info-card p.invite-gate-error { margin-top: 10px; color: var(--danger); font-size: 14px; }
+.invite-gate .wide-primary:disabled { opacity: .55; }
+.invite-gate-request { display: inline-block; margin-top: 16px; color: var(--primary); font-size: 15px; font-weight: 700; text-underline-offset: 3px; }

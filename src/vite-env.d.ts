@@ -4,6 +4,8 @@
 // them the app runs local-only.
 interface ImportMetaEnv {
   readonly VITE_ROOTMAP_CLOUD?: string;
+  // "off" removes the early-access invite gate from a build, "on" shows it on the dev server too (lib/inviteGate.ts).
+  readonly VITE_ROOTMAP_INVITE_GATE?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   readonly VITE_TURNSTILE_SITE_KEY?: string;

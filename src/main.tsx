@@ -7,7 +7,9 @@ import { startCloud } from "./lib/cloud/session";
 import { startSpace } from "./lib/cloud/space";
 import { lockNativeZoom, platform } from "./lib/platform";
 import { startViewportTracking } from "./lib/native";
-import { captureInviteToken } from "./lib/inviteToken";
+import { captureInviteToken, pendingInviteToken } from "./lib/inviteToken";
+import { InviteGate } from "./components/InviteGate";
+import { inviteGateApplies } from "./lib/inviteGate";
 import "./index.css";
 
 // Before anything else: an invitation link's token leaves the address bar (lib/inviteToken.ts).
@@ -18,6 +20,14 @@ startViewportTracking();
 if (platform.kind === "ios") document.documentElement.classList.add("ios-app");
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
+
+// Early access: the website asks for an invite code before the app opens (a soft gate, see lib/inviteGate.ts).
+const gated = inviteGateApplies({
+  production: import.meta.env.PROD,
+  setting: import.meta.env.VITE_ROOTMAP_INVITE_GATE,
+  ios: platform.kind === "ios",
+  openingInvitation: pendingInviteToken() !== null,
+});
 
 // Saved data is loaded (and, once per device, moved from localStorage to IndexedDB) before the first render,
 // so every screen reads it synchronously as before. A signed-in parent's own space opens instead of the guest
@@ -31,7 +41,7 @@ startSpace().then(initData).then(async status => {
   }
   root.render(
     <React.StrictMode>
-      {status.mode === "unavailable" ? <DataUnavailable /> : <App />}
+      {status.mode === "unavailable" ? <DataUnavailable /> : gated ? <InviteGate><App /></InviteGate> : <App />}
     </React.StrictMode>,
   );
   // Restores a signed-in session when this build uses the cloud; does nothing otherwise (the default).
