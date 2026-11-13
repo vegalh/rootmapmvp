@@ -246,8 +246,8 @@ await step("Music in Activities: search, Category, and Setting + Age + Category 
   assert.equal(await count(".activity-card"), all);
   assert.deepEqual(await pills(), ["Setting: All Settings", "Age: All Ages", "Category: All", "Materials: All"]);
   for (const sel of [".music-card img", ".music-card .music-play", ".music-card .heart", ".music-card .activity-facts li"]) assert.ok((await count(sel)) >= total, sel);
-  // Songs have no "Builds" line (no abilities are listed for them); the guided music activities do.
-  assert.ok((await count(".music-card:not(.song-card) .activity-builds")) >= (await count(".music-card:not(.song-card)")), "guided music: Builds");
+  // Cards show the picture, title and facts only: no "Builds" line.
+  assert.equal(await count(".activity-builds"), 0);
   await noOverflow("Activities with music");
 });
 

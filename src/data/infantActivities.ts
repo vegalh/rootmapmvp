@@ -39,7 +39,7 @@ type Entry = {
   materialType?: MaterialType;
   description: string;
   zhDescription: string;
-  // The capacities it builds (the card's "Builds" line shows the first two).
+  // The capacities it builds (shown on the activity's page).
   domains: string[];
   zhDomains: string[];
   materials: string[];

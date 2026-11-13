@@ -99,19 +99,6 @@ export function ageOptionsFor(rangesOfEach: AgeRange[][]): string[] {
   return ["All Ages", ...AGE_RANGES.filter(r => rangesOfEach.some(x => x.includes(r)))];
 }
 
-// What an activity card says the activity builds: the first two abilities among its `domains` (in Chinese from
-// `zh.domains`, which lists the same entries in the same order). Entries that describe the activity rather than an
-// ability are skipped; an activity with none left has no "Builds" line.
-export const DESCRIPTIVE_DOMAINS = ["Food Preparation", "Nature Awareness", "Creativity", "Sequencing"];
-export function buildsDomains(a: Pick<Activity, "domains" | "zh">, lang: Lang): string[] {
-  const zh = lang === "zh" ? a.zh?.domains : undefined;
-  return a.domains
-    .map((d, i) => ({ d, label: zh?.[i] || d }))
-    .filter(x => !DESCRIPTIVE_DOMAINS.includes(x.d))
-    .slice(0, 2)
-    .map(x => x.label);
-}
-
 // The card's age tag: "2–4 yrs" / "2–4岁", "4+ yrs" / "4岁+"; "0–3 mo" / "0–3个月".
 export function ageTagLabel(a: Pick<Activity, "age" | "ageKey">, lang: Lang): string {
   const months = isMonths(a) && a.age.match(/(\d+)\s*[–-]\s*(\d+)/);

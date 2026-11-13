@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { collections } from "../../src/data/collections.ts";
 import { activities } from "../../src/data/activities.ts";
-import { DESCRIPTIVE_DOMAINS, ageTagLabel, buildsDomains, catalogItems, matchesTime, suitableFirst, timeBand } from "../../src/lib/catalog.ts";
+import { ageTagLabel, catalogItems, matchesTime, suitableFirst, timeBand } from "../../src/lib/catalog.ts";
 import { MIN_COLLECTION_SIZE, collectionActivities, collectionImages, findShownCollection, isCollectionShown, shownCollections } from "../../src/lib/collections.ts";
 import { TABLE, fromRow, toRow } from "../../src/lib/sync/mapping.ts";
 import type { Activity, Child } from "../../src/types.ts";
@@ -108,26 +108,6 @@ test("collections: autumn is shown only from September through November", () => 
 test("collections: ids are unique and every one has English and Chinese text", () => {
   assert.equal(new Set(collections.map(c => c.id)).size, collections.length);
   for (const c of collections) assert.ok(c.title && c.subtitle && c.zh.title && c.zh.subtitle, c.id);
-});
-
-test("builds line: the first two abilities, skipping descriptions of the activity", () => {
-  assert.deepEqual(DESCRIPTIVE_DOMAINS, ["Food Preparation", "Nature Awareness", "Creativity", "Sequencing"]);
-  const a = make("x", {
-    domains: ["Food Preparation", "Concentration", "Sequencing", "Fine Motor Coordination", "Independence"],
-    zh: { domains: ["食物准备", "专注力", "顺序感", "精细动作协调", "独立性"] },
-  });
-  assert.deepEqual(buildsDomains(a, "en"), ["Concentration", "Fine Motor Coordination"]);
-  assert.deepEqual(buildsDomains(a, "zh"), ["专注力", "精细动作协调"]);
-  assert.deepEqual(buildsDomains(make("one", { domains: ["Creativity", "Observation"] }), "en"), ["Observation"]);
-  assert.deepEqual(buildsDomains(make("none", { domains: ["Creativity", "Nature Awareness"] }), "en"), [], "no line when nothing is left");
-  // Without a Chinese list the English name is shown.
-  assert.deepEqual(buildsDomains(make("en-only", { domains: ["Balance"] }), "zh"), ["Balance"]);
-  // Nothing excluded ever reaches a card, in either language.
-  for (const item of catalogItems()) {
-    assert.ok(buildsDomains(item, "en").length <= 2);
-    assert.ok(!buildsDomains(item, "en").some(d => DESCRIPTIVE_DOMAINS.includes(d)), item.id);
-    if (item.zh?.domains) assert.ok(!buildsDomains(item, "zh").includes("食物准备"), item.id);
-  }
 });
 
 test("quick facts: age tag and time bands", () => {
