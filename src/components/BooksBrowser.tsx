@@ -5,11 +5,13 @@ import { BookTile } from "./BookCover";
 import { books } from "../data/books";
 import { ageOptionsFor, bookAgeRanges, matchesAge, matchesQuery } from "../lib/catalog";
 import { ageOptionLabel, type Copy } from "../lib/i18n";
+import { useKeptState } from "../lib/keptState";
 
 // Discover > Books: the curated collection, searchable by title and author (English or Chinese) and by age.
 export default function BooksBrowser({ openBook, t }: { openBook: (id: string) => void; t: Copy }) {
-  const [q, setQ] = useState("");
-  const [age, setAge] = useState("All Ages");
+  // Kept while the app is open, so coming back from a book shows the same list.
+  const [q, setQ] = useKeptState("books.q", "");
+  const [age, setAge] = useKeptState("books.age", "All Ages");
   const [ageOpen, setAgeOpen] = useState(false);
   const result = books.filter(b => matchesQuery(q, [b.title, b.titleZh, b.author, b.authorZh]) && matchesAge(bookAgeRanges(b), age));
   return (

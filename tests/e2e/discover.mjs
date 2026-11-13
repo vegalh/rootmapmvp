@@ -518,6 +518,33 @@ await step("Every screen shows an activity's current category, in English and Ch
   await setLang("English", "en");
 });
 
+await step("Discover: search and filters are still applied after opening an activity and going back; Reset clears them", async () => {
+  await nav(NAV.discover); await tab("Activities");
+  const titles = () => page.eval(`[...document.querySelectorAll(".activity-grid .activity-name")].map(b => b.textContent)`);
+  const all = (await titles()).length;
+  await pickFilter("Category", "Music");
+  const before = { pills: await pills(), titles: await titles() };
+  assert.ok(before.titles.length > 0 && before.titles.length < all, "the category narrows the list");
+  const openFirst = async () => {
+    await page.eval(`__t.clickSel(".activity-grid .activity-name")`);
+    await page.waitFor(`!document.querySelector(".discover-page")`, 3000, "activity page");
+  };
+  const backOnDiscover = () => page.waitFor(`document.querySelector(".discover-page .activity-grid")`, 3000, "Discover again");
+  // The page's own Back button, then the browser's.
+  await openFirst();
+  await page.eval(`document.querySelector('button[aria-label="Back"]').click()`);
+  await backOnDiscover();
+  assert.deepEqual({ pills: await pills(), titles: await titles() }, before);
+  await openFirst();
+  await page.eval(`history.back()`);
+  await backOnDiscover();
+  assert.deepEqual({ pills: await pills(), titles: await titles() }, before);
+  // Still one tap to clear.
+  await page.eval(`__t.clickSel(".reset-link")`); await sleep(150);
+  assert.equal((await titles()).length, all);
+  assert.equal(await count(".reset-link"), 0);
+});
+
 await page.close();
 const failed = results.filter(r => r[0] === "FAIL");
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

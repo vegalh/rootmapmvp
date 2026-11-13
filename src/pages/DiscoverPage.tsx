@@ -5,6 +5,7 @@ import BooksBrowser from "../components/BooksBrowser";
 import CollectionCard from "../components/CollectionCard";
 import { ACTIVITY_SETTINGS, MATERIAL_TYPES, activityAgeRanges, ageOptionsFor, ageTagLabel, buildsDomains, catalogCategories, catalogItems, childAgeRanges, durationLabel, filterDiscoverActivities, findMusic, materialsTagLabel, suitableFirst } from "../lib/catalog";
 import { childShortName } from "../lib/children";
+import { useKeptState } from "../lib/keptState";
 import { collectionImages, shownCollections } from "../lib/collections";
 import type { Activity, Child } from "../types";
 import { ageOptionLabel, categoryOptionLabel, localizeActivity, materialsOptionLabel, settingOptionLabel, type Copy } from "../lib/i18n";
@@ -61,11 +62,12 @@ const collections = shownCollections();
 const collectionPictures = collectionImages(collections);
 
 function ActivitiesBrowser({ saved, toggleSaved, open, childrenData, t }: { saved: string[]; toggleSaved: (id: string) => void; open: (id: string) => void; childrenData: Child[]; t: Copy }) {
-  const [q, setQ] = useState("");
-  const [setting, setSetting] = useState("All");
-  const [age, setAge] = useState("All Ages");
-  const [category, setCategory] = useState("All");
-  const [materials, setMaterials] = useState("All");
+  // Search and filters are kept while the app is open, so coming back from an activity shows the same list.
+  const [q, setQ] = useKeptState("discover.q", "");
+  const [setting, setSetting] = useKeptState("discover.setting", "All");
+  const [age, setAge] = useKeptState("discover.age", "All Ages");
+  const [category, setCategory] = useKeptState("discover.category", "All");
+  const [materials, setMaterials] = useKeptState("discover.materials", "All");
   const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
   // Each child's age filter. Suggestions only: every activity stays a tap away.
   const childRanges = childAgeRanges(childrenData);
